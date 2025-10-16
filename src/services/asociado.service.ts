@@ -4,10 +4,11 @@ import {
   AsociadoResponse,
   AsociadoResponseWithMessage,
   ListarAsociadosResponse,
-  FiltrosAsociadoRequest
+  FiltrosAsociadoRequest,
+  AllAsociadosResponse
 } from '@/dto/asociado.dto';
 import { AsociadoValidator } from '@/validators/asociado.validator';
-
+import { AsociadoDAO, AsociadoDAOError } from '@/dao/asociado.dao'; // <-- Importar el DAO
 /**
  * Clase de error personalizada para errores del servicio
  */
@@ -27,9 +28,11 @@ export class AsociadoServiceError extends Error {
  */
 export class AsociadoService {
   private baseUrl: string;
+  private asociadoDAO: AsociadoDAO; // <-- Definición de la propiedad
 
   constructor(baseUrl: string = '/api/asociados') {
     this.baseUrl = baseUrl;
+    this.asociadoDAO = new AsociadoDAO(); // <-- Inicialización de la propiedad
   }
 
   /**
@@ -350,7 +353,47 @@ export class AsociadoService {
       );
     }
   }
+
+
+  /**
+   * Obtiene todos los asociados sin paginación
+   */
+  async obtenerTodos(): Promise<AllAsociadosResponse> {
+    try {
+      // Llama al nuevo método del DAO
+      const asociados = await this.asociadoDAO.listarTodos(); 
+      
+      const data: AsociadoResponse[] = asociados.map(asociado => ({
+          id: asociado.id,
+          nombreCompleto: asociado.nombreCompleto,
+          cedula: asociado.cedula,
+          correo: asociado.correo,
+          telefono: asociado.telefono,
+          ministerio: asociado.ministerio,
+          direccion: asociado.direccion,
+          // Convertir Date a ISO string para el DTO
+          fechaIngreso: asociado.fechaIngreso.toISOString(), 
+          estado: asociado.estado
+      }));
+
+      return {
+        success: true,
+        data: data,
+        message: `Se encontraron ${data.length} asociados.`
+      };
+    } catch (error) {
+      if (error instanceof AsociadoServiceError) {
+        throw error;
+      }
+      throw new AsociadoServiceError(
+        'Error al obtener todos los asociados',
+        500
+      );
+    }
+  }
+
 }
+
 
 // Exportar una instancia singleton del servicio
 export const asociadoService = new AsociadoService();

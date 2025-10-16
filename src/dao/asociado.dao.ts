@@ -418,4 +418,28 @@ export class AsociadoDAO {
       );
     }
   }
+
+/**
+   * Obtiene todos los asociados sin paginación (útil para listas desplegables, etc.).
+   */
+  async listarTodos(): Promise<Asociado[]> {
+    try {
+      const sql = await this.getConnection();
+      
+      const result = await sql`
+        SELECT * FROM asociados
+        ORDER BY nombre_completo
+      `;
+      
+      return result.map((row: any) => this.mapRowToAsociado(row));
+    } catch (error) {
+      throw new AsociadoDAOError(
+        'Error al listar todos los asociados',
+        'DATABASE_ERROR',
+        error
+      );
+    }
+  }
+
+
 }

@@ -83,86 +83,103 @@ export class AsociadoValidator {
     };
   }
 
-  /**
-   * Valida los datos para actualizar un asociado
-   */
-  static validarActualizarAsociado(data: ActualizarAsociadoRequest): { valid: boolean; errors: string[] } {
+/**
+ * Valida los datos para actualizar un asociado existente
+ */
+static validarActualizarAsociado(data: ActualizarAsociadoRequest): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
+    let hasData = false;
 
-    // Validar nombre completo (opcional)
+    // Helper para verificar si al menos un campo tiene datos
+    const checkData = (value: any) => {
+        if (value !== undefined) hasData = true;
+    };
+
+    // Validar nombre completo (si se proporciona)
     if (data.nombreCompleto !== undefined) {
-      if (data.nombreCompleto.trim().length === 0) {
-        errors.push('El nombre completo no puede estar vacío');
-      } else if (data.nombreCompleto.length > 100) {
-        errors.push('El nombre completo no puede exceder 100 caracteres');
-      }
-    }
-
-    // Validar cédula (opcional)
-    if (data.cedula !== undefined) {
-      if (data.cedula.trim().length === 0) {
-        errors.push('La cédula no puede estar vacía');
-      } else if (data.cedula.length > 20) {
-        errors.push('La cédula no puede exceder 20 caracteres');
-      } else if (!/^[0-9-]+$/.test(data.cedula)) {
-        errors.push('La cédula solo puede contener números y guiones');
-      }
-    }
-
-    // Validar correo (opcional)
-    if (data.correo !== undefined) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (data.correo && !emailRegex.test(data.correo)) {
-        errors.push('El formato del correo electrónico no es válido');
-      } else if (data.correo && data.correo.length > 100) {
-        errors.push('El correo no puede exceder 100 caracteres');
-      }
-    }
-
-    // Validar teléfono (requerido)
-    if (data.telefono !== undefined) {
-      if (!data.telefono || data.telefono.trim().length === 0) {
-        errors.push('El número de celular es requerido');
-      } else if (data.telefono.length > 20) {
-        errors.push('El teléfono no puede exceder 20 caracteres');
-      } else {
-        // Limpiar el número para validación (solo dígitos)
-        const cleanPhone = data.telefono.replace(/[\s\-+()]/g, '');
-        
-        // Validar que solo contenga números y algunos caracteres permitidos
-        const phoneRegex = /^[\d\s\-+()]+$/;
-        
-        if (!phoneRegex.test(data.telefono)) {
-          errors.push('El teléfono contiene caracteres no válidos');
-        } else if (cleanPhone.length < 8) {
-          errors.push('El número debe tener al menos 8 dígitos');
+        checkData(data.nombreCompleto);
+        if (data.nombreCompleto.trim().length === 0) {
+            errors.push('El nombre completo no puede estar vacío');
+        } else if (data.nombreCompleto.length > 100) {
+            errors.push('El nombre completo no puede exceder 100 caracteres');
         }
-      }
     }
 
-    // Validar ministerio (opcional)
-    if (data.ministerio !== undefined && data.ministerio && data.ministerio.length > 50) {
-      errors.push('El ministerio no puede exceder 50 caracteres');
+    // Validar cédula (si se proporciona)
+    if (data.cedula !== undefined) {
+        checkData(data.cedula);
+        if (data.cedula.trim().length === 0) {
+            errors.push('La cédula no puede estar vacía');
+        } else if (data.cedula.length > 20) {
+            errors.push('La cédula no puede exceder 20 caracteres');
+        } else if (!/^[0-9-]+$/.test(data.cedula)) {
+            errors.push('La cédula solo puede contener números y guiones');
+        }
     }
 
-    // Validar fecha de ingreso (opcional)
+    // Validar correo (si se proporciona)
+    if (data.correo !== undefined) {
+        checkData(data.correo);
+        const emailRegex = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+        if (data.correo && !emailRegex.test(data.correo)) {
+            errors.push('El formato del correo electrónico no es válido');
+        }
+    }
+
+    // Validar teléfono (si se proporciona)
+    if (data.telefono !== undefined) {
+        checkData(data.telefono);
+        if (data.telefono && !/^[0-9+\s()-]{8,20}$/.test(data.telefono)) {
+            errors.push('El teléfono no es válido');
+        }
+    }
+
+    // Validar dirección (si se proporciona)
+    if (data.direccion !== undefined) {
+        checkData(data.direccion);
+        if (data.direccion && data.direccion.length > 255) {
+            errors.push('La dirección no puede exceder 255 caracteres');
+        }
+    }
+
+    // Validar ministerio (si se proporciona)
+    if (data.ministerio !== undefined) {
+        checkData(data.ministerio);
+        if (data.ministerio && data.ministerio.length > 50) {
+            errors.push('El ministerio no puede exceder 50 caracteres');
+        }
+    }
+    
+    // Validar fecha de ingreso (si se proporciona)
     if (data.fechaIngreso !== undefined) {
-      const fecha = new Date(data.fechaIngreso);
-      if (isNaN(fecha.getTime())) {
-        errors.push('La fecha de ingreso no es válida');
-      }
+        checkData(data.fechaIngreso);
+        if (data.fechaIngreso) {
+            const fecha = new Date(data.fechaIngreso);
+            if (isNaN(fecha.getTime())) {
+                errors.push('La fecha de ingreso no es válida');
+            }
+        }
     }
 
-    // Validar estado (opcional)
-    if (data.estado !== undefined && ![0, 1].includes(data.estado)) {
-      errors.push('El estado debe ser 0 (inactivo) o 1 (activo)');
+    // Validar estado (si se proporciona)
+    if (data.estado !== undefined) {
+        checkData(data.estado);
+        if (![0, 1].includes(data.estado)) {
+            errors.push('El estado debe ser 0 (inactivo) o 1 (activo)');
+        }
     }
+
+    // Si no hay errores, pero tampoco se proporcionó ningún campo para actualizar.
+    if (!hasData && errors.length === 0) {
+        errors.push('No se proporcionó ningún campo para actualizar');
+    }
+
 
     return {
-      valid: errors.length === 0,
-      errors
+        valid: errors.length === 0,
+        errors
     };
-  }
+}
 
   /**
    * Sanitiza los datos de entrada
