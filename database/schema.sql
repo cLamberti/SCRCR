@@ -9,7 +9,7 @@ CREATE TABLE asociados (
     nombre_completo VARCHAR(255) NOT NULL,
     cedula VARCHAR(20) UNIQUE NOT NULL,
     correo VARCHAR(255),
-    telefono VARCHAR(20),
+    telefono VARCHAR(20) NOT NULL,
     ministerio VARCHAR(255),
     direccion TEXT,
     fecha_ingreso TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -20,7 +20,7 @@ CREATE TABLE asociados (
     -- Constraints adicionales
     CONSTRAINT chk_cedula_format CHECK (cedula ~ '^[0-9]{9,20}$'),
     CONSTRAINT chk_correo_format CHECK (correo IS NULL OR correo ~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'),
-    CONSTRAINT chk_telefono_format CHECK (telefono IS NULL OR telefono ~ '^[0-9+\-\s()]{8,20}$')
+    CONSTRAINT chk_telefono_format CHECK (telefono ~ '^(\+?505\s?)?(\(?\d{1,4}\)?\s?)?[\d\s\-]{8,20}$' AND LENGTH(REGEXP_REPLACE(telefono, '[^0-9]', '', 'g')) >= 8)
 );
 
 -- Crear índices para mejorar el rendimiento

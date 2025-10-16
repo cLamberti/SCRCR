@@ -38,12 +38,24 @@ export class AsociadoValidator {
       }
     }
 
-    // Validar teléfono (opcional)
-    if (data.telefono) {
+    // Validar teléfono (requerido)
+    if (!data.telefono || data.telefono.trim().length === 0) {
+      errors.push('El número de celular es requerido');
+    } else {
       if (data.telefono.length > 20) {
         errors.push('El teléfono no puede exceder 20 caracteres');
-      } else if (!/^[0-9+\-\s()]+$/.test(data.telefono)) {
-        errors.push('El teléfono contiene caracteres no válidos');
+      } else {
+        // Limpiar el número para validación (solo dígitos)
+        const cleanPhone = data.telefono.replace(/[\s\-+()]/g, '');
+        
+        // Validar que solo contenga números y algunos caracteres permitidos
+        const phoneRegex = /^[\d\s\-+()]+$/;
+        
+        if (!phoneRegex.test(data.telefono)) {
+          errors.push('El teléfono contiene caracteres no válidos');
+        } else if (cleanPhone.length < 8) {
+          errors.push('El número debe tener al menos 8 dígitos');
+        }
       }
     }
 
@@ -107,12 +119,24 @@ export class AsociadoValidator {
       }
     }
 
-    // Validar teléfono (opcional)
-    if (data.telefono !== undefined && data.telefono) {
-      if (data.telefono.length > 20) {
+    // Validar teléfono (requerido)
+    if (data.telefono !== undefined) {
+      if (!data.telefono || data.telefono.trim().length === 0) {
+        errors.push('El número de celular es requerido');
+      } else if (data.telefono.length > 20) {
         errors.push('El teléfono no puede exceder 20 caracteres');
-      } else if (!/^[0-9+\-\s()]+$/.test(data.telefono)) {
-        errors.push('El teléfono contiene caracteres no válidos');
+      } else {
+        // Limpiar el número para validación (solo dígitos)
+        const cleanPhone = data.telefono.replace(/[\s\-+()]/g, '');
+        
+        // Validar que solo contenga números y algunos caracteres permitidos
+        const phoneRegex = /^[\d\s\-+()]+$/;
+        
+        if (!phoneRegex.test(data.telefono)) {
+          errors.push('El teléfono contiene caracteres no válidos');
+        } else if (cleanPhone.length < 8) {
+          errors.push('El número debe tener al menos 8 dígitos');
+        }
       }
     }
 

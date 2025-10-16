@@ -9,6 +9,25 @@ import { CrearAsociadoRequest } from '@/dto/asociado.dto';
 const asociadoDAO = new AsociadoDAO();
 
 /**
+ * GET /api/asociados - Listar todos los asociados
+ */
+export async function GET() {
+  try {
+    const resultado = await asociadoDAO.obtenerTodos(1, 100);
+    return NextResponse.json({
+      success: true,
+      data: resultado.data,
+      total: resultado.total
+    });
+  } catch (error: any) {
+    return NextResponse.json({
+      success: false,
+      message: error.message
+    }, { status: 500 });
+  }
+}
+
+/**
  * POST /api/asociados - Crear un nuevo asociado
  */
 export async function POST(request: NextRequest) {
