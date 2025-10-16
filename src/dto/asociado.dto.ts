@@ -67,6 +67,15 @@ export interface ListarAsociadosResponse {
 }
 
 /**
+ * DTO para la respuesta de un listado SIN paginación de asociados
+ */
+export interface AllAsociadosResponse {
+  success: boolean;
+  data: AsociadoResponse[];
+  message?: string;
+}
+
+/**
  * DTO para filtros de búsqueda
  */
 export interface FiltrosAsociadoRequest {
