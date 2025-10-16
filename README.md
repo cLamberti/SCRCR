@@ -14,6 +14,12 @@ pnpm dev
 bun dev
 ```
 
+Then commands for dependencies of the proyect
+```bash
+npm install react-icons
+npm install @neondatabase/serverless
+```
+
 and for run tests
 
 ```bash
