@@ -34,8 +34,11 @@ export default function EliminarAsociadosPage() {
     try {
       setLoading(true);
       setMensaje('');
+      console.log('=== CARGANDO LISTA ===');
       const res = await fetch('/api/asociados');
+      console.log('Response status:', res.status);
       const json = await res.json();
+      console.log('Response data:', json);
       if (!res.ok || !json.success) {
         setMensaje(json.message || 'Error al obtener asociados');
         setData([]);
@@ -45,8 +48,12 @@ export default function EliminarAsociadosPage() {
         ...a,
         fechaIngreso: a.fechaIngreso ? new Date(a.fechaIngreso).toISOString() : '',
       }));
+      console.log('Processed rows:', rows);
+      console.log('Total registros:', rows.length);
+      console.log('Estados encontrados:', rows.map(r => ({ id: r.id, estado: r.estado })));
       setData(rows);
     } catch (e) {
+      console.error('Error cargando:', e);
       setMensaje('Error de conexión. Intenta de nuevo.');
       setData([]);
     } finally {
@@ -94,17 +101,35 @@ export default function EliminarAsociadosPage() {
     setMensaje('');
     try {
       const url = `/api/asociados/delete?id=${selectedId}${permanente ? '&permanente=true' : ''}`;
+      console.log('=== INICIANDO ELIMINACIÓN ===');
+      console.log('URL:', url);
+      console.log('Selected ID:', selectedId);
+      console.log('Permanente:', permanente);
+      
       const res = await fetch(url, { method: 'DELETE' });
+      console.log('Response status:', res.status);
+      console.log('Response ok:', res.ok);
+      
       const json = await res.json();
+      console.log('Response JSON:', json);
+      
       if (!res.ok || !json.success) {
+        console.log('Error en la respuesta');
         setMensaje(json.message || 'Error al eliminar el asociado');
         return;
       }
-      setMensaje(json.message || 'Asociado eliminado exitosamente');
+      console.log('Eliminación exitosa');
+      const mensajeExito = permanente 
+        ? 'Asociado eliminado permanentemente'
+        : 'Asociado marcado como eliminado (soft delete)';
+      setMensaje(mensajeExito);
       setSelectedId(null);
+      console.log('Recargando lista...');
       // refrescar lista para que desaparezca el registro (o pase a inactivo)
       await cargar();
+      console.log('Lista recargada');
     } catch (e) {
+      console.error('Error en eliminación:', e);
       setMensaje('Error de conexión al eliminar.');
     } finally {
       setLoading(false);
@@ -226,7 +251,7 @@ export default function EliminarAsociadosPage() {
                     </tr>
                   ) : filtrados.length > 0 ? (
                     filtrados.map((r) => (
-                      <tr key={r.id} className={`border-t ${selectedId === r.id ? 'bg-blue-50' : ''}`}>
+                      <tr key={r.id} className={`border-t ${selectedId === r.id ? 'bg-blue-50' : ''} ${r.estado === 0 ? 'bg-red-50 opacity-75' : ''}`}>
                         <td className="p-2">
                           <input
                             type="radio"
@@ -236,11 +261,19 @@ export default function EliminarAsociadosPage() {
                           />
                         </td>
                         <td className="p-2">{r.id}</td>
-                        <td className="p-2">{r.nombreCompleto}</td>
+                        <td className={`p-2 ${r.estado === 0 ? 'line-through text-gray-500' : ''}`}>{r.nombreCompleto}</td>
                         <td className="p-2">{r.cedula}</td>
                         <td className="p-2">{r.telefono || '-'}</td>
                         <td className="p-2">{r.ministerio || '-'}</td>
-                        <td className="p-2">{r.estado === 1 ? 'Activo' : 'Inactivo'}</td>
+                        <td className="p-2">
+                          <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                            r.estado === 1 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {r.estado === 1 ? 'Activo' : 'Eliminado'}
+                          </span>
+                        </td>
                       </tr>
                     ))
                   ) : (
@@ -254,16 +287,22 @@ export default function EliminarAsociadosPage() {
 
             {/* Controles de eliminación */}
             <div className="mt-4 flex flex-col md:flex-row items-start md:items-center gap-4 justify-between">
-              <div className="flex items-center gap-2">
-                <input
-                  id="permanente"
-                  type="checkbox"
-                  checked={permanente}
-                  onChange={(e) => setPermanente(e.target.checked)}
-                />
-                <label htmlFor="permanente" className="text-sm text-gray-700">
-                  Eliminación permanente (hard delete)
-                </label>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    id="permanente"
+                    type="checkbox"
+                    checked={permanente}
+                    onChange={(e) => setPermanente(e.target.checked)}
+                  />
+                  <label htmlFor="permanente" className="text-sm text-gray-700">
+                    Eliminación permanente (hard delete)
+                  </label>
+                </div>
+                <div className="text-xs text-gray-500 max-w-md">
+                  <strong>Sin marcar:</strong> Marca como "Eliminado" (se puede recuperar)<br/>
+                  <strong>Marcado:</strong> Elimina permanentemente de la base de datos
+                </div>
               </div>
 
               <div className="flex items-center gap-3">
