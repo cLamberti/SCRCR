@@ -88,3 +88,21 @@ export interface FiltrosAsociadoRequest {
   page?: number;
   limit?: number;
 }
+
+/**
+ * DTO para eliminar (delete) un asociado
+ */
+export interface DeleteAsociadoRequest {
+  id: number; // ID del asociado a eliminar
+  permanente?: boolean; // Si es true, se elimina definitivamente (hard delete)
+}
+
+/**
+ * DTO para respuesta de eliminación de asociado
+ */
+export interface DeleteAsociadoResponse {
+  success: boolean;
+  message: string;
+  id?: number; // ID eliminado (opcional)
+  permanente?: boolean; // Indica si fue hard delete
+}

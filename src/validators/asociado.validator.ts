@@ -209,3 +209,95 @@ static validarActualizarAsociado(data: ActualizarAsociadoRequest): { valid: bool
     return sanitized;
   }
 }
+
+export class ConsultaAsociadoValidator {
+  static validarFiltros(input: {
+    nombreCompleto?: string;
+    cedula?: string;
+    estado?: string | number;
+    page?: string | number;
+    limit?: string | number;
+  }): { valid: boolean; errors: string[]; filtros: {
+    nombreCompleto?: string;
+    cedula?: string;
+    estado?: number;
+    page: number;
+    limit: number;
+  } } {
+    const errors: string[] = [];
+    const filtros: any = {};
+
+    // nombreCompleto (opcional)
+    if (input.nombreCompleto !== undefined) {
+      const n = String(input.nombreCompleto).trim();
+      if (n.length > 0 && n.length < 2) {
+        errors.push('El nombre completo debe tener al menos 2 caracteres');
+      } else if (n.length > 0) {
+        filtros.nombreCompleto = n;
+      }
+    }
+
+    // cedula (opcional)
+    if (input.cedula !== undefined) {
+      const c = String(input.cedula).trim();
+      if (c.length > 0) {
+        if (!/^[0-9-]+$/.test(c)) {
+          errors.push('La cédula solo puede contener números y guiones');
+        } else {
+          filtros.cedula = c;
+        }
+      }
+    }
+
+    // estado (opcional: 0 | 1)
+    if (input.estado !== undefined && String(input.estado).length > 0) {
+      const e = Number(input.estado);
+      if (![0, 1].includes(e)) {
+        errors.push('El estado debe ser 0 (inactivo) o 1 (activo)');
+      } else {
+        filtros.estado = e;
+      }
+    }
+
+    // paginación (opcionales con defaults)
+    const p = Number(input.page ?? 1);
+    const l = Number(input.limit ?? 10);
+    if (!Number.isFinite(p) || p < 1) errors.push('El page debe ser un número mayor o igual a 1');
+    if (!Number.isFinite(l) || l < 1 || l > 100) errors.push('El limit debe estar entre 1 y 100');
+
+    filtros.page = Number.isFinite(p) && p >= 1 ? p : 1;
+    filtros.limit = Number.isFinite(l) && l >= 1 && l <= 100 ? l : 10;
+
+    return { valid: errors.length === 0, errors, filtros };
+  }
+}
+
+export class DeleteAsociadoValidator {
+  static validar(input: { id?: string | number; permanente?: string | boolean }): {
+    valid: boolean;
+    errors: string[];
+    id?: number;
+    permanente: boolean;
+  } {
+    const errors: string[] = [];
+
+    // ID: requerido, numérico y > 0
+    const rawId = input.id;
+    const idNum = Number(rawId);
+    if (!rawId || Number.isNaN(idNum) || idNum <= 0) {
+      errors.push('El ID debe ser un número');
+    }
+
+    // permanente: opcional; aceptamos 'true' | true como verdadero
+    const permanente =
+      input.permanente === true ||
+      String(input.permanente).toLowerCase() === 'true';
+
+    return {
+      valid: errors.length === 0,
+      errors,
+      id: errors.length === 0 ? idNum : undefined,
+      permanente,
+    };
+  }
+}
