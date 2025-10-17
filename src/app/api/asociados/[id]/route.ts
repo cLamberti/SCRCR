@@ -1,5 +1,5 @@
 /**
- * Controller para buscar un asociado por ID
+ * Controller para actualizar un asociado
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { AsociadoDAO } from '@/dao/asociado.dao';
@@ -9,17 +9,14 @@ import { ActualizarAsociadoRequest } from '@/dto/asociado.dto';
 const asociadoDAO = new AsociadoDAO();
 
 /**
- * GET /api/asociados/[id] - Obtener un asociado por ID
+ * PUT /api/asociados/update - Actualizar un asociado
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(request: NextRequest) {
   try {
-    const { id } = await params;
-    const asociadoId = parseInt(id);
+    const url = new URL(request.url);
+    const id = url.searchParams.get('id');
 
-    if (isNaN(asociadoId)) {
+    if (!id || isNaN(parseInt(id))) {
       return NextResponse.json(
         {
           success: false,
@@ -30,65 +27,11 @@ export async function GET(
       );
     }
 
-    const asociado = await asociadoDAO.obtenerPorId(asociadoId);
-
-    if (!asociado) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: 'Asociado no encontrado',
-          errors: ['No existe un asociado con este ID']
-        },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      data: asociado,
-      message: 'Asociado obtenido exitosamente'
-    });
-  } catch (error: any) {
-    console.error('Error al obtener asociado:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        message: error.message || 'Error al obtener el asociado',
-        errors: [error.message]
-      },
-      { status: 500 }
-    );
-  }
-}
-
-/**
- * PUT /api/asociados/[id] - Actualizar un asociado
- */
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
     const asociadoId = parseInt(id);
-
-    if (isNaN(asociadoId)) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: 'ID de asociado inválido',
-          errors: ['El ID debe ser un número']
-        },
-        { status: 400 }
-      );
-    }
-
     const body: ActualizarAsociadoRequest = await request.json();
 
-    // Sanitizar datos
     const sanitizedData = AsociadoValidator.sanitizarDatos(body);
 
-    // Validar datos
     const validation = AsociadoValidator.validarActualizarAsociado(sanitizedData);
     if (!validation.valid) {
       return NextResponse.json(
@@ -101,7 +44,7 @@ export async function PUT(
       );
     }
 
-    // Actualizar el asociado
+
     const asociadoActualizado = await asociadoDAO.actualizar(asociadoId, sanitizedData);
 
     return NextResponse.json({
@@ -111,7 +54,7 @@ export async function PUT(
     });
   } catch (error: any) {
     console.error('Error al actualizar asociado:', error);
-    
+
     if (error.code === 'NOT_FOUND') {
       return NextResponse.json(
         {
@@ -127,58 +70,6 @@ export async function PUT(
       {
         success: false,
         message: error.message || 'Error al actualizar el asociado',
-        errors: [error.message]
-      },
-      { status: 500 }
-    );
-  }
-}
-
-/**
- * DELETE /api/asociados/[id] - Eliminar un asociado (soft delete)
- */
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-    const asociadoId = parseInt(id);
-
-    if (isNaN(asociadoId)) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: 'ID de asociado inválido',
-          errors: ['El ID debe ser un número']
-        },
-        { status: 400 }
-      );
-    }
-
-    const eliminado = await asociadoDAO.eliminar(asociadoId);
-
-    if (!eliminado) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: 'Asociado no encontrado',
-          errors: ['No existe un asociado con este ID']
-        },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: 'Asociado eliminado exitosamente'
-    });
-  } catch (error: any) {
-    console.error('Error al eliminar asociado:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        message: error.message || 'Error al eliminar el asociado',
         errors: [error.message]
       },
       { status: 500 }
