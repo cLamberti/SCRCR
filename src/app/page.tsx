@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { FaChurch, FaUserPlus, FaUsers } from 'react-icons/fa'; 
+import { FaChurch } from 'react-icons/fa'; 
 
 export default function HomePage() {
   return (
@@ -62,11 +62,6 @@ export default function HomePage() {
           />
         </div>
 
-        {/* Botones de Navegación Rápida */}
-        <div className="flex flex-wrap justify-center items-start gap-8">
-      
-
-        </div>
       </div>
 
       {/* Footer */}
