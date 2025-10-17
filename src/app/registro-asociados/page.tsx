@@ -14,7 +14,7 @@ const Sidebar = () => {
     { id: 'inicio', href: '/', icon: FaHome, label: 'Inicio' },
     { id: 'registro-asociados', href: '/registro-asociados', icon: FaUserPlus, label: 'Registro de Asociados' },
     { id: 'registro-congregados', href: '#', icon: FaUsers, label: 'Registro de Congregados' },
-    { id: 'listado', href: '#', icon: FaList, label: 'Listado General' },
+    { id: 'listado', href: '/consulta-asociados', icon: FaList, label: 'Listado General' },
     { id: 'configuracion', href: '#', icon: FaCog, label: 'Configuración' },
     { id: 'cerrar', href: '#', icon: FaSignOutAlt, label: 'Cerrar Sesión' }
   ];
