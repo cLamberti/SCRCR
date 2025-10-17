@@ -251,6 +251,15 @@ export class AsociadoDAO {
     try {
       const sql = await this.getConnection();
       
+      // Verificar que el asociado existe primero
+      const existente = await this.obtenerPorId(id);
+      if (!existente) {
+        throw new AsociadoDAOError(
+          'Asociado no encontrado',
+          'NOT_FOUND'
+        );
+      }
+
       // Construir objeto con solo los campos a actualizar
       const updates: any = {};
       
@@ -270,25 +279,26 @@ export class AsociadoDAO {
         );
       }
 
-      // Construir la consulta dinámicamente
-      const setClause = Object.keys(updates)
-        .map((key, index) => `${key} = ${index + 1}`)
-        .join(', ');
-      
-      const values = Object.values(updates);
-      values.push(id);
-
+      // Actualizar todos los campos (usando los valores existentes si no se proporcionan nuevos)
       const result = await sql`
         UPDATE asociados
-        SET ${sql(updates)}
+        SET 
+          nombre_completo = ${updates.nombre_completo ?? existente.nombreCompleto},
+          cedula = ${updates.cedula ?? existente.cedula},
+          correo = ${updates.correo ?? existente.correo},
+          telefono = ${updates.telefono ?? existente.telefono},
+          ministerio = ${updates.ministerio ?? existente.ministerio},
+          direccion = ${updates.direccion ?? existente.direccion},
+          fecha_ingreso = ${updates.fecha_ingreso ?? existente.fechaIngreso},
+          estado = ${updates.estado ?? existente.estado}
         WHERE id = ${id}
         RETURNING *
       `;
       
       if (!result || result.length === 0) {
         throw new AsociadoDAOError(
-          'Asociado no encontrado',
-          'NOT_FOUND'
+          'Error al actualizar el asociado',
+          'UPDATE_FAILED'
         );
       }
 
