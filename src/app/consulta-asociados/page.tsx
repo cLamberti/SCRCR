@@ -1,8 +1,9 @@
-'use client';
+"use client";
 
 import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { FaHome, FaUserPlus, FaUsers, FaList, FaCog, FaSignOutAlt, FaSearch, FaEdit, FaTrash } from 'react-icons/fa';
+import { AsociadoResponse } from '@/dto/asociado.dto';
 
 // Componente para el menú lateral (sidebar)
 const Sidebar = () => {
@@ -119,23 +120,28 @@ export default function ConsultarAsociadosPage() {
       setMensaje('');
       const res = await fetch('/api/asociados', { method: 'GET' });
       const json = await res.json();
+      console.log('Asociados:', json.data);
       if (!res.ok || !json.success) {
         setMensaje(json.message || 'Error al consultar asociados');
         setData([]);
         return;
       }
-      const rows: AsociadoRow[] = (json.data || []).map((a: any) => ({
+      const rows: AsociadoRow[] = (json.data || []).map((a: AsociadoResponse) => ({
         ...a,
         fechaIngreso: a.fechaIngreso
           ? new Date(a.fechaIngreso).toISOString()
           : '',
       }));
       setData(rows);
+      setMensaje('Asociado actualizado exitosamente');
+      cerrarModal();
+      await cargar();
     } catch (err) {
-      setMensaje('Error de conexión. Intenta de nuevo.');
+      const errorMessage = err instanceof Error ? err.message : 'ErroWr de conexión al actualizar.';
+      setMensaje(errorMessage);
       setData([]);
     } finally {
-      setLoading(false);
+      setGuardando(false);
     }
   };
 
@@ -256,7 +262,8 @@ export default function ConsultarAsociadosPage() {
       cerrarConfirmacionEliminar();
       await cargar();
     } catch (error) {
-      setMensaje('Error de conexión al eliminar.');
+        const errorMessage = error instanceof Error ? error.message : 'Error de conexión al eliminar.';
+        setMensaje(errorMessage);
     } finally {
       setLoading(false);
     }
