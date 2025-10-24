@@ -26,7 +26,7 @@ const mapAsociadosToResponse = (asociados: any[]): AsociadoResponse[] => {
 };
 
 /**
- * GET /api/asociados/consultaAsociadosController
+ * GET /api/asociados/consulta
  */
 export async function GET(request: NextRequest) {
   try {
