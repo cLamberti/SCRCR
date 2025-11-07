@@ -1,5 +1,5 @@
 
-import { RegistroUsuarioSchema, LoginSchema, ActualizarUsuarioSchema, CambiarPasswordSchema } from '@/dto/usuario.dto';
+import { CreateUsuarioSchema, LoginSchema, ActualizarUsuarioSchema, CambiarPasswordSchema } from '@/dto/usuario.dto';
 import { ZodError } from 'zod';
 
 export class UsuarioValidator {
@@ -7,7 +7,7 @@ export class UsuarioValidator {
     try {
       return {
         success: true,
-        data: RegistroUsuarioSchema.parse(data),
+        data: CreateUsuarioSchema.parse(data),
         errors: null,
       };
     } catch (error) {
@@ -107,4 +107,4 @@ export class UsuarioValidator {
     }
   }
 }
-export { LoginSchema, RegistroUsuarioSchema, ActualizarUsuarioSchema, CambiarPasswordSchema };
+export { LoginSchema, CreateUsuarioSchema, ActualizarUsuarioSchema, CambiarPasswordSchema };

@@ -3,14 +3,14 @@ import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 
 const secret = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'your-secret-key-here'
+  process.env.JWT_SECRET || 'uwrT0PdHQ7gkJeoaD3iKqMGk'
 );
 
 export interface TokenPayload {
   id: number;
   username: string;
   rol: 'admin' | 'tesorero' | 'pastorGeneral';
-  [key: string]: string | number; // Índice de firma para compatibilidad con JWTPayload
+  [key: string]: string | number; 
 }
 
 export async function createToken(payload: TokenPayload): Promise<string> {
