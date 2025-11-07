@@ -6,14 +6,21 @@ import { AsociadoDAO } from '@/dao/asociado.dao';
 import { AsociadoValidator } from '@/validators/asociado.validator';
 import { CrearAsociadoRequest } from '@/dto/asociado.dto';
 import { ConsultaAsociadoValidator } from '@/validators/asociado.validator';
+import { requireAuth } from '@/middleware/auth.middleware';
 
 const asociadoDAO = new AsociadoDAO();
 
 /**
- * GET /api/asociados - Listar todos los asociados
+ * GET /api/asociados - Listar todos los asociados (solo usuarios autenticados)
  */
 export async function GET(request: NextRequest) {
   try {
+    // Verificar autenticación - solo usuarios logueados pueden ver la lista completa
+    const authResult = await requireAuth(request, ['admin', 'tesorero', 'pastorGeneral']);
+    if (!authResult.success) {
+      return authResult.response!;
+    }
+    
     const { searchParams } = new URL(request.url);
 
     const nombreCompleto = searchParams.get('nombreCompleto') ?? undefined;

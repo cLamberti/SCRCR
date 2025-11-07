@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AsociadoDAO } from '@/dao/asociado.dao';
 import { DeleteAsociadoValidator } from '@/validators/asociado.validator';
+import { requireAuth } from '@/middleware/auth.middleware';
 
 const asociadoDAO = new AsociadoDAO();
 
@@ -14,6 +15,12 @@ const asociadoDAO = new AsociadoDAO();
  */
 export async function DELETE(request: NextRequest) {
   try {
+    // Verificar autenticación - solo usuarios logueados pueden eliminar
+    const authResult = await requireAuth(request, ['admin', 'tesorero', 'pastorGeneral']);
+    if (!authResult.success) {
+      return authResult.response!;
+    }
+    
     const url = new URL(request.url);
     const id = url.searchParams.get('id') ?? undefined;
     const permanenteParam = url.searchParams.get('permanente') ?? undefined;

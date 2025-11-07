@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { AsociadoDAO } from '@/dao/asociado.dao';
 import { AsociadoResponse } from '@/dto/asociado.dto';
 import { PaginacionResultado } from '@/dao/asociado.dao';
+import { requireAuth } from '@/middleware/auth.middleware';
 
 const asociadoDAO = new AsociadoDAO();
 
@@ -26,10 +27,16 @@ const mapAsociadosToResponse = (asociados: any[]): AsociadoResponse[] => {
 };
 
 /**
- * GET /api/asociados/consultaAsociadosController
+ * GET /api/asociados/consulta - Consultar asociados (solo usuarios autenticados)
  */
 export async function GET(request: NextRequest) {
   try {
+    // Verificar autenticación - solo usuarios logueados pueden consultar
+    const authResult = await requireAuth(request, ['admin', 'tesorero', 'pastorGeneral']);
+    if (!authResult.success) {
+      return authResult.response!;
+    }
+    
     const searchParams = request.nextUrl.searchParams;
     const all = searchParams.get('all');
     

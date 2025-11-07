@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { AsociadoDAO } from '@/dao/asociado.dao';
 import { AsociadoValidator } from '@/validators/asociado.validator';
 import { ActualizarAsociadoRequest } from '@/dto/asociado.dto';
+import { requireAuth } from '@/middleware/auth.middleware';
 
 const asociadoDAO = new AsociadoDAO();
 
@@ -12,6 +13,11 @@ const asociadoDAO = new AsociadoDAO();
  */
 export async function PUT(request: NextRequest) {
   try {
+    // Verificar autenticación - solo usuarios logueados pueden actualizar
+    const authResult = await requireAuth(request, ['admin', 'tesorero', 'pastorGeneral']);
+    if (!authResult.success) {
+      return authResult.response!;
+    }
     
     const url = new URL(request.url);
     const idFromQuery = url.searchParams.get('id');
