@@ -3,7 +3,7 @@
 
 import Image from 'next/image';
 import { useState } from 'react';
-import { FaHome, FaUserPlus, FaUsers, FaList, FaCog, FaSignOutAlt, FaCalendarAlt } from 'react-icons/fa';
+import { FaHome, FaUserPlus, FaUsers, FaList, FaCog, FaSignOutAlt, FaCalendarAlt, FaTrash } from 'react-icons/fa';
 
 
 // Componente para el menú lateral (sidebar) mejorado
@@ -13,16 +13,15 @@ const Sidebar = () => {
   const menuItems = [
     { id: 'inicio', href: '/', icon: FaHome, label: 'Inicio' },
     { id: 'registro-asociados', href: '/registro-asociados', icon: FaUserPlus, label: 'Registro de Asociados' },
-    { id: 'registro-congregados', href: '#', icon: FaUsers, label: 'Registro de Congregados' },
     { id: 'listado', href: '/consulta-asociados', icon: FaList, label: 'Listado General' },
-    { id: 'configuracion', href: '#', icon: FaCog, label: 'Configuración' },
+    { id: 'eliminar-asociado', href: '/eliminar-asociados', icon: FaTrash, label: 'Eliminar Asociados' },
     { id: 'cerrar', href: '#', icon: FaSignOutAlt, label: 'Cerrar Sesión' }
   ];
 
   return (
     <div className="w-[220px] bg-[#003366] text-white min-h-screen pt-[30px] flex flex-col shadow-lg">
       <div className="px-5 mb-8">
-        <h4 className="text-center text-lg font-semibold">Bienvenido</h4>
+        <h4 className="text-center text-lg font-semibold">Bienvenido a Gestion de asociados</h4>
         <div className="w-full h-px bg-[#005599] mt-2"></div>
       </div>
 
