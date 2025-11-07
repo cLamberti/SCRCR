@@ -107,3 +107,4 @@ export class UsuarioValidator {
     }
   }
 }
+export { LoginSchema, RegistroUsuarioSchema, ActualizarUsuarioSchema, CambiarPasswordSchema };

@@ -1,10 +1,10 @@
 
-import { NextRequest, NextResponse } from 'next/server';
-import { LoginSchema } from '@/dto/usuario.dto';
-import { UsuarioService, UsuarioServiceError } from '@/services/usuario.service';
-import { ZodError } from 'zod';
+import { NextResponse } from 'next/server';
+import { UsuarioDAO } from '@/dao/usuario.dao';
+import { LoginSchema } from '@/validators/usuario.validator';
+import bcrypt from 'bcryptjs';
 
-const usuarioService = new UsuarioService();
+const usuarioDAO = new UsuarioDAO();
 
 /**
  * @swagger
@@ -41,34 +41,82 @@ const usuarioService = new UsuarioService();
  *       500:
  *         description: Error interno del servidor
  */
-export async function POST(req: NextRequest) {
+export async function POST(request: Request) {
   try {
-    const body = await req.json();
-    const validatedData = LoginSchema.parse(body);
+    const body = await request.json();
+    const validation = LoginSchema.safeParse(body);
 
-    const { token, usuario } = await usuarioService.login(validatedData);
-
-    return NextResponse.json({ success: true, token, data: usuario });
-
-  } catch (error) {
-    if (error instanceof ZodError) {
+    if (!validation.success) {
       return NextResponse.json(
-        { success: false, message: 'Datos de inicio de sesión inválidos', errors: error.issues },
+        {
+          success: false,
+          message: 'Datos de entrada no válidos',
+          errors: validation.error.flatten().fieldErrors,
+        },
         { status: 400 }
       );
     }
 
-    if (error instanceof UsuarioServiceError) {
+    const { username, password } = validation.data;
+
+    // Buscar usuario por username
+    const usuario = await usuarioDAO.obtenerPorUsername(username);
+
+    if (!usuario) {
       return NextResponse.json(
-        { success: false, message: error.message },
-        { status: error.statusCode || 500 }
+        {
+          success: false,
+          message: 'Credenciales inválidas',
+        },
+        { status: 401 }
       );
     }
 
+    // Verificar si el usuario está activo
+    if (usuario.estado !== 1) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Usuario inactivo. Contacte al administrador.',
+        },
+        { status: 403 }
+      );
+    }
+
+    // Verificar contraseña
+    const passwordValido = await bcrypt.compare(password, usuario.passwordHash);
+
+    if (!passwordValido) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Credenciales inválidas',
+        },
+        { status: 401 }
+      );
+    }
+
+    // Login exitoso - devolver datos del usuario (sin el passwordHash)
+    const { passwordHash, ...usuarioSinPassword } = usuario;
+
+    return NextResponse.json({
+      success: true,
+      message: 'Login exitoso',
+      data: {
+        usuario: usuarioSinPassword,
+      },
+    });
+
+  } catch (error) {
     console.error('Error en POST /api/auth/login:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Error desconocido al iniciar sesión';
     return NextResponse.json(
-      { success: false, message: 'Error interno del servidor' },
+      {
+        success: false,
+        message: errorMessage,
+      },
       { status: 500 }
     );
   }
 }
+

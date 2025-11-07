@@ -12,11 +12,11 @@ const Sidebar = () => {
   const menuItems = [
     { id: 'inicio', href: '/', icon: FaHome, label: 'Inicio' },
     { id: 'registro-asociados', href: '/registro-asociados', icon: FaUserPlus, label: 'Registro de Asociados' },
-    { id: 'registro-congregados', href: '#', icon: FaUsers, label: 'Registro de Congregados' },
     { id: 'listado', href: '/consulta-asociados', icon: FaList, label: 'Listado General' },
-    { id: 'configuracion', href: '#', icon: FaCog, label: 'Configuración' },
+    { id: 'eliminar-asociado', href: '/eliminar-asociados', icon: FaTrash, label: 'Eliminar Asociados' },
     { id: 'cerrar', href: '#', icon: FaSignOutAlt, label: 'Cerrar Sesión' }
   ];
+
 
   return (
     <div className="w-[220px] bg-[#003366] text-white min-h-screen pt-[30px] flex flex-col shadow-lg">
