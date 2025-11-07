@@ -1,4 +1,3 @@
-
 import { z } from 'zod';
 
 export const crearUsuarioSchema = z.object({
@@ -7,15 +6,6 @@ export const crearUsuarioSchema = z.object({
   email: z.string().email('El formato del email no es válido'),
   password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
   rol: z.enum(['admin', 'tesorero', 'pastorGeneral'], {
-    errorMap: (issue, ctx) => {
-      switch (issue.code) {
-        case 'invalid_type':
-          return { message: 'El rol es requerido.' };
-        case 'invalid_enum_value':
-          return { message: 'Rol no válido.' };
-        default:
-          return { message: ctx.defaultError };
-      }
-    },
+    error: "Rol no válido. Debe ser 'admin', 'tesorero' o 'pastorGeneral'.",
   }),
 });
