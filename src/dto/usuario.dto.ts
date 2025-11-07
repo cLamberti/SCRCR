@@ -10,14 +10,11 @@ export const RegistroUsuarioSchema = z.object({
     .email('Formato de correo electrónico inválido')
     .max(255, 'El correo no puede exceder 255 caracteres'),
   password: z.string()
-    .min(8, 'La contraseña debe tener al menos 8 caracteres')
-    .regex(/[A-Z]/, 'La contraseña debe contener al menos una letra mayúscula')
-    .regex(/[a-z]/, 'La contraseña debe contener al menos una letra minúscula')
-    .regex(/[0-9]/, 'La contraseña debe contener al menos un número'),
+    .min(1, 'La contraseña es requerida'),
   nombreCompleto: z.string()
     .min(3, 'El nombre completo debe tener al menos 3 caracteres')
     .max(255, 'El nombre completo no puede exceder 255 caracteres'),
-  rol: z.enum(['admin', 'usuario', 'moderador']).default('usuario'),
+  rol: z.enum(['admin', 'tesorero', 'pastorGeneral']).default('admin'),
 });
 
 export type RegistroUsuarioDTO = z.infer<typeof RegistroUsuarioSchema>;
@@ -36,18 +33,24 @@ export interface UsuarioResponse {
   username: string;
   email: string;
   nombreCompleto: string;
-  rol: string;
+  rol: 'admin' | 'tesorero' | 'pastorGeneral';
   estado: number;
-  ultimoAcceso: string | null;
-  createdAt: string;
+  ultimoAcceso: Date | null;
+  createdAt: Date;
 }
 
 // DTO para actualización de usuario
 export const ActualizarUsuarioSchema = z.object({
-  email: z.string().email().optional(),
-  nombreCompleto: z.string().min(3).max(255).optional(),
-  rol: z.enum(['admin', 'usuario', 'moderador']).optional(),
-  estado: z.number().int().min(0).max(1).optional(),
+  email: z.string()
+    .email('Formato de correo electrónico inválido')
+    .max(255, 'El correo no puede exceder 255 caracteres')
+    .optional(),
+  nombreCompleto: z.string()
+    .min(3, 'El nombre completo debe tener al menos 3 caracteres')
+    .max(255, 'El nombre completo no puede exceder 255 caracteres')
+    .optional(),
+  rol: z.enum(['admin', 'tesorero', 'pastorGeneral']).optional(),
+  estado: z.number().int().min(0).max(2).optional(),
 });
 
 export type ActualizarUsuarioDTO = z.infer<typeof ActualizarUsuarioSchema>;
@@ -56,10 +59,7 @@ export type ActualizarUsuarioDTO = z.infer<typeof ActualizarUsuarioSchema>;
 export const CambiarPasswordSchema = z.object({
   passwordActual: z.string().min(1, 'La contraseña actual es requerida'),
   passwordNueva: z.string()
-    .min(8, 'La nueva contraseña debe tener al menos 8 caracteres')
-    .regex(/[A-Z]/, 'La contraseña debe contener al menos una letra mayúscula')
-    .regex(/[a-z]/, 'La contraseña debe contener al menos una letra minúscula')
-    .regex(/[0-9]/, 'La contraseña debe contener al menos un número'),
+    .min(1, 'La nueva contraseña es requerida'),
   confirmarPassword: z.string(),
 }).refine((data) => data.passwordNueva === data.confirmarPassword, {
   message: 'Las contraseñas no coinciden',
