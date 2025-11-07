@@ -1,19 +1,19 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, Suspense } from 'react';
+import { FaChurch } from 'react-icons/fa';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { FaChurch, FaUser } from 'react-icons/fa';
-import { useAuth } from '@/contexts/AuthContext';
 
-export default function LoginPage() {
+function LoginForm() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const { login, usuario } = useAuth();
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get('redirect') || '/';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,32 +21,52 @@ export default function LoginPage() {
     setSuccess('');
     setLoading(true);
 
+    console.log('=== FRONTEND LOGIN ===');
+    console.log('Username:', username);
+    console.log('Password length:', password.length);
+
     try {
+      const body = {
+        username: username.trim(),
+        password: password
+      };
+
+      console.log('Enviando body:', body);
+
       const res = await fetch('/api/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        headers: { 
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(body),
       });
 
+      console.log('Response status:', res.status);
       const data = await res.json();
+      console.log('Response data:', data);
 
       if (!res.ok || !data.success) {
         throw new Error(data.message || 'Error al iniciar sesión');
       }
 
-      // Guardar usuario en el contexto
-      login(data.data.usuario);
+      // Guardar el token en localStorage o cookies
+      if (data.token) {
+        localStorage.setItem('auth-token', data.token);
+      }
 
       // Mostrar mensaje de éxito
       setSuccess('¡Inicio de sesión exitoso! Redirigiendo...');
       
       // Esperar un momento para que el usuario vea el mensaje
       setTimeout(() => {
-        router.push('/');
+        router.push(redirect);
+        router.refresh();
       }, 1500);
 
     } catch (err: any) {
-      setError(err.message);
+      console.error('Error en login:', err);
+      setError(err.message || 'Error al iniciar sesión');
     } finally {
       setLoading(false);
     }
@@ -82,8 +102,9 @@ export default function LoginPage() {
               required
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#003366]"
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#003366] text-gray-900"
               placeholder="su_usuario"
+              autoComplete="username"
             />
           </div>
 
@@ -101,8 +122,9 @@ export default function LoginPage() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#003366]"
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#003366] text-gray-900"
               placeholder="••••••••"
+              autoComplete="current-password"
             />
           </div>
 
@@ -122,22 +144,35 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full px-4 py-2 text-white font-bold bg-[#003366] rounded-md hover:bg-[#004488] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#003366] disabled:bg-gray-400"
+              className="w-full px-4 py-2 text-white font-bold bg-[#003366] rounded-md hover:bg-[#004488] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#003366] disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
             </button>
           </div>
         </form>
-        
-        {usuario && (
-          <div className="mt-6 text-center">
-            <div className="flex items-center justify-center space-x-2">
-              <FaUser className="text-2xl text-gray-700" />
-              <span className="text-lg font-medium text-gray-900">{usuario.username}</span>
-            </div>
-          </div>
-        )}
+
+        <div className="text-center text-sm text-gray-600">
+          <p>¿Olvidaste tu contraseña?</p>
+          <Link href="/recuperar-password" className="text-[#003366] hover:underline font-medium">
+            Recuperar contraseña
+          </Link>
+        </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#003366] mx-auto"></div>
+          <p className="mt-4 text-gray-600">Cargando...</p>
+        </div>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 }

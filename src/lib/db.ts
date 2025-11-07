@@ -14,20 +14,16 @@ class DatabaseConnection {
       ssl: {
         rejectUnauthorized: false
       },
-      max: 20, // Máximo de conexiones en el pool
+      max: 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 2000,
     });
 
-    // Manejar errores del pool
     this.pool.on('error', (err) => {
       console.error('Error inesperado en el pool de conexiones:', err);
     });
   }
 
-  /**
-   * Obtiene la instancia única de la conexión (Singleton)
-   */
   public static getInstance(): DatabaseConnection {
     if (!DatabaseConnection.instance) {
       DatabaseConnection.instance = new DatabaseConnection();
@@ -35,16 +31,10 @@ class DatabaseConnection {
     return DatabaseConnection.instance;
   }
 
-  /**
-   * Obtiene el pool de conexiones
-   */
   public getPool(): Pool {
     return this.pool;
   }
 
-  /**
-   * Ejecuta una consulta SQL
-   */
   public async query(text: string, params?: any[]) {
     const start = Date.now();
     try {
@@ -58,23 +48,14 @@ class DatabaseConnection {
     }
   }
 
-  /**
-   * Obtiene un cliente del pool para transacciones
-   */
   public async getClient(): Promise<PoolClient> {
     return await this.pool.connect();
   }
 
-  /**
-   * Cierra todas las conexiones del pool
-   */
   public async close(): Promise<void> {
     await this.pool.end();
   }
 
-  /**
-   * Verifica la conexión a la base de datos
-   */
   public async testConnection(): Promise<boolean> {
     try {
       const result = await this.pool.query('SELECT NOW()');
@@ -89,3 +70,6 @@ class DatabaseConnection {
 
 // Exportar la instancia única
 export const db = DatabaseConnection.getInstance();
+
+// Exportar el pool directamente para compatibilidad
+export const pool = db.getPool();

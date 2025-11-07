@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "SCRCR - Sistema de Control y Registro",
-  description: "Sistema de Control y Registro de Asociados, Congregados y Recursos Humanos",
+  description: "Sistema de Control y Registro de Asociados, Congregados y Recursos Humanos - Iglesia Bíblica Emanuel",
 };
 
 export default function RootLayout({

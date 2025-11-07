@@ -1,5 +1,5 @@
 
-import { RegistroUsuarioSchema, LoginSchema, ActualizarUsuarioSchema, CambiarPasswordSchema } from '@/dto/usuario.dto';
+import { CreateUsuarioSchema, LoginSchema} from '@/dto/usuario.dto';
 import { ZodError } from 'zod';
 
 export class UsuarioValidator {
@@ -7,7 +7,7 @@ export class UsuarioValidator {
     try {
       return {
         success: true,
-        data: RegistroUsuarioSchema.parse(data),
+        data: CreateUsuarioSchema.parse(data),
         errors: null,
       };
     } catch (error) {
@@ -54,57 +54,5 @@ export class UsuarioValidator {
       };
     }
   }
-
-  static validarActualizacion(data: unknown) {
-    try {
-      return {
-        success: true,
-        data: ActualizarUsuarioSchema.parse(data),
-        errors: null,
-      };
-    } catch (error) {
-      if (error instanceof ZodError) {
-        return {
-          success: false,
-          data: null,
-          errors: error.issues.map((issue) => ({
-            field: issue.path.join('.'),
-            message: issue.message,
-          })),
-        };
-      }
-      return {
-        success: false,
-        data: null,
-        errors: [{ field: 'general', message: 'Error de validación desconocido' }],
-      };
-    }
-  }
-
-  static validarCambioPassword(data: unknown) {
-    try {
-      return {
-        success: true,
-        data: CambiarPasswordSchema.parse(data),
-        errors: null,
-      };
-    } catch (error) {
-      if (error instanceof ZodError) {
-        return {
-          success: false,
-          data: null,
-          errors: error.issues.map((issue) => ({
-            field: issue.path.join('.'),
-            message: issue.message,
-          })),
-        };
-      }
-      return {
-        success: false,
-        data: null,
-        errors: [{ field: 'general', message: 'Error de validación desconocido' }],
-      };
-    }
-  }
 }
-export { LoginSchema, RegistroUsuarioSchema, ActualizarUsuarioSchema, CambiarPasswordSchema };
+export { LoginSchema, CreateUsuarioSchema};
