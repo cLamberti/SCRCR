@@ -62,7 +62,6 @@ CREATE TABLE usuarios (
     -- Constraints adicionales
     CONSTRAINT chk_username_format CHECK (username ~ '^[a-zA-Z0-9_]{3,50}),
     CONSTRAINT chk_email_format CHECK (email ~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}),
-    CONSTRAINT chk_password_length CHECK (LENGTH(password_hash) >= 60)
 );
 
 -- Índices para mejorar el rendimiento
