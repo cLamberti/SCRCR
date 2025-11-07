@@ -1,79 +1,128 @@
-import { db } from '@/lib/db';
-import { sql } from '@vercel/postgres';
+import { pool } from '@/lib/db';
 import { Usuario } from '@/models/Usuario';
 
 export class UsuarioDAO {
-  async findAll(): Promise<Omit<Usuario, 'passwordHash'>[]> {
+  /**
+   * Obtiene un usuario por su username
+   */
+  async obtenerPorUsername(username: string): Promise<Usuario | null> {
+    console.log('=== DAO: Buscando usuario ===');
+    console.log('Username:', username);
+
     const query = `
       SELECT 
-        id, username, email, nombre_completo, rol, estado, 
-        ultimo_acceso, intentos_fallidos, bloqueado_hasta, 
-        created_at, updated_at 
-      FROM usuarios ORDER BY nombre_completo ASC
+        id,
+        username,
+        email,
+        password_hash as "passwordHash",
+        nombre_completo as "nombreCompleto",
+        rol,
+        estado,
+        ultimo_acceso as "ultimoAcceso",
+        intentos_fallidos as "intentosFallidos",
+        bloqueado_hasta as "bloqueadoHasta",
+        created_at as "createdAt",
+        updated_at as "updatedAt"
+      FROM usuarios
+      WHERE username = $1
     `;
-    try {
-      const result = await db.query(query);
-      return result.rows.map(row => ({
-        id: row.id,
-        username: row.username,
-        email: row.email,
-        nombreCompleto: row.nombre_completo,
-        rol: row.rol,
-        estado: row.estado,
-        ultimoAcceso: row.ultimo_acceso,
-        intentosFallidos: row.intentos_fallidos,
-        bloqueadoHasta: row.bloqueado_hasta,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-      }));
-    } catch (error) {
-      console.error('Error en UsuarioDAO.findAll:', error);
-      throw new Error('Error al obtener todos los usuarios de la base de datos.');
+
+    const result = await pool.query(query, [username]);
+    console.log('Resultados encontrados:', result.rows.length);
+
+    if (result.rows.length === 0) {
+      return null;
     }
-  }
 
-  async create(usuarioData: Omit<Usuario, 'id' | 'createdAt' | 'updatedAt' | 'ultimoAcceso' | 'intentosFallidos' | 'bloqueadoHasta'>): Promise<Usuario> {
-    const { nombreCompleto, username, email, passwordHash, rol, estado } = usuarioData;
-    
-    const result = await sql`
-      INSERT INTO usuarios (nombre_completo, username, email, password_hash, rol, estado)
-      VALUES (${nombreCompleto}, ${username}, ${email}, ${passwordHash}, ${rol}, ${estado})
-      RETURNING id, nombre_completo, username, email, rol, estado, ultimo_acceso, created_at, updated_at;
-    `;
-
-    const newUser = result.rows[0];
+    const row = result.rows[0];
+    console.log('Usuario encontrado - ID:', row.id, 'Estado:', row.estado);
 
     return {
-      id: newUser.id,
-      nombreCompleto: newUser.nombre_completo,
-      username: newUser.username,
-      email: newUser.email,
-      passwordHash: '', // No devolvemos el hash
-      rol: newUser.rol,
-      estado: newUser.estado,
-      ultimoAcceso: newUser.ultimo_acceso,
-      intentosFallidos: 0,
-      bloqueadoHasta: null,
-      createdAt: newUser.created_at,
-      updatedAt: newUser.updated_at,
+      id: row.id,
+      username: row.username,
+      email: row.email,
+      passwordHash: row.passwordHash,
+      nombreCompleto: row.nombreCompleto,
+      rol: row.rol,
+      estado: row.estado,
+      ultimoAcceso: row.ultimoAcceso,
+      intentosFallidos: row.intentosFallidos,
+      bloqueadoHasta: row.bloqueadoHasta,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
     };
   }
 
-  async obtenerPorUsername(username: string): Promise<Usuario | null> {
-    const query = 'SELECT * FROM usuarios WHERE username = $1';
+  /**
+   * Alias para mantener compatibilidad
+   */
+  async findByUsername(username: string): Promise<Usuario | null> {
+    return this.obtenerPorUsername(username);
+  }
+
+  /**
+   * Obtiene un usuario por su ID
+   */
+  async obtenerPorId(id: number): Promise<Usuario | null> {
+    const query = `
+      SELECT 
+        id,
+        username,
+        email,
+        password_hash as "passwordHash",
+        nombre_completo as "nombreCompleto",
+        rol,
+        estado,
+        ultimo_acceso as "ultimoAcceso",
+        intentos_fallidos as "intentosFallidos",
+        bloqueado_hasta as "bloqueadoHasta",
+        created_at as "createdAt",
+        updated_at as "updatedAt"
+      FROM usuarios
+      WHERE id = $1
+    `;
+
+    const result = await pool.query(query, [id]);
+
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    const row = result.rows[0];
+
+    return {
+      id: row.id,
+      username: row.username,
+      email: row.email,
+      passwordHash: row.passwordHash,
+      nombreCompleto: row.nombreCompleto,
+      rol: row.rol,
+      estado: row.estado,
+      ultimoAcceso: row.ultimoAcceso,
+      intentosFallidos: row.intentosFallidos,
+      bloqueadoHasta: row.bloqueadoHasta,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    };
+  }
+
+  async findByEmail(email: string): Promise<Usuario | null> {
     try {
-      const result = await db.query(query, [username]);
+      const result = await pool.query(
+        'SELECT * FROM usuarios WHERE email = $1',
+        [email]
+      );
+
       if (result.rows.length === 0) {
         return null;
       }
+
       const row = result.rows[0];
-      
-      // Mapeo correcto de columnas de la BD (snake_case) a propiedades del modelo (camelCase)
       return {
         id: row.id,
         username: row.username,
         email: row.email,
-        passwordHash: row.password_hash, 
+        passwordHash: row.password_hash,
         nombreCompleto: row.nombre_completo,
         rol: row.rol,
         estado: row.estado,
@@ -84,8 +133,70 @@ export class UsuarioDAO {
         updatedAt: row.updated_at,
       };
     } catch (error) {
-      console.error('Error en UsuarioDAO.obtenerPorUsername:', error);
-      throw new Error('Error al obtener el usuario de la base de datos.');
+      console.error('Error en DAO findByEmail:', error);
+      throw error;
+    }
+  }
+
+  async create(usuario: Omit<Usuario, 'id' | 'createdAt' | 'updatedAt'>): Promise<Usuario> {
+    try {
+      const result = await pool.query(
+        `INSERT INTO usuarios (
+          username, email, password_hash, nombre_completo, rol, estado
+        ) VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING *`,
+        [
+          usuario.username,
+          usuario.email,
+          usuario.passwordHash,
+          usuario.nombreCompleto,
+          usuario.rol,
+          usuario.estado,
+        ]
+      );
+
+      const row = result.rows[0];
+      return {
+        id: row.id,
+        username: row.username,
+        email: row.email,
+        passwordHash: row.password_hash,
+        nombreCompleto: row.nombre_completo,
+        rol: row.rol,
+        estado: row.estado,
+        ultimoAcceso: row.ultimo_acceso,
+        intentosFallidos: row.intentos_fallidos,
+        bloqueadoHasta: row.bloqueado_hasta,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      };
+    } catch (error) {
+      console.error('Error en DAO create:', error);
+      throw error;
+    }
+  }
+
+  async findAll(): Promise<Usuario[]> {
+    try {
+      const result = await pool.query('SELECT * FROM usuarios ORDER BY id DESC');
+      
+      return result.rows.map(row => ({
+        id: row.id,
+        username: row.username,
+        email: row.email,
+        passwordHash: row.password_hash,
+        nombreCompleto: row.nombre_completo,
+        rol: row.rol,
+        estado: row.estado,
+        ultimoAcceso: row.ultimo_acceso,
+        intentosFallidos: row.intentos_fallidos,
+        bloqueadoHasta: row.bloqueado_hasta,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }));
+    } catch (error) {
+      console.error('Error en DAO findAll:', error);
+      throw error;
     }
   }
 
@@ -102,7 +213,7 @@ export class UsuarioDAO {
     }
     
     try {
-      await db.query(query, params);
+      await pool.query(query, params);
     } catch (error) {
       console.error('Error en UsuarioDAO.actualizarIntentos:', error);
       throw new Error('Error al actualizar los intentos de login.');
@@ -112,7 +223,7 @@ export class UsuarioDAO {
   async resetearIntentos(id: number): Promise<void> {
     const query = 'UPDATE usuarios SET intentos_fallidos = 0, ultimo_acceso = NOW(), bloqueado_hasta = NULL, estado = 1 WHERE id = $1';
     try {
-      await db.query(query, [id]);
+      await pool.query(query, [id]);
     } catch (error) {
       console.error('Error en UsuarioDAO.resetearIntentos:', error);
       throw new Error('Error al resetear los intentos de login.');

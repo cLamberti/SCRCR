@@ -1,10 +1,10 @@
 
-import { NextResponse } from 'next/server';
-import { UsuarioDAO } from '@/dao/usuario.dao';
-import { LoginSchema } from '@/validators/usuario.validator';
-import bcrypt from 'bcryptjs';
+import { ZodError } from 'zod';
+import { UsuarioService, UsuarioServiceError } from '@/services/usuario.service';
+import { LoginSchema } from '@/dto/usuario.dto';
+import { NextRequest, NextResponse } from 'next/server';
 
-const usuarioDAO = new UsuarioDAO();
+const usuarioService = new UsuarioService();
 
 /**
  * @swagger
@@ -41,82 +41,82 @@ const usuarioDAO = new UsuarioDAO();
  *       500:
  *         description: Error interno del servidor
  */
-export async function POST(request: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const body = await request.json();
-    const validation = LoginSchema.safeParse(body);
+    console.log('=== LOGIN REQUEST ===');
+    
+    // Leer el body
+    const body = await req.json();
+    console.log('Body completo recibido:', body);
+    console.log('Username:', body.username);
+    console.log('Password presente:', !!body.password);
 
-    if (!validation.success) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: 'Datos de entrada no válidos',
-          errors: validation.error.flatten().fieldErrors,
-        },
-        { status: 400 }
-      );
+    // Validar con Zod
+    let validatedData;
+    try {
+      validatedData = LoginSchema.parse(body);
+      console.log('Datos validados correctamente');
+    } catch (zodError) {
+      if (zodError instanceof ZodError) {
+        console.log('=== ERROR DE VALIDACIÓN ===');
+        console.log('Errores:', zodError.issues);
+        return NextResponse.json(
+          { 
+            success: false, 
+            message: 'Datos de inicio de sesión inválidos', 
+            errors: zodError.issues.map(issue => ({
+              field: issue.path.join('.'),
+              message: issue.message
+            }))
+          },
+          { status: 400 }
+        );
+      }
+      throw zodError;
     }
 
-    const { username, password } = validation.data;
+    // Intentar login
+    console.log('Llamando al servicio de login...');
+    const { token, usuario } = await usuarioService.login(validatedData);
+    console.log('Login exitoso, generando respuesta...');
 
-    // Buscar usuario por username
-    const usuario = await usuarioDAO.obtenerPorUsername(username);
-
-    if (!usuario) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: 'Credenciales inválidas',
-        },
-        { status: 401 }
-      );
-    }
-
-    // Verificar si el usuario está activo
-    if (usuario.estado !== 1) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: 'Usuario inactivo. Contacte al administrador.',
-        },
-        { status: 403 }
-      );
-    }
-
-    // Verificar contraseña
-    const passwordValido = await bcrypt.compare(password, usuario.passwordHash);
-
-    if (!passwordValido) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: 'Credenciales inválidas',
-        },
-        { status: 401 }
-      );
-    }
-
-    // Login exitoso - devolver datos del usuario (sin el passwordHash)
-    const { passwordHash, ...usuarioSinPassword } = usuario;
-
-    return NextResponse.json({
-      success: true,
-      message: 'Login exitoso',
-      data: {
-        usuario: usuarioSinPassword,
-      },
+    const response = NextResponse.json({ 
+      success: true, 
+      token, 
+      data: usuario 
     });
 
+    // Establecer cookie con el token
+    response.cookies.set('auth-token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24, // 24 horas
+      path: '/',
+    });
+
+    console.log('Cookie establecida');
+    console.log('=== FIN LOGIN REQUEST ===');
+
+    return response;
+
   } catch (error) {
-    console.error('Error en POST /api/auth/login:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Error desconocido al iniciar sesión';
+    console.error('=== ERROR EN LOGIN ===');
+    console.error('Tipo de error:', error?.constructor?.name);
+    console.error('Error completo:', error);
+
+    if (error instanceof UsuarioServiceError) {
+      console.error('Error del servicio:', error.message, 'Status:', error.statusCode);
+      return NextResponse.json(
+        { success: false, message: error.message },
+        { status: error.statusCode || 500 }
+      );
+    }
+
+    console.error('Error desconocido:', error);
     return NextResponse.json(
-      {
-        success: false,
-        message: errorMessage,
-      },
+      { success: false, message: 'Error interno del servidor' },
       { status: 500 }
     );
   }
 }
-
