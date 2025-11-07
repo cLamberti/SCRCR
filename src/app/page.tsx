@@ -12,7 +12,8 @@ import {
   FaUsers, 
   FaChartLine,
   FaCog,
-  FaExclamationTriangle
+  FaExclamationTriangle,
+  FaCalendarAlt
 } from 'react-icons/fa';
 
 export default function HomePage() {
@@ -85,7 +86,15 @@ export default function HomePage() {
         href: '/configuracion',
         roles: ['admin'],
         color: 'from-gray-700 to-gray-800'
-      }
+      },
+      {
+        titulo: 'Eventos',
+        descripcion: 'Crea, edita y elimina eventos',
+        icono: <FaCalendarAlt className="text-4xl" />, 
+        href: '/eventos',
+        roles: ['admin', 'tesorero', 'pastorGeneral'], 
+        color: 'from-[#3080bc] to-[#17609c]'
+      },
     ];
 
     // Filtrar módulos según el rol del usuario

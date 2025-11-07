@@ -3,18 +3,15 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  FaCalendarCheck,
-  FaHome,
-  FaArrowLeft,
-  FaSearch,
-  FaCheckSquare,
-  FaRegSquare,
-} from "react-icons/fa";
+import { FaClipboardCheck, FaHome, FaArrowLeft } from "react-icons/fa";
+import { useAuth } from "@/contexts/AuthContext";
 
 type Evento = {
   id: number;
   nombre: string;
+  fecha: string;        
+  hora?: string | null;
+  activo?: boolean;
 };
 
 type Persona = {
@@ -23,57 +20,88 @@ type Persona = {
   nombre_completo?: string;
 };
 
-type ApiListResponse<T> = { success?: boolean; data?: T[] } | T[];
+type ApiList<T> =
+  | { success?: boolean; data?: T[]; pagination?: any }
+  | T[];
 
-type AsistenciaResponse = {
-  id: number;
-  id_asociado: number;
-  id_actividad: number;
-  fecha_asistencia: string;
-  fecha_registro: string;
+type ApiPost<T> = {
+  success: boolean;
+  message?: string;
+  data?: T;
+  errors?: string[];
+  issues?: { field: string; message: string }[];
 };
 
-function todayStr() {
-  const t = new Date();
-  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(
-    t.getDate()
-  ).padStart(2, "0")}`;
+type BulkResponse = {
+  success: boolean;
+  message?: string;
+  inserted?: number;
+  duplicated?: number;
+  errors?: string[];
+};
+
+function fmtFecha(fechaISO: string) {
+  try {
+    const [y, m, d] = fechaISO.split("-").map(Number);
+    const dt = new Date(y, (m ?? 1) - 1, d ?? 1);
+    return dt.toLocaleDateString();
+  } catch {
+    return fechaISO;
+  }
 }
+const todayYMD = (() => {
+  const t = new Date();
+  const yyyy = t.getFullYear();
+  const mm = String(t.getMonth() + 1).padStart(2, "0");
+  const dd = String(t.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+})();
 
 export default function RegistroAsistenciaPage() {
   const router = useRouter();
+  const { usuario, loading } = useAuth?.() ?? { usuario: null, loading: false };
 
-  
+  // Eventos activos
   const [eventos, setEventos] = useState<Evento[]>([]);
+  const [loadingEventos, setLoadingEventos] = useState(true);
+  const [errorEventos, setErrorEventos] = useState<string | null>(null);
   const [eventoId, setEventoId] = useState<number>(0);
-  const [cargandoEventos, setCargandoEventos] = useState(true);
 
-
+  // Personas  para checkboxes
   const [personas, setPersonas] = useState<Persona[]>([]);
-  const [cargandoPersonas, setCargandoPersonas] = useState(true);
-  const [errorCarga, setErrorCarga] = useState<string | null>(null);
-
-  
-  const [busqueda, setBusqueda] = useState("");
+  const [loadingPersonas, setLoadingPersonas] = useState(true);
+  const [errorPersonas, setErrorPersonas] = useState<string | null>(null);
+  const [filtro, setFiltro] = useState("");
   const [seleccionados, setSeleccionados] = useState<Set<number>>(new Set());
 
-  
-  const [enviando, setEnviando] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [ok, setOk] = useState<boolean | null>(null);
+  // Envío y feedback
+  const [submitting, setSubmitting] = useState(false);
+  const [serverMsg, setServerMsg] = useState<string | null>(null);
+  const [serverOk, setServerOk] = useState<boolean | null>(null);
 
-  // Eventos, vacio por ahora
+  // Implementar proteccion de ruta
+  useEffect(() => {
+    if (!loading && !usuario) {
+    }
+  }, [loading, usuario, router]);
+
+
   useEffect(() => {
     let cancel = false;
     (async () => {
-      setCargandoEventos(true);
       try {
-        const list: Evento[] = []; 
-        if (!cancel) setEventos(list);
-      } catch {
-        if (!cancel) setEventos([]);
+        setLoadingEventos(true);
+        setErrorEventos(null);
+        const res = await fetch("/api/eventos?activo=true&page=1&limit=200", {
+          cache: "no-store",
+        });
+        const json: ApiList<Evento> = await res.json();
+        const list = Array.isArray(json) ? json : (json.data ?? []);
+        if (!cancel) setEventos(list ?? []);
+      } catch (e) {
+        if (!cancel) setErrorEventos("No se pudo obtener la lista de eventos.");
       } finally {
-        if (!cancel) setCargandoEventos(false);
+        if (!cancel) setLoadingEventos(false);
       }
     })();
     return () => {
@@ -84,137 +112,159 @@ export default function RegistroAsistenciaPage() {
 
   useEffect(() => {
     let cancel = false;
+
+    async function fetchFrom(url: string) {
+      const r = await fetch(url, { cache: "no-store" });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const j: ApiList<Persona> = await r.json();
+      return Array.isArray(j) ? j : (j.data ?? []);
+    }
+
     (async () => {
-      setCargandoPersonas(true);
-      setErrorCarga(null);
       try {
-        let res = await fetch("/api/congregados", { cache: "no-store" });
-        if (!res.ok) throw new Error("fallback");
-        let json: ApiListResponse<Persona> = await res.json();
-        let list = Array.isArray(json) ? json : (json.data ?? []);
-        if (!list || list.length === 0) throw new Error("fallback");
-        if (!cancel) setPersonas(list);
-      } catch {
+        setLoadingPersonas(true);
+        setErrorPersonas(null);
+
+        let list: Persona[] = [];
         try {
-          const res2 = await fetch("/api/asociados", { cache: "no-store" });
-          const json2: ApiListResponse<Persona> = await res2.json();
-          const list2 = Array.isArray(json2) ? json2 : (json2.data ?? []);
-          if (!cancel) setPersonas(list2 ?? []);
+          list = await fetchFrom("/api/congregados");
         } catch {
-          if (!cancel) {
-            setErrorCarga("No se pudo cargar la lista de congregados.");
-            setPersonas([]);
-          }
+          list = await fetchFrom("/api/asociados");
         }
+
+        if (!cancel) setPersonas(list ?? []);
+      } catch (e) {
+        if (!cancel)
+          setErrorPersonas("No se pudo cargar la lista de personas.");
       } finally {
-        if (!cancel) setCargandoPersonas(false);
+        if (!cancel) setLoadingPersonas(false);
       }
     })();
+
     return () => {
       cancel = true;
     };
   }, []);
 
-  const nombrePersona = (p: Persona) =>
-    p.nombreCompleto ?? p.nombre_completo ?? "";
 
-  const filtrados = useMemo(() => {
-    const q = busqueda.trim().toLowerCase();
-    if (!q) return personas;
-    return personas.filter((p) => nombrePersona(p).toLowerCase().includes(q));
-  }, [busqueda, personas]);
+  const canSubmit = useMemo(
+    () => eventoId > 0 && seleccionados.size > 0,
+    [eventoId, seleccionados]
+  );
 
-  const totalSeleccionados = seleccionados.size;
+  const personasFiltradas = useMemo(() => {
+    const f = filtro.trim().toLowerCase();
+    if (!f) return personas;
+    return personas.filter((p) =>
+      (p.nombreCompleto ?? p.nombre_completo ?? "")
+        .toLowerCase()
+        .includes(f)
+    );
+  }, [filtro, personas]);
 
-  function toggleUno(id: number) {
+
+  function togglePersona(id: number) {
     setSeleccionados((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
+      const copy = new Set(prev);
+      if (copy.has(id)) copy.delete(id);
+      else copy.add(id);
+      return copy;
     });
   }
 
-  function toggleTodos() {
-    if (totalSeleccionados === filtrados.length) {
-      setSeleccionados((prev) => {
-        const idsVisibles = new Set(filtrados.map((p) => p.id));
-        const next = new Set(prev);
-        idsVisibles.forEach((id) => next.delete(id));
-        return next;
-      });
-    } else {
-      setSeleccionados((prev) => {
-        const next = new Set(prev);
-        filtrados.forEach((p) => next.add(p.id));
-        return next;
-      });
-    }
+  function toggleAllVisible(check: boolean) {
+    setSeleccionados((prev) => {
+      const copy = new Set(prev);
+      for (const p of personasFiltradas) {
+        if (check) copy.add(p.id);
+        else copy.delete(p.id);
+      }
+      return copy;
+    });
   }
 
-  async function onSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setMsg(null);
-    setOk(null);
+    if (!canSubmit || submitting) return;
 
-    if (!eventoId) {
-      setMsg("Selecciona un evento para registrar asistencia.");
-      setOk(false);
-      return;
-    }
-    if (seleccionados.size === 0) {
-      setMsg("Selecciona al menos un congregado.");
-      setOk(false);
-      return;
-    }
+    setSubmitting(true);
+    setServerMsg(null);
+    setServerOk(null);
 
-    setEnviando(true);
-    const fecha = todayStr();
-    const ids = Array.from(seleccionados);
+    const persona_ids = Array.from(seleccionados);
+    const fecha = todayYMD;
 
     try {
-      const results = await Promise.allSettled(
-        ids.map((id_asociado) =>
-          fetch("/api/asistencia/registro", {
+  
+      const bulkRes = await fetch("/api/asistencia/registro-bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          evento_id: eventoId,
+          persona_ids,
+          fecha,
+        }),
+      });
+
+      if (bulkRes.ok) {
+        const bulkJson: BulkResponse = await bulkRes.json();
+        setServerOk(true);
+        setServerMsg(
+          bulkJson.message ||
+            `Asistencia registrada: ${bulkJson.inserted ?? persona_ids.length
+            } persona(s).`
+        );
+        setSeleccionados(new Set());
+        return;
+      }
+
+      if (bulkRes.status === 404) {
+        let okCount = 0;
+        let dupCount = 0;
+        let errCount = 0;
+
+        for (const pid of persona_ids) {
+          const r = await fetch("/api/asistencia/registro", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              id_asociado,
-              id_actividad: eventoId,
+              id_asociado: pid, 
+              id_actividad: eventoId,  
               fecha_asistencia: fecha,
             }),
-          }).then(async (r) => {
-            const js = (await r.json()) as { success?: boolean; message?: string };
-            return { ok: r.ok, status: r.status, body: js };
-          })
-        )
-      );
+          });
 
-      const okCount = results.filter(
-        (r) => r.status === "fulfilled" && r.value.ok
-      ).length;
-      const dupCount = results.filter(
-        (r) =>
-          r.status === "fulfilled" &&
-          !r.value.ok &&
-          r.value.status === 409
-      ).length;
-      const failCount = ids.length - okCount - dupCount;
+          if (r.ok) okCount++;
+          else if (r.status === 409) dupCount++;
+          else errCount++;
+        }
 
-      let resumen = `Registrados: ${okCount}`;
-      if (dupCount) resumen += ` | Duplicados: ${dupCount}`;
-      if (failCount) resumen += ` | Fallidos: ${failCount}`;
+        setServerOk(errCount === 0);
+        setServerMsg(
+          `Resultado: ${okCount} registrados, ${dupCount} duplicados, ${errCount} con error.`
+        );
+        if (okCount > 0) setSeleccionados(new Set());
+        return;
+      }
 
-      setMsg(`Registro completado. ${resumen}`);
-      setOk(okCount > 0 && failCount === 0);
-      if (okCount === ids.length) setSeleccionados(new Set());
-    } catch {
-      setMsg("Error de red/servidor al registrar asistencias.");
-      setOk(false);
+ 
+      const errJson = (await bulkRes.json().catch(() => ({}))) as any;
+      const msg =
+        errJson?.errors?.join(" | ") ||
+        errJson?.message ||
+        "No se pudo registrar la asistencia.";
+      setServerOk(false);
+      setServerMsg(msg);
+    } catch (err) {
+      setServerOk(false);
+      setServerMsg("Error de red o del servidor al registrar la asistencia.");
     } finally {
-      setEnviando(false);
+      setSubmitting(false);
     }
   }
+
+  const nombrePersona = (p: Persona) =>
+    p.nombreCompleto ?? p.nombre_completo ?? "Sin nombre";
 
   return (
     <div className="min-h-screen bg-[#f4f4f4] text-[#0f172a]">
@@ -222,157 +272,178 @@ export default function RegistroAsistenciaPage() {
       <header className="bg-[#003366] text-white">
         <div className="container mx-auto px-4 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <FaCalendarCheck className="text-2xl" />
+            <FaClipboardCheck className="text-2xl" />
             <div>
               <h1 className="text-xl font-bold">Registro de Asistencia</h1>
               <p className="text-sm opacity-90">
-                Selecciona un evento y marca los congregados que asistieron
+                Selecciona un evento y marca los asistentes
               </p>
             </div>
           </div>
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 border border-white/60 px-3 py-2 rounded hover:bg-white hover:text-[#003366] transition"
-          >
-            <FaHome /> Inicio
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 border border-white/60 px-3 py-2 rounded hover:bg-white hover:text-[#003366] transition"
+            >
+              <FaHome /> Inicio
+            </Link>
+          </div>
         </div>
       </header>
 
-      {/* Main */}
+      {/* Body */}
       <main className="container mx-auto px-4 py-8">
-        <button
-          onClick={() => router.back()}
-          className="inline-flex items-center gap-2 text-[#003366] hover:underline mb-6"
-        >
-          <FaArrowLeft /> Volver
-        </button>
+        <div className="mb-6">
+          <button
+            onClick={() => router.back()}
+            className="inline-flex items-center gap-2 text-[#003366] hover:underline"
+          >
+            <FaArrowLeft /> Volver
+          </button>
+        </div>
 
-        <form
-          onSubmit={onSubmit}
-          className="bg-white rounded-lg shadow-md p-6 border border-gray-200"
-        >
-          {/* Evento */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Evento
-            </label>
-            <select
-              className="w-full rounded-md border border-gray-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#17609c]"
-              value={eventoId}
-              onChange={(e) => setEventoId(Number(e.target.value))}
-              disabled={cargandoEventos || eventos.length === 0}
-            >
-              <option value={0}>
-                {cargandoEventos
-                  ? "Cargando eventos…"
-                  : eventos.length === 0
-                  ? "No hay eventos disponibles"
-                  : "Seleccione un evento…"}
-              </option>
-              {eventos.map((ev) => (
-                <option key={ev.id} value={ev.id}>
-                  {ev.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+          <h2 className="text-lg font-semibold text-[#003366] mb-1">
+            Registrar asistencia por evento
+          </h2>
+          <p className="text-sm text-gray-500 mb-6">
+            Elige el evento y marca los congregados que asistieron.
+          </p>
 
-          {/* Búsqueda y Seleccionar todos */}
-          <div className="mb-3 flex items-center gap-3">
-            <div className="relative flex-1">
-              <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-6">
+
+            {/* Evento */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Evento
+              </label>
+              {loadingEventos ? (
+                <div className="text-gray-600 text-sm">Cargando eventos…</div>
+              ) : errorEventos ? (
+                <div className="text-red-600 text-sm">{errorEventos}</div>
+              ) : (
+                <select
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#17609c]"
+                  value={eventoId}
+                  onChange={(e) => setEventoId(Number(e.target.value))}
+                  required
+                >
+                  <option value={0}>Seleccione un evento…</option>
+                  {eventos.map((ev) => (
+                    <option key={ev.id} value={ev.id}>
+                      {ev.nombre} — {fmtFecha(ev.fecha)}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {/* Buscador de personas */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Buscar
+              </label>
               <input
                 type="text"
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-                placeholder="Buscar congregado…"
-                className="w-full rounded-md border border-gray-300 pl-9 pr-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#17609c]"
+                value={filtro}
+                onChange={(e) => setFiltro(e.target.value)}
+                placeholder="Filtrar por nombre…"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#17609c]"
               />
             </div>
-            <button
-              type="button"
-              onClick={toggleTodos}
-              className="inline-flex items-center gap-2 text-sm border px-3 py-2 rounded hover:bg-gray-50"
-              disabled={cargandoPersonas || personas.length === 0}
-            >
-              {filtrados.length > 0 && totalSeleccionados === filtrados.length ? (
-                <FaCheckSquare />
+
+            {/* Lista de checkboxes */}
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <label className="text-sm font-medium text-gray-700">
+                  Congregados
+                </label>
+                <div className="flex items-center gap-2 text-sm">
+                  <button
+                    type="button"
+                    className="underline text-[#17609c]"
+                    onClick={() => toggleAllVisible(true)}
+                  >
+                    Seleccionar visibles
+                  </button>
+                  <span className="text-gray-400">|</span>
+                  <button
+                    type="button"
+                    className="underline text-[#17609c]"
+                    onClick={() => toggleAllVisible(false)}
+                  >
+                    Quitar visibles
+                  </button>
+                </div>
+              </div>
+
+              {loadingPersonas ? (
+                <div className="text-gray-600 text-sm">Cargando lista…</div>
+              ) : errorPersonas ? (
+                <div className="text-red-600 text-sm">{errorPersonas}</div>
               ) : (
-                <FaRegSquare />
+                <div className="max-h-80 overflow-auto border rounded-md p-3">
+                  {personasFiltradas.length === 0 ? (
+                    <div className="text-sm text-gray-500">Sin resultados.</div>
+                  ) : (
+                    <ul className="space-y-2">
+                      {personasFiltradas.map((p) => {
+                        const checked = seleccionados.has(p.id);
+                        return (
+                          <li key={p.id} className="flex items-center gap-3">
+                            <input
+                              id={`p-${p.id}`}
+                              type="checkbox"
+                              className="h-4 w-4"
+                              checked={checked}
+                              onChange={() => togglePersona(p.id)}
+                            />
+                            <label
+                              htmlFor={`p-${p.id}`}
+                              className="text-sm text-gray-800 select-none"
+                            >
+                              {nombrePersona(p)}
+                            </label>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
               )}
-              {filtrados.length > 0 && totalSeleccionados === filtrados.length
-                ? "Deseleccionar"
-                : "Seleccionar"}{" "}
-              {filtrados.length > 0 ? `(${filtrados.length})` : ""}
-            </button>
-          </div>
-
-          {/* Lista de congregados */}
-          <div className="rounded border border-gray-200 max-h-[420px] overflow-auto">
-            {cargandoPersonas ? (
-              <div className="p-4 text-gray-600 text-sm">
-                Cargando congregados…
-              </div>
-            ) : errorCarga ? (
-              <div className="p-4 text-red-600 text-sm">{errorCarga}</div>
-            ) : filtrados.length === 0 ? (
-              <div className="p-4 text-gray-500 text-sm">
-                {personas.length === 0
-                  ? "No hay congregados para listar."
-                  : "No hay coincidencias para la búsqueda."}
-              </div>
-            ) : (
-              <ul className="divide-y divide-gray-100">
-                {filtrados.map((p) => {
-                  const checked = seleccionados.has(p.id);
-                  return (
-                    <li key={p.id} className="flex items-center justify-between p-3">
-                      <label className="flex items-center gap-3 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4"
-                          checked={checked}
-                          onChange={() => toggleUno(p.id)}
-                        />
-                        <span className="text-sm">{nombrePersona(p)}</span>
-                      </label>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
-
-          {/* feedback */}
-          {msg && (
-            <div
-              className={`mt-4 px-4 py-3 rounded-md text-sm border ${
-                ok
-                  ? "bg-green-50 text-green-800 border-green-200"
-                  : "bg-yellow-50 text-yellow-800 border-yellow-200"
-              }`}
-            >
-              {msg}
             </div>
-          )}
 
-          {/* acciones */}
-          <div className="mt-6 flex justify-end">
-            <button
-              type="submit"
-              disabled={enviando || eventoId === 0 || seleccionados.size === 0}
-              className={`px-5 py-2 rounded-md text-white transition ${
-                enviando || eventoId === 0 || seleccionados.size === 0
-                  ? "bg-[#17609c]/50 cursor-not-allowed"
-                  : "bg-[#17609c] hover:bg-[#0f4c7a]"
-              }`}
-            >
-              {enviando ? "Registrando…" : "Registrar asistencia"}
-            </button>
-          </div>
-        </form>
+            {/* Feedback */}
+            {serverMsg && (
+              <div
+                className={`px-4 py-3 rounded-md text-sm border ${
+                  serverOk
+                    ? "bg-green-50 text-green-800 border-green-200"
+                    : "bg-red-50 text-red-700 border-red-200"
+                }`}
+              >
+                {serverMsg}
+              </div>
+            )}
 
+            {/* Submit */}
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={!canSubmit || submitting}
+                className={`px-5 py-2 rounded-md text-white transition ${
+                  !canSubmit || submitting
+                    ? "bg-[#17609c]/50 cursor-not-allowed"
+                    : "bg-[#17609c] hover:bg-[#0f4c7a]"
+                }`}
+              >
+                {submitting ? "Registrando…" : "Registrar asistencia"}
+              </button>
+            </div>
+          </form>
+
+        </div>
       </main>
     </div>
   );
