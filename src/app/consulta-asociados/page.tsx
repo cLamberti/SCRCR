@@ -133,15 +133,12 @@ export default function ConsultarAsociadosPage() {
           : '',
       }));
       setData(rows);
-      setMensaje('Asociado actualizado exitosamente');
-      cerrarModal();
-      await cargar();
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'ErroWr de conexión al actualizar.';
+      const errorMessage = err instanceof Error ? err.message : 'Error de conexión.';
       setMensaje(errorMessage);
       setData([]);
     } finally {
-      setGuardando(false);
+      setLoading(false);
     }
   };
 
@@ -219,7 +216,8 @@ export default function ConsultarAsociadosPage() {
       cerrarModal();
       await cargar();
     } catch (err) {
-      setMensaje('Error de conexión al actualizar.');
+      const errorMessage = err instanceof Error ? err.message : 'Error de conexión al actualizar.';
+      setMensaje(errorMessage);
     } finally {
       setGuardando(false);
     }

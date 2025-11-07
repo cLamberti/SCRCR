@@ -38,7 +38,7 @@ export class AsociadoDAO {
   private sql: any;
 
   constructor(connectionString?: string) {
-    this.connectionString = connectionString || process.env.DATABASE_URL || '';
+    this.connectionString = connectionString || process.env.POSTGRES_URL || '';
     this.sql = neon(this.connectionString);
   }
 
