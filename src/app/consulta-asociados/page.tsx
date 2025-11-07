@@ -2,63 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
-import { FaHome, FaUserPlus, FaUsers, FaList, FaCog, FaSignOutAlt, FaSearch, FaEdit, FaTrash } from 'react-icons/fa';
+import { FaSearch, FaEdit, FaTrash, FaPlus, FaUsers } from 'react-icons/fa';
+import ResponsiveSidebar from '@/components/ResponsiveSidebar';
+import Navbar from '@/components/Navbar';
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
-// Componente para el menú lateral (sidebar)
-const Sidebar = () => {
-  const [activeItem, setActiveItem] = useState('listado');
-
-  const menuItems = [
-    { id: 'inicio', href: '/', icon: FaHome, label: 'Inicio' },
-    { id: 'registro-asociados', href: '/registro-asociados', icon: FaUserPlus, label: 'Registro de Asociados' },
-    { id: 'registro-congregados', href: '#', icon: FaUsers, label: 'Registro de Congregados' },
-    { id: 'listado', href: '/consulta-asociados', icon: FaList, label: 'Listado General' },
-    { id: 'configuracion', href: '#', icon: FaCog, label: 'Configuración' },
-    { id: 'cerrar', href: '#', icon: FaSignOutAlt, label: 'Cerrar Sesión' }
-  ];
-
-  return (
-    <div className="w-[220px] bg-[#003366] text-white min-h-screen pt-[30px] flex flex-col shadow-lg">
-      <div className="px-5 mb-8">
-        <h4 className="text-center text-lg font-semibold">Bienvenido</h4>
-        <div className="w-full h-px bg-[#005599] mt-2"></div>
-      </div>
-
-      <nav className="flex-1">
-        {menuItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = activeItem === item.id;
-          
-          return (
-            <a
-              key={item.id}
-              href={item.href}
-              onClick={() => setActiveItem(item.id)}
-              className={`
-                text-white no-underline flex items-center py-3 px-5 transition-all duration-200 group relative
-                ${isActive 
-                  ? 'bg-[#005599] border-r-4 border-white shadow-inner' 
-                  : 'hover:bg-[#004488] hover:pl-6'
-                }
-              `}
-            >
-              <Icon className={`
-                mr-3 transition-all duration-200
-                ${isActive ? 'text-white scale-110' : 'text-gray-300 group-hover:text-white'}
-              `} />
-              <span className={`
-                transition-all duration-200
-                ${isActive ? 'font-semibold' : 'group-hover:font-medium'}
-              `}>
-                {item.label}
-              </span>
-            </a>
-          );
-        })}
-      </nav>
-    </div>
-  );
-};
+// Tipos para la interfaz
 
 type AsociadoRow = {
   id: number;
@@ -268,12 +217,17 @@ export default function ConsultarAsociadosPage() {
     }`;
 
   return (
-    <div className="flex bg-[#f2f2f2] min-h-screen font-['Segoe_UI',sans-serif]">
-      {/* Sidebar */}
-      <Sidebar />
-      
-      {/* Contenido Principal */}
-      <div className="flex-grow p-4">
+    <ProtectedRoute>
+      <div className="min-h-screen bg-[#f2f2f2] font-['Segoe_UI',sans-serif]">
+        {/* Navbar */}
+        <Navbar />
+        
+        <div className="flex">
+          {/* Sidebar Responsive */}
+          <ResponsiveSidebar activeItem="listado" />
+          
+          {/* Contenido Principal */}
+          <div className="flex-grow lg:ml-0 p-4">
         <div className="max-w-7xl mx-auto">
           <div className="p-[30px] bg-white rounded-lg my-[30px] shadow-md">
             
@@ -684,6 +638,8 @@ export default function ConsultarAsociadosPage() {
         </div>
       )}
 
-    </div>
+        </div>
+      </div>
+    </ProtectedRoute>
   );
 }

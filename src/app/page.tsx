@@ -1,41 +1,11 @@
-import Link from 'next/link';
 import Image from 'next/image';
-import { FaChurch } from 'react-icons/fa'; 
+import Navbar from '@/components/Navbar';
 
 export default function HomePage() {
   return (
     <div className="min-h-screen flex flex-col bg-[#f4f4f4] font-['Segoe_UI',_sans-serif]">
       {/* Navbar */}
-      <nav className="bg-[#003366] shadow-md">
-        <div className="container mx-auto px-4">
-          <div className="flex justify-between items-center py-3">
-            {/* Logo y Marca */}
-            <Link 
-              href="/" 
-              className="text-white text-xl font-bold p-2 rounded transition-colors hover:bg-[#005599] flex items-center" 
-              id="head"
-            >
-              <FaChurch className="inline mr-2" /> SCRCR
-            </Link>
-            
-            {/* Botones de Navegación */}
-            <div className="flex gap-4">
-              <Link
-                href="/login" // Pendiente la ruta /login
-                className="text-white font-bold py-2 px-4 rounded border border-white hover:bg-white hover:text-[#003366] transition duration-300"
-              >
-                Iniciar Sesión
-              </Link>
-              <Link
-                href="/registro-asociados" // registro-asociados
-                className="text-white font-bold py-2 px-4 rounded border border-white hover:bg-white hover:text-[#003366] transition duration-300"
-              >
-                Registro
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       {/* Hero Section */}
       <section className="py-24 px-5 text-center bg-gradient-to-r from-[#003366] to-[#17609c] text-white">
