@@ -58,6 +58,16 @@ export const MODULES: ModulePermission[] = [
     description: 'Administrar eventos de la iglesia',
     allowedRoles: [ROLES.ADMIN, ROLES.PASTOR_GENERAL],
   },
+  {
+  name: 'Registro de asistencia',
+  path: '/asistencia/registro',
+  icon: 'FaClipboard', 
+  description: 'Registrar asistencia de congregados y asociados',
+  allowedRoles: [ROLES.ADMIN,], //Ver roles que van aqui
+},
+
+
+
 ];
 
 export function getModulesForRole(role: Role): ModulePermission[] {
