@@ -8,8 +8,19 @@ export interface CrearReporteAsistenciaRequest {
   asociado_id: number;
   evento_id: number;
   fecha: string; // Formato YYYY-MM-DD
-  estado: EstadoAsistencia;
+  estado: 'presente' | 'ausente' | 'justificado';
   justificacion?: string;
+}
+
+export interface ActualizarReporteAsistenciaRequest {
+  estado: 'presente' | 'ausente' | 'justificado';
+  justificacion?: string;
+}
+
+export interface ActualizarReporteAsistenciaResponse {
+  success: boolean;
+  data?: ReporteAsistenciaResponse;
+  message: string;
 }
 /**
  * Esquema de validación con Zod para la creación de un reporte de asistencia.

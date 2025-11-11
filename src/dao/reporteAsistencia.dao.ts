@@ -1,37 +1,29 @@
 
-import { neon } from '@neondatabase/serverless';
 import { ReporteAsistencia } from '@/models/ReporteAsistencia';
-import { CrearReporteAsistenciaRequest } from '@/dto/reporteAsistencia.dto';
+import { neon } from '@neondatabase/serverless';
+import { CrearReporteAsistenciaRequest, ActualizarReporteAsistenciaRequest } from '@/dto/reporteAsistencia.dto';
 
-/**
- * Clase de error personalizada para errores del DAO de ReporteAsistencia
- */
 export class ReporteAsistenciaDAOError extends Error {
-  constructor(
-    message: string,
-    public code?: string,
-    public originalError?: unknown
-  ) {
+  code: string;
+  originalError?: any;
+
+  constructor(message: string, code: string, originalError?: any) {
     super(message);
+    this.code = code;
+    this.originalError = originalError;
     this.name = 'ReporteAsistenciaDAOError';
   }
 }
 
-/**
- * Data Access Object para la entidad ReporteAsistencia (tabla asistencias)
- */
 export class ReporteAsistenciaDAO {
   private connectionString: string;
   private sql: any;
 
   constructor(connectionString?: string) {
-    this.connectionString = connectionString || process.env.DATABASE_URL || '';
+    this.connectionString = connectionString || process.env.DATABASE_URL || process.env.POSTGRES_URL || '';
     this.sql = neon(this.connectionString);
   }
 
-  /**
-   * Obtiene la conexión a la base de datos
-   */
   private async getConnection(): Promise<any> {
     if (!this.sql) {
       throw new ReporteAsistenciaDAOError(
@@ -42,51 +34,60 @@ export class ReporteAsistenciaDAO {
     return this.sql;
   }
 
-  /**
-   * Mapea una fila de la base de datos a un objeto ReporteAsistencia
-   */
   private mapRowToReporteAsistencia(row: any): ReporteAsistencia {
-    const fechaRegistro = new Date(row.fecha_registro);
+    console.log('Mapeando fila:', row); // Debug
+    
     return {
-      id: row.id,
-      asociado_id: row.asociado_id,
-      evento_id: row.evento_id,
-      // Extraemos la fecha en formato YYYY-MM-DD
-      fecha: fechaRegistro.toISOString().split('T')[0],
-      estado: row.estado,
-      hora_registro: row.hora_registro,
-      justificacion: row.justificacion,
-      created_at: new Date(row.created_at).toISOString(),
-      updated_at: new Date(row.updated_at).toISOString(),
+      id: Number(row.id),
+      asociadoId: Number(row.asociado_id),
+      eventoId: Number(row.evento_id),
+      fecha: row.fecha instanceof Date 
+        ? row.fecha.toISOString().split('T')[0]
+        : new Date(row.fecha).toISOString().split('T')[0],
+      estado: row.estado as 'presente' | 'ausente' | 'justificado',
+      horaRegistro: row.hora_registro || null,
+      justificacion: row.justificacion || null,
+      createdAt: row.created_at instanceof Date
+        ? row.created_at.toISOString()
+        : new Date(row.created_at).toISOString(),
+      updatedAt: row.updated_at instanceof Date
+        ? row.updated_at.toISOString()
+        : new Date(row.updated_at).toISOString(),
     };
   }
 
-  /**
-   * Crea un nuevo registro de asistencia en la base de datos
-   */
   async crear(data: CrearReporteAsistenciaRequest): Promise<ReporteAsistencia> {
     try {
       const sql = await this.getConnection();
       
-      // La hora actual se registrará en la base de datos
+      console.log('Creando registro con datos:', data); // Debug
+      
       const result = await sql`
-        INSERT INTO asistencias (
+        INSERT INTO reportes_asistencia (
           asociado_id,
           evento_id,
-          fecha_registro,
+          fecha,
           estado,
           justificacion,
           hora_registro
         ) VALUES (
           ${data.asociado_id},
           ${data.evento_id},
-          ${new Date(data.fecha)},
+          ${data.fecha},
           ${data.estado},
           ${data.justificacion || null},
-          NOW()::time
+          CURRENT_TIME
         )
+        ON CONFLICT (asociado_id, evento_id, fecha)
+        DO UPDATE SET
+          estado = EXCLUDED.estado,
+          justificacion = EXCLUDED.justificacion,
+          hora_registro = CURRENT_TIME,
+          updated_at = CURRENT_TIMESTAMP
         RETURNING *
       `;
+      
+      console.log('Resultado de crear:', result); // Debug
       
       if (!result || result.length === 0) {
         throw new ReporteAsistenciaDAOError(
@@ -97,51 +98,140 @@ export class ReporteAsistenciaDAO {
 
       return this.mapRowToReporteAsistencia(result[0]);
     } catch (error: any) {
+      console.error('Error en crear:', error); // Debug
+      
       if (error instanceof ReporteAsistenciaDAOError) {
         throw error;
       }
       
-      // Manejar errores específicos de PostgreSQL (ej. foreign key, unique constraint)
-      if (error.code === '23503') { // Foreign key violation
+      if (error.code === '23503') {
         throw new ReporteAsistenciaDAOError(
-          'El asociado_id o evento_id no existen',
+          'El asociado o evento no existe',
           'FOREIGN_KEY_VIOLATION',
-          error
-        );
-      }
-       if (error.code === '23505') { // Unique constraint violation
-        throw new ReporteAsistenciaDAOError(
-          'Este asociado ya tiene un registro de asistencia para este evento',
-          'DUPLICATE_KEY',
           error
         );
       }
 
       throw new ReporteAsistenciaDAOError(
-        'Error al crear el registro de asistencia en la base de datos',
+        `Error al crear el registro: ${error.message}`,
         'DATABASE_ERROR',
         error
       );
     }
   }
 
-  /**
-   * Obtiene todos los registros de asistencia para un evento específico
-   */
+  async actualizar(id: number, data: ActualizarReporteAsistenciaRequest): Promise<ReporteAsistencia> {
+    try {
+      const sql = await this.getConnection();
+      
+      console.log('Actualizando registro:', id, data); // Debug
+      
+      const result = await sql`
+        UPDATE reportes_asistencia
+        SET 
+          estado = ${data.estado},
+          justificacion = ${data.justificacion || null},
+          hora_registro = CURRENT_TIME,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${id}
+        RETURNING *
+      `;
+      
+      console.log('Resultado de actualizar:', result); // Debug
+      
+      if (!result || result.length === 0) {
+        throw new ReporteAsistenciaDAOError(
+          'Registro de asistencia no encontrado',
+          'NOT_FOUND'
+        );
+      }
+
+      return this.mapRowToReporteAsistencia(result[0]);
+    } catch (error: any) {
+      console.error('Error en actualizar:', error); // Debug
+      
+      if (error instanceof ReporteAsistenciaDAOError) {
+        throw error;
+      }
+
+      throw new ReporteAsistenciaDAOError(
+        `Error al actualizar el registro: ${error.message}`,
+        'DATABASE_ERROR',
+        error
+      );
+    }
+  }
+
   async obtenerPorEventoId(eventoId: number): Promise<ReporteAsistencia[]> {
     try {
       const sql = await this.getConnection();
       
+      console.log('Obteniendo registros para evento:', eventoId); // Debug
+      
       const result = await sql`
-        SELECT * FROM asistencias
+        SELECT * FROM reportes_asistencia
         WHERE evento_id = ${eventoId}
         ORDER BY id ASC
       `;
       
+      console.log('Registros encontrados:', result.length); // Debug
+      console.log('Primer registro:', result[0]); // Debug
+      
       return result.map((row: any) => this.mapRowToReporteAsistencia(row));
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Error en obtenerPorEventoId:', error); // Debug
+      
       throw new ReporteAsistenciaDAOError(
-        'Error al obtener los registros de asistencia por evento',
+        `Error al obtener registros: ${error.message}`,
+        'DATABASE_ERROR',
+        error
+      );
+    }
+  }
+
+  async eliminarPorEvento(eventoId: number): Promise<number> {
+    try {
+      const sql = await this.getConnection();
+      
+      console.log('Eliminando registros del evento:', eventoId); // Debug
+      
+      const result = await sql`
+        DELETE FROM reportes_asistencia
+        WHERE evento_id = ${eventoId}
+        RETURNING id
+      `;
+      
+      console.log('Registros eliminados:', result.length); // Debug
+      
+      return result.length;
+    } catch (error: any) {
+      console.error('Error en eliminarPorEvento:', error); // Debug
+      
+      throw new ReporteAsistenciaDAOError(
+        `Error al eliminar registros: ${error.message}`,
+        'DATABASE_ERROR',
+        error
+      );
+    }
+  }
+
+  async obtenerPorId(id: number): Promise<ReporteAsistencia | null> {
+    try {
+      const sql = await this.getConnection();
+      
+      const result = await sql`
+        SELECT * FROM reportes_asistencia
+        WHERE id = ${id}
+      `;
+      
+      if (!result || result.length === 0) {
+        return null;
+      }
+
+      return this.mapRowToReporteAsistencia(result[0]);
+    } catch (error: any) {
+      throw new ReporteAsistenciaDAOError(
+        `Error al obtener registro por ID: ${error.message}`,
         'DATABASE_ERROR',
         error
       );
