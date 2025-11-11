@@ -11,6 +11,17 @@ export interface CrearReporteAsistenciaRequest {
   estado: EstadoAsistencia;
   justificacion?: string;
 }
+
+export interface ActualizarReporteAsistenciaRequest {
+  estado: EstadoAsistencia;
+  justificacion?: string;
+}
+
+export interface ActualizarReporteAsistenciaResponse {
+  success: boolean;
+  data?: ReporteAsistenciaResponse;
+  message: string;
+}
 /**
  * Esquema de validación con Zod para la creación de un reporte de asistencia.
  */
