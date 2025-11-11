@@ -23,7 +23,7 @@ export async function middleware(request: NextRequest) {
   const token = request.cookies.get('auth-token')?.value;
   const { pathname } = request.nextUrl;
 
-  console.log('=== MIDDLEWARE ===');
+  console.log(' MIDDLEWARE ');
   console.log('Path:', pathname);
   console.log('Token presente:', !!token);
 

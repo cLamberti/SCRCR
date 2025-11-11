@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { FaArrowLeft, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 
 // Definimos un tipo para los datos del usuario que mostraremos en la tabla
 type UsuarioRow = {
@@ -21,7 +23,21 @@ type FormState = {
   rol: 'admin' | 'tesorero' | 'pastorGeneral';
 };
 
+// Tipo para la respuesta de la API con paginación
+type ApiResponse = {
+  success: boolean;
+  data: UsuarioRow[];
+  message?: string;
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
 export default function GestionUsuariosPage() {
+  const router = useRouter();
   const [usuarios, setUsuarios] = useState<UsuarioRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [mensaje, setMensaje] = useState('');
@@ -33,20 +49,34 @@ export default function GestionUsuariosPage() {
     rol: 'tesorero', // Rol por defecto
   });
 
-  // Función para cargar la lista de usuarios
-  const cargarUsuarios = async () => {
+  // Estados para paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+
+  // Función para cargar la lista de usuarios con paginación
+  const cargarUsuarios = async (page: number = currentPage, limit: number = itemsPerPage) => {
     setLoading(true);
     setMensaje('');
     try {
-      const res = await fetch('/api/usuarios');
-      const json = await res.json();
+      const res = await fetch(`/api/usuarios?page=${page}&limit=${limit}`);
+      const json: ApiResponse = await res.json();
 
       if (!res.ok || !json.success) {
         setMensaje(json.message || 'Error al obtener usuarios');
         setUsuarios([]);
         return;
       }
+      
       setUsuarios(json.data || []);
+      
+      // Actualizar información de paginación
+      if (json.pagination) {
+        setCurrentPage(json.pagination.page);
+        setTotalPages(json.pagination.totalPages);
+        setTotalItems(json.pagination.total);
+      }
     } catch (e) {
       console.error('Error cargando usuarios:', e);
       setMensaje('Error de conexión. Intenta de nuevo.');
@@ -59,6 +89,11 @@ export default function GestionUsuariosPage() {
   useEffect(() => {
     cargarUsuarios();
   }, []);
+
+  // Recargar cuando cambia la página o items por página
+  useEffect(() => {
+    cargarUsuarios(currentPage, itemsPerPage);
+  }, [currentPage, itemsPerPage]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -103,7 +138,8 @@ export default function GestionUsuariosPage() {
         rol: 'tesorero',
       });
       // Recargar la lista de usuarios para ver el nuevo
-      await cargarUsuarios();
+      setCurrentPage(1); // Volver a la primera página
+      await cargarUsuarios(1, itemsPerPage);
 
     } catch (error) {
       console.error('Error en el submit:', error);
@@ -113,12 +149,39 @@ export default function GestionUsuariosPage() {
     }
   };
 
+  // Funciones de paginación
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const handleItemsPerPageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newLimit = parseInt(e.target.value);
+    setItemsPerPage(newLimit);
+    setCurrentPage(1); // Resetear a la primera página
+  };
+
   const formInputClass = "shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-200";
 
   return (
     <div className="flex bg-[#f2f2f2] min-h-screen font-['Segoe_UI',sans-serif]">
       <div className="flex-grow p-4">
         <div className="max-w-7xl mx-auto">
+          {/* Botón de Volver */}
+          <button
+            onClick={() => router.back()}
+            className="inline-flex items-center gap-2 text-[#003366] hover:text-[#17609c] mb-4 transition-colors"
+          >
+            <FaArrowLeft /> Volver
+          </button>
+
           <div className="p-[30px] bg-white rounded-lg my-[30px] shadow-md">
             <div className="text-2xl font-bold border-b-2 border-gray-300 pb-2 mb-[20px] text-[#003366]">
               Gestión de Usuarios
@@ -179,6 +242,27 @@ export default function GestionUsuariosPage() {
               </div>
             </form>
 
+            {/* Controles de paginación superiores */}
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-700">Mostrar:</label>
+                <select
+                  value={itemsPerPage}
+                  onChange={handleItemsPerPageChange}
+                  className="border border-gray-300 rounded px-2 py-1 text-sm"
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                </select>
+                <span className="text-sm text-gray-700">registros por página</span>
+              </div>
+              <div className="text-sm text-gray-700">
+                Total: {totalItems} usuario{totalItems !== 1 ? 's' : ''}
+              </div>
+            </div>
+
             {/* Tabla de usuarios */}
             <div className="overflow-x-auto">
               <table className="min-w-full bg-white border border-gray-200">
@@ -219,6 +303,40 @@ export default function GestionUsuariosPage() {
                   )}
                 </tbody>
               </table>
+            </div>
+
+            {/* Controles de paginación inferiores */}
+            <div className="flex justify-between items-center mt-4">
+              <div className="text-sm text-gray-700">
+                Mostrando {usuarios.length} de {totalItems} usuarios
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handlePreviousPage}
+                  disabled={currentPage === 1}
+                  className={`p-2 rounded ${
+                    currentPage === 1
+                      ? 'text-gray-400 cursor-not-allowed'
+                      : 'text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  <FaChevronLeft />
+                </button>
+                <span className="text-sm text-gray-700">
+                  Página {currentPage} de {totalPages}
+                </span>
+                <button
+                  onClick={handleNextPage}
+                  disabled={currentPage === totalPages}
+                  className={`p-2 rounded ${
+                    currentPage === totalPages
+                      ? 'text-gray-400 cursor-not-allowed'
+                      : 'text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  <FaChevronRight />
+                </button>
+              </div>
             </div>
           </div>
         </div>
