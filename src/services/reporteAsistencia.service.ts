@@ -85,7 +85,7 @@ export class ReporteAsistenciaService {
       asociado_id: reporte.asociado_id,
       evento_id: reporte.evento_id,
       fecha: reporte.fecha,
-      estado: reporte.estado,
+      estado: reporte.estado as any,
       hora_registro: reporte.hora_registro,
       justificacion: reporte.justificacion,
     };
@@ -211,8 +211,10 @@ export class ReporteAsistenciaService {
       // Actualizar el registro
       const registroActualizado = await this.dao.actualizar(
         id,
-        estadoLower as 'presente' | 'ausente' | 'justificado',
-        data.justificacion
+        {
+          estado: estadoLower as 'presente' | 'ausente' | 'justificado',
+          justificacion: data.justificacion
+        }
       );
 
       return registroActualizado;

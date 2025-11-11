@@ -13,33 +13,35 @@ import {
   FaTimesCircle,
   FaExclamationCircle,
   FaSpinner,
-  FaEdit,
 } from 'react-icons/fa';
+
+enum EstadoAsistencia {
+  Presente = 'presente',
+  Ausente = 'ausente',
+  Justificado = 'justificado',
+}
 
 interface Asociado {
   id: number;
   nombreCompleto: string;
   cedula: string;
-  telefono?: string;
   ministerio?: string;
 }
 
 interface Evento {
   id: number;
   nombre: string;
-  descripcion?: string;
   fecha: string;
-  hora?: string;
 }
 
 interface RegistroAsistencia {
   id: number;
-  eventoId: number;
   asociadoId: number;
-  estado: 'presente' | 'ausente' | 'justificado';
+  eventoId: number;
+  estado: EstadoAsistencia;
   fecha: string;
-  horaRegistro?: string;
   justificacion?: string;
+  horaRegistro: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -64,13 +66,15 @@ export default function ReportesPage() {
   useEffect(() => {
     if (eventoId > 0) {
       cargarRegistros();
+    } else {
+      setRegistros([]);
     }
   }, [eventoId]);
 
   const cargarAsociados = async () => {
     try {
       setCargandoAsociados(true);
-      const res = await fetch('/api/asociados');
+      const res = await fetch('/api/asociados/consulta?all=true');
       const data = await res.json();
 
       if (data.success && Array.isArray(data.data)) {
@@ -118,9 +122,26 @@ export default function ReportesPage() {
       const res = await fetch(`/api/reporte-asistencia?eventoId=${eventoId}`);
       const data = await res.json();
 
+      console.log('Respuesta completa del servidor:', data); // Debug
+
       if (data.success && Array.isArray(data.data)) {
-        setRegistros(data.data);
+        // Mapear los datos correctamente
+        const registrosMapeados = data.data.map((registro: any) => ({
+          id: registro.id,
+          asociadoId: registro.asociado_id || registro.asociadoId,
+          eventoId: registro.evento_id || registro.eventoId,
+          estado: registro.estado as EstadoAsistencia,
+          fecha: registro.fecha,
+          justificacion: registro.justificacion,
+          horaRegistro: registro.hora_registro || registro.horaRegistro,
+          createdAt: registro.created_at || registro.createdAt,
+          updatedAt: registro.updated_at || registro.updatedAt,
+        }));
+        
+        console.log('Registros mapeados:', registrosMapeados); // Debug
+        setRegistros(registrosMapeados);
       } else {
+        console.log('No hay datos o formato incorrecto'); // Debug
         setRegistros([]);
       }
     } catch (error) {
@@ -134,23 +155,34 @@ export default function ReportesPage() {
 
   const registrarAsistencia = async (
     asociadoId: number,
-    estado: 'presente' | 'ausente' | 'justificado',
+    estado: EstadoAsistencia,
     justificacion?: string
   ) => {
     setProcesando(prev => new Set(prev).add(asociadoId));
     const toastId = toast.loading('Registrando asistencia...');
 
     try {
+      const body: {
+        eventoId: number;
+        asociadoId: number;
+        estado: EstadoAsistencia;
+        fecha: string;
+        justificacion?: string;
+      } = {
+        eventoId,
+        asociadoId,
+        estado,
+        fecha: new Date().toISOString().split('T')[0],
+      };
+
+      if (justificacion) {
+        body.justificacion = justificacion;
+      }
+
       const res = await fetch('/api/reporte-asistencia', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          eventoId,
-          asociadoId,
-          estado,
-          fecha: new Date().toISOString().split('T')[0],
-          justificacion,
-        }),
+        body: JSON.stringify(body),
       });
 
       const data = await res.json();
@@ -160,8 +192,8 @@ export default function ReportesPage() {
         await cargarRegistros();
         
         toast.success(
-          estado === 'presente' ? '✓ Presente' :
-          estado === 'ausente' ? '✗ Ausente' :
+          estado === EstadoAsistencia.Presente ? '✓ Presente' :
+          estado === EstadoAsistencia.Ausente ? '✗ Ausente' :
           '⚠ Justificado',
           { id: toastId, duration: 1500 }
         );
@@ -183,7 +215,7 @@ export default function ReportesPage() {
   const actualizarAsistencia = async (
     registroId: number,
     asociadoId: number,
-    nuevoEstado: 'presente' | 'ausente' | 'justificado',
+    nuevoEstado: EstadoAsistencia,
     justificacion?: string
   ) => {
     setProcesando(prev => new Set(prev).add(asociadoId));
@@ -206,8 +238,8 @@ export default function ReportesPage() {
         await cargarRegistros();
         
         toast.success(
-          nuevoEstado === 'presente' ? '✓ Actualizado a Presente' :
-          nuevoEstado === 'ausente' ? '✗ Actualizado a Ausente' :
+          nuevoEstado === EstadoAsistencia.Presente ? '✓ Actualizado a Presente' :
+          nuevoEstado === EstadoAsistencia.Ausente ? '✗ Actualizado a Ausente' :
           '⚠ Actualizado a Justificado',
           { id: toastId, duration: 1500 }
         );
@@ -228,13 +260,15 @@ export default function ReportesPage() {
 
   const manejarCambioEstado = async (
     asociadoId: number,
-    nuevoEstado: 'presente' | 'ausente' | 'justificado'
+    nuevoEstado: EstadoAsistencia
   ) => {
     const registroExistente = registros.find(r => r.asociadoId === asociadoId);
     
+    console.log('Cambio de estado:', { asociadoId, nuevoEstado, registroExistente }); // Debug
+    
     if (!registroExistente) {
       // Si no existe registro, crear uno nuevo
-      if (nuevoEstado === 'justificado') {
+      if (nuevoEstado === EstadoAsistencia.Justificado) {
         const { value: justificacion } = await Swal.fire({
           title: 'Justificación',
           input: 'textarea',
@@ -248,14 +282,14 @@ export default function ReportesPage() {
           cancelButtonText: 'Cancelar',
           reverseButtons: true,
           inputValidator: (value) => {
-            if (!value) {
+            if (!value || value.trim() === '') {
               return 'La justificación es obligatoria';
             }
             return null;
           }
         });
 
-        if (justificacion !== undefined) {
+        if (justificacion) {
           await registrarAsistencia(asociadoId, nuevoEstado, justificacion);
         }
       } else {
@@ -264,15 +298,24 @@ export default function ReportesPage() {
       return;
     }
 
+    // Si el estado actual es el mismo que el nuevo, no hacer nada
+    if (registroExistente.estado === nuevoEstado) {
+      toast('El asociado ya tiene este estado registrado', {
+        icon: 'ℹ️',
+        duration: 2000,
+      });
+      return;
+    }
+
     // Si ya existe registro, confirmar cambio
     const estadoActualTexto = 
-      registroExistente.estado === 'presente' ? 'Presente' :
-      registroExistente.estado === 'ausente' ? 'Ausente' :
+      registroExistente.estado === EstadoAsistencia.Presente ? 'Presente' :
+      registroExistente.estado === EstadoAsistencia.Ausente ? 'Ausente' :
       'Justificado';
 
     const nuevoEstadoTexto = 
-      nuevoEstado === 'presente' ? 'Presente' :
-      nuevoEstado === 'ausente' ? 'Ausente' :
+      nuevoEstado === EstadoAsistencia.Presente ? 'Presente' :
+      nuevoEstado === EstadoAsistencia.Ausente ? 'Ausente' :
       'Justificado';
 
     const result = await Swal.fire({
@@ -297,7 +340,7 @@ export default function ReportesPage() {
     }
 
     // Si el nuevo estado es justificado, pedir justificación
-    if (nuevoEstado === 'justificado') {
+    if (nuevoEstado === EstadoAsistencia.Justificado) {
       const { value: justificacion } = await Swal.fire({
         title: 'Nueva Justificación',
         input: 'textarea',
@@ -311,14 +354,14 @@ export default function ReportesPage() {
         cancelButtonText: 'Cancelar',
         reverseButtons: true,
         inputValidator: (value) => {
-          if (!value) {
+          if (!value || value.trim() === '') {
             return 'La justificación es obligatoria';
           }
           return null;
         }
       });
 
-      if (justificacion !== undefined) {
+      if (justificacion) {
         await actualizarAsistencia(registroExistente.id, asociadoId, nuevoEstado, justificacion);
       }
     } else {
@@ -371,7 +414,7 @@ export default function ReportesPage() {
         // Limpiar el estado local inmediatamente
         setRegistros([]);
         
-        toast.success('✓ Asistencia reseteada exitosamente', { 
+        toast.success('Asistencia reseteada exitosamente', { 
           id: toastId, 
           duration: 2000 
         });
@@ -393,37 +436,43 @@ export default function ReportesPage() {
   };
 
   const obtenerEstadoAsociado = (asociadoId: number) => {
-    return registros.find(r => r.asociadoId === asociadoId)?.estado;
+    const registro = registros.find(r => {
+      console.log(`Comparando: r.asociadoId=${r.asociadoId} con asociadoId=${asociadoId}`); // Debug
+      return r.asociadoId === asociadoId;
+    });
+    console.log(`Estado encontrado para asociado ${asociadoId}:`, registro?.estado); // Debug
+    return registro?.estado;
   };
 
-  const getEstadoIcon = (estado?: string) => {
+  const getEstadoIcon = (estado?: EstadoAsistencia) => {
     switch (estado) {
-      case 'presente':
+      case EstadoAsistencia.Presente:
         return <FaCheckCircle className="text-green-600" />;
-      case 'ausente':
+      case EstadoAsistencia.Ausente:
         return <FaTimesCircle className="text-red-600" />;
-      case 'justificado':
+      case EstadoAsistencia.Justificado:
         return <FaExclamationCircle className="text-yellow-600" />;
       default:
         return null;
     }
   };
 
-  const getEstadoBadge = (estado?: string) => {
+  const getEstadoBadge = (estado?: EstadoAsistencia) => {
+    console.log('getEstadoBadge:', estado);
     switch (estado) {
-      case 'presente':
+      case EstadoAsistencia.Presente:
         return (
           <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">
             Presente
           </span>
         );
-      case 'ausente':
+      case EstadoAsistencia.Ausente:
         return (
           <span className="px-2 py-1 bg-red-100 text-red-800 text-xs font-semibold rounded-full">
             Ausente
           </span>
         );
-      case 'justificado':
+      case EstadoAsistencia.Justificado:
         return (
           <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded-full">
             Justificado
@@ -439,9 +488,9 @@ export default function ReportesPage() {
   };
 
   const contarEstados = () => {
-    const presentes = registros.filter(r => r.estado === 'presente').length;
-    const ausentes = registros.filter(r => r.estado === 'ausente').length;
-    const justificados = registros.filter(r => r.estado === 'justificado').length;
+    const presentes = registros.filter(r => r.estado === EstadoAsistencia.Presente).length;
+    const ausentes = registros.filter(r => r.estado === EstadoAsistencia.Ausente).length;
+    const justificados = registros.filter(r => r.estado === EstadoAsistencia.Justificado).length;
     const sinRegistro = asociados.length - registros.length;
 
     return { presentes, ausentes, justificados, sinRegistro };
@@ -589,12 +638,12 @@ export default function ReportesPage() {
                         <td className="py-3 px-4 border-b">
                           <div className="flex gap-2 flex-wrap">
                             <button
-                              onClick={() => manejarCambioEstado(asociado.id, 'presente')}
-                              disabled={procesando.has(asociado.id) || estado === 'presente'}
+                              onClick={() => manejarCambioEstado(asociado.id, EstadoAsistencia.Presente)}
+                              disabled={procesando.has(asociado.id) || estado === EstadoAsistencia.Presente}
                               className={`px-3 py-1 rounded text-sm flex items-center gap-1 ${
                                 procesando.has(asociado.id)
                                   ? 'bg-gray-300 cursor-not-allowed'
-                                  : estado === 'presente'
+                                  : estado === EstadoAsistencia.Presente
                                   ? 'bg-green-300 cursor-not-allowed'
                                   : 'bg-green-600 hover:bg-green-700 text-white'
                               }`}
@@ -607,12 +656,12 @@ export default function ReportesPage() {
                               Presente
                             </button>
                             <button
-                              onClick={() => manejarCambioEstado(asociado.id, 'ausente')}
-                              disabled={procesando.has(asociado.id) || estado === 'ausente'}
+                              onClick={() => manejarCambioEstado(asociado.id, EstadoAsistencia.Ausente)}
+                              disabled={procesando.has(asociado.id) || estado === EstadoAsistencia.Ausente}
                               className={`px-3 py-1 rounded text-sm flex items-center gap-1 ${
                                 procesando.has(asociado.id)
                                   ? 'bg-gray-300 cursor-not-allowed'
-                                  : estado === 'ausente'
+                                  : estado === EstadoAsistencia.Ausente
                                   ? 'bg-red-300 cursor-not-allowed'
                                   : 'bg-red-600 hover:bg-red-700 text-white'
                               }`}
@@ -625,12 +674,12 @@ export default function ReportesPage() {
                               Ausente
                             </button>
                             <button
-                              onClick={() => manejarCambioEstado(asociado.id, 'justificado')}
-                              disabled={procesando.has(asociado.id) || estado === 'justificado'}
+                              onClick={() => manejarCambioEstado(asociado.id, EstadoAsistencia.Justificado)}
+                              disabled={procesando.has(asociado.id) || estado === EstadoAsistencia.Justificado}
                               className={`px-3 py-1 rounded text-sm flex items-center gap-1 ${
                                 procesando.has(asociado.id)
                                   ? 'bg-gray-300 cursor-not-allowed'
-                                  : estado === 'justificado'
+                                  : estado === EstadoAsistencia.Justificado
                                   ? 'bg-yellow-300 cursor-not-allowed'
                                   : 'bg-yellow-600 hover:bg-yellow-700 text-white'
                               }`}

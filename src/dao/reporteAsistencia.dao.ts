@@ -1,5 +1,5 @@
 
-import { ReporteAsistencia } from '@/models/ReporteAsistencia';
+import { ReporteAsistencia, EstadoAsistencia } from '@/models/ReporteAsistencia';
 import { neon } from '@neondatabase/serverless';
 import { CrearReporteAsistenciaRequest, ActualizarReporteAsistenciaRequest } from '@/dto/reporteAsistencia.dto';
 
@@ -36,21 +36,25 @@ export class ReporteAsistenciaDAO {
 
   private mapRowToReporteAsistencia(row: any): ReporteAsistencia {
     console.log('Mapeando fila:', row); // Debug
-    
+    const estadoValido = ['presente', 'ausente', 'justificado'].includes(row.estado);
+    if (!estadoValido) {
+      console.warn(`Estado inválido encontrado: ${row.estado}, usando 'ausente' por defecto`);
+    }
+
     return {
       id: Number(row.id),
-      asociadoId: Number(row.asociado_id),
-      eventoId: Number(row.evento_id),
+      asociado_id: Number(row.asociado_id),
+      evento_id: Number(row.evento_id),
       fecha: row.fecha instanceof Date 
         ? row.fecha.toISOString().split('T')[0]
         : new Date(row.fecha).toISOString().split('T')[0],
-      estado: row.estado as 'presente' | 'ausente' | 'justificado',
-      horaRegistro: row.hora_registro || null,
+      estado: estadoValido ? row.estado as EstadoAsistencia : EstadoAsistencia.Ausente,
+      hora_registro: row.hora_registro || null,
       justificacion: row.justificacion || null,
-      createdAt: row.created_at instanceof Date
+      created_at: row.created_at instanceof Date
         ? row.created_at.toISOString()
         : new Date(row.created_at).toISOString(),
-      updatedAt: row.updated_at instanceof Date
+      updated_at: row.updated_at instanceof Date
         ? row.updated_at.toISOString()
         : new Date(row.updated_at).toISOString(),
     };
@@ -120,48 +124,46 @@ export class ReporteAsistenciaDAO {
     }
   }
 
-  async actualizar(id: number, data: ActualizarReporteAsistenciaRequest): Promise<ReporteAsistencia> {
-    try {
-      const sql = await this.getConnection();
-      
-      console.log('Actualizando registro:', id, data); // Debug
-      
-      const result = await sql`
-        UPDATE reportes_asistencia
-        SET 
-          estado = ${data.estado},
-          justificacion = ${data.justificacion || null},
-          hora_registro = CURRENT_TIME,
-          updated_at = CURRENT_TIMESTAMP
-        WHERE id = ${id}
-        RETURNING *
-      `;
-      
-      console.log('Resultado de actualizar:', result); // Debug
-      
-      if (!result || result.length === 0) {
-        throw new ReporteAsistenciaDAOError(
-          'Registro de asistencia no encontrado',
-          'NOT_FOUND'
-        );
-      }
-
-      return this.mapRowToReporteAsistencia(result[0]);
-    } catch (error: any) {
-      console.error('Error en actualizar:', error); // Debug
-      
-      if (error instanceof ReporteAsistenciaDAOError) {
-        throw error;
-      }
-
+  /**
+ * Actualiza un registro de asistencia existente
+ */
+async actualizar(
+  id: number,
+  data: { estado: string; justificacion?: string }
+): Promise<ReporteAsistencia> {
+  try {
+    const sql = await this.getConnection();
+    
+    const result = await sql`
+      UPDATE asistencias
+      SET 
+        estado = ${data.estado},
+        justificacion = ${data.justificacion || null},
+        updated_at = NOW()
+      WHERE id = ${id}
+      RETURNING *
+    `;
+    
+    if (!result || result.length === 0) {
       throw new ReporteAsistenciaDAOError(
-        `Error al actualizar el registro: ${error.message}`,
-        'DATABASE_ERROR',
-        error
+        'No se pudo actualizar el registro de asistencia',
+        'UPDATE_FAILED'
       );
     }
-  }
 
+    return this.mapRowToReporteAsistencia(result[0]);
+  } catch (error: any) {
+    if (error instanceof ReporteAsistenciaDAOError) {
+      throw error;
+    }
+    
+    throw new ReporteAsistenciaDAOError(
+      'Error al actualizar el registro de asistencia en la base de datos',
+      'DATABASE_ERROR',
+      error
+    );
+  }
+}
   async obtenerPorEventoId(eventoId: number): Promise<ReporteAsistencia[]> {
     try {
       const sql = await this.getConnection();

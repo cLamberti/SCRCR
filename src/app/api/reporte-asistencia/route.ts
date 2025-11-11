@@ -15,28 +15,39 @@ export async function GET(request: NextRequest) {
 
     if (!eventoId) {
       return NextResponse.json(
-        {
-          success: false,
-          message: 'El ID del evento es requerido',
-        },
+        { success: false, message: 'eventoId es requerido' },
         { status: 400 }
       );
     }
 
-    const registros = await reporteDAO.obtenerPorEventoId(Number(eventoId));
+    const dao = new ReporteAsistenciaDAO();
+    const registros = await dao.obtenerPorEventoId(Number(eventoId));
+     console.log('Registros desde DAO:', registros); // Debug
+
+     // Asegurarse de que los datos tengan el formato correcto
+    const registrosFormateados = registros.map(registro => ({
+      id: registro.id,
+      asociadoId: registro.asociado_id,
+      eventoId: registro.evento_id,
+      estado: registro.estado,
+      fecha: registro.fecha,
+      justificacion: registro.justificacion,
+      horaRegistro: registro.hora_registro,
+      createdAt: registro.created_at,
+      updatedAt: registro.updated_at,
+    }));
+
+    console.log('Registros formateados:', registrosFormateados); // Debug
 
     return NextResponse.json({
       success: true,
-      data: registros,
-      message: `Se encontraron ${registros.length} registros de asistencia`,
+      data: registrosFormateados,
+      message: `Se encontraron ${registros.length} registros`
     });
-  } catch (error: any) {
-    console.error('Error al obtener registros de asistencia:', error);
+  } catch (error) {
+    console.error('Error en GET /api/reporte-asistencia:', error);
     return NextResponse.json(
-      {
-        success: false,
-        message: error.message || 'Error al obtener los registros de asistencia',
-      },
+      { success: false, message: 'Error al obtener registros' },
       { status: 500 }
     );
   }
@@ -97,44 +108,39 @@ export async function PUT(request: NextRequest) {
 
     if (!id) {
       return NextResponse.json(
-        {
-          success: false,
-          message: 'El ID del registro es requerido',
-        },
+        { success: false, message: 'ID es requerido' },
         { status: 400 }
       );
     }
-
     const body = await request.json();
-    const { estado, justificacion } = body;
+    const dao = new ReporteAsistenciaDAO();
 
-    if (!estado) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: 'El estado es requerido',
-        },
-        { status: 400 }
-      );
-    }
-
-    const registroActualizado = await reporteDAO.actualizar(Number(id), {
-      estado,
-      justificacion,
+    const registroActualizado = await dao.actualizar(Number(id), {
+      estado: body.estado,
+      justificacion: body.justificacion,
     });
+
+    console.log('Registro actualizado:', registroActualizado); // Debug
 
     return NextResponse.json({
       success: true,
-      data: registroActualizado,
-      message: 'Asistencia actualizada exitosamente',
-    });
-  } catch (error: any) {
-    console.error('Error al actualizar registro de asistencia:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        message: error.message || 'Error al actualizar la asistencia',
+      data: {
+        id: registroActualizado.id,
+        asociadoId: registroActualizado.asociado_id,
+        eventoId: registroActualizado.evento_id,
+        estado: registroActualizado.estado,
+        fecha: registroActualizado.fecha,
+        justificacion: registroActualizado.justificacion,
+        horaRegistro: registroActualizado.hora_registro,
+        createdAt: registroActualizado.created_at,
+        updatedAt: registroActualizado.updated_at,
       },
+      message: 'Registro actualizado exitosamente'
+    });
+  } catch (error) {
+    console.error('Error en PUT /api/reporte-asistencia:', error);
+    return NextResponse.json(
+      { success: false, message: 'Error al actualizar registro' },
       { status: 500 }
     );
   }

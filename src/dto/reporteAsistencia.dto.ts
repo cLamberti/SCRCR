@@ -8,12 +8,12 @@ export interface CrearReporteAsistenciaRequest {
   asociado_id: number;
   evento_id: number;
   fecha: string; // Formato YYYY-MM-DD
-  estado: 'presente' | 'ausente' | 'justificado';
+  estado: EstadoAsistencia;
   justificacion?: string;
 }
 
 export interface ActualizarReporteAsistenciaRequest {
-  estado: 'presente' | 'ausente' | 'justificado';
+  estado: EstadoAsistencia;
   justificacion?: string;
 }
 
