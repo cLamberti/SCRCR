@@ -135,7 +135,7 @@ async actualizar(
     const sql = await this.getConnection();
     
     const result = await sql`
-      UPDATE asistencias
+      UPDATE reportes_asistencia
       SET 
         estado = ${data.estado},
         justificacion = ${data.justificacion || null},
