@@ -1,5 +1,5 @@
 
-import { CreateUsuarioSchema, LoginSchema} from '@/dto/usuario.dto';
+import { CreateUsuarioSchema, LoginSchema } from '@/dto/usuario.dto';
 import { ZodError } from 'zod';
 
 export class UsuarioValidator {
@@ -55,4 +55,5 @@ export class UsuarioValidator {
     }
   }
 }
-export { LoginSchema, CreateUsuarioSchema};
+
+export { LoginSchema, CreateUsuarioSchema };
