@@ -72,10 +72,10 @@ export default function HomePage() {
         color: 'from-slate-600 to-slate-700'
       },
       {
-        titulo: 'Registro de Asistencia',
-        descripcion: 'Generar registro de asistencia',
+        titulo: 'Reportes',
+        descripcion: 'Generar reportes y estadísticas',
         icono: <FaChartLine className="text-4xl" />,
-        href: '/asistencia/registro',
+        href: '/reportes',
         roles: ['admin', 'tesorero', 'pastorGeneral'],
         color: 'from-[#2070ac] to-[#3080bc]'
       },
