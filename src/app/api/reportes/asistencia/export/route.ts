@@ -23,43 +23,17 @@ export async function GET(request: NextRequest) {
     // Validaciones
     const dateRe = /^\d{4}-\d{2}-\d{2}$/;
     const issues: string[] = [];
-
-    if (fechaInicio && !dateRe.test(fechaInicio)) {
-      issues.push("fechaInicio: formato inválido (YYYY-MM-DD).");
-    }
-    if (fechaFin && !dateRe.test(fechaFin)) {
-      issues.push("fechaFin: formato inválido (YYYY-MM-DD).");
-    }
+    if (fechaInicio && !dateRe.test(fechaInicio)) issues.push("fechaInicio: formato inválido (YYYY-MM-DD).");
+    if (fechaFin && !dateRe.test(fechaFin))       issues.push("fechaFin: formato inválido (YYYY-MM-DD).");
     if (fechaInicio && fechaFin && new Date(fechaInicio) > new Date(fechaFin)) {
       issues.push("rangoFechas: fechaInicio no puede ser mayor que fechaFin.");
     }
-
-    let eventoNum: number | undefined;
-    let usuarioNum: number | undefined;
-
-    if (evento) {
-      const n = Number(evento);
-      if (!Number.isFinite(n) || n <= 0) {
-        issues.push("evento: debe ser número positivo.");
-      } else {
-        eventoNum = n;
-      }
-    }
-
-    if (usuario) {
-      const n = Number(usuario);
-      if (!Number.isFinite(n) || n <= 0) {
-        issues.push("usuario: debe ser número positivo.");
-      } else {
-        usuarioNum = n;
-      }
-    }
-
+    const eventoNum  = evento  ? Number(evento)  : undefined;
+    const usuarioNum = usuario ? Number(usuario) : undefined;
+    if (evento && (!Number.isFinite(eventoNum) || eventoNum <= 0))   issues.push("evento: debe ser número positivo.");
+    if (usuario && (!Number.isFinite(usuarioNum) || usuarioNum <= 0)) issues.push("usuario: debe ser número positivo.");
     if (issues.length) {
-      return NextResponse.json(
-        { success: false, message: "Parámetros inválidos.", errors: issues },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, message: "Parámetros inválidos.", errors: issues }, { status: 400 });
     }
 
     const where: string[] = [];
