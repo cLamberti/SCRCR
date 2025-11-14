@@ -50,7 +50,7 @@ export function useAuth() {
 
   const logout = async () => {
     try {
-      console.log('=== Cerrando sesión ===');
+      console.log('Cerrando sesión');
       
       await fetch('/api/auth/logout', {
         method: 'POST',
