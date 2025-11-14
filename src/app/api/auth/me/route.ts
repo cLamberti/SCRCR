@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const secret = process.env.JWT_SECRET || 'tu-secreto-super-seguro-cambiar-en-produccion';
+    const secret = process.env.JWT_SECRET || 'uwrT0PdHQ7gkJeoaD3iKqMGk';
     
     let decoded: any;
     try {
