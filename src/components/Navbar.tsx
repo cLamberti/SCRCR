@@ -19,25 +19,8 @@ export default function Navbar() {
 
           {/* Menú de navegación */}
           <div className="flex items-center space-x-6">
-            <Link href="/" className="hover:text-gray-300 transition-colors">
-              Inicio
-            </Link>
             
-            {isAuthenticated && (
-              <>
-                <Link href="/registro-asociados" className="hover:text-gray-300 transition-colors">
-                  Registro
-                </Link>
-                <Link href="/consulta-asociados" className="hover:text-gray-300 transition-colors">
-                  Consulta
-                </Link>
-                {(user?.rol === 'admin' || user?.rol === 'pastorGeneral') && (
-                  <Link href="/gestion-usuarios" className="hover:text-gray-300 transition-colors">
-                    Usuarios
-                  </Link>
-                )}
-              </>
-            )}
+  
 
             {/* Usuario y logout */}
             {loading ? (

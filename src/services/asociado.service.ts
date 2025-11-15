@@ -8,7 +8,7 @@ import {
   AllAsociadosResponse
 } from '@/dto/asociado.dto';
 import { AsociadoValidator } from '@/validators/asociado.validator';
-import { AsociadoDAO, AsociadoDAOError } from '@/dao/asociado.dao'; // <-- Importar el DAO
+import { AsociadoDAO, AsociadoDAOError } from '@/dao/asociado.dao'; 
 /**
  * Clase de error personalizada para errores del servicio
  */
@@ -28,11 +28,11 @@ export class AsociadoServiceError extends Error {
  */
 export class AsociadoService {
   private baseUrl: string;
-  private asociadoDAO: AsociadoDAO; // <-- Definición de la propiedad
+  private asociadoDAO: AsociadoDAO;
 
   constructor(baseUrl: string = '/api/asociados') {
     this.baseUrl = baseUrl;
-    this.asociadoDAO = new AsociadoDAO(); // <-- Inicialización de la propiedad
+    this.asociadoDAO = new AsociadoDAO();
   }
 
   /**

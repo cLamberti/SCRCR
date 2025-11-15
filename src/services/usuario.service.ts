@@ -23,7 +23,7 @@ export class UsuarioService {
       console.log('=== INICIO LOGIN SERVICE ===');
       console.log('Login data:', { username: data.username });
 
-      // Buscar usuario por username - CORREGIDO: usar findByUsername
+      // Buscar usuario por username
       const usuario = await this.usuarioDAO.findByUsername(data.username);
       console.log('Usuario encontrado:', usuario ? 'Sí' : 'No');
 
@@ -110,7 +110,7 @@ export class UsuarioService {
 
   async verificarToken(token: string): Promise<UsuarioResponse> {
     try {
-      const secret = process.env.JWT_SECRET || 'tu-secreto-super-seguro-cambiar-en-produccion';
+      const secret = process.env.JWT_SECRET || 'uwrT0PdHQ7gkJeoaD3iKqMGk';
       const decoded = jwt.verify(token, secret) as any;
 
       const usuario = await this.usuarioDAO.findByUsername(decoded.username);

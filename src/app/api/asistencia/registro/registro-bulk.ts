@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
  * Body:
  * {
  *   "evento_id": number,
- *   "persona_ids": number[],   // ids de asociados (o congregados si tu tabla se llama igual)
+ *   "persona_ids": number[],
  *   "fecha": "YYYY-MM-DD"
  * }
  */
