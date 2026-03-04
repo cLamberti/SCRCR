@@ -246,7 +246,7 @@ export default function ConsultarAsociadosPage() {
   /* ══════════════════ RENDER ══════════════════ */
   return (
     <div className="flex bg-[#f2f2f2] min-h-screen">
-      <Sidebar activeItem="listado" menuItems={menuItems} pageTitle="Consultar Asociados" />
+      <Sidebar activeItem="listado" pageTitle="Consultar Asociados" />
 
       <div className="flex-grow p-4 pt-16 md:pt-4 min-w-0">
         <div className="max-w-7xl mx-auto">

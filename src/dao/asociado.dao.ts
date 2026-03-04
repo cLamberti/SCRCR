@@ -64,13 +64,13 @@ export class AsociadoDAO {
           ${data.estado ?? 1}
         )
         RETURNING *
-      `;
+      ` as any[];
 
-      if (!result || (result as any[]).length === 0) {
+      if (!result || result.length === 0) {
         throw new AsociadoDAOError('No se pudo crear el asociado', 'CREATE_FAILED');
       }
 
-      return this.mapRowToAsociado((result as any[])[0]);
+      return this.mapRowToAsociado(result[0]);
     } catch (error: any) {
       if (error instanceof AsociadoDAOError) throw error;
       if (error.code === '23505') {
@@ -82,9 +82,8 @@ export class AsociadoDAO {
 
   async obtenerPorId(id: number): Promise<Asociado | null> {
     try {
-      const result = await this.sql`
-        SELECT * FROM asociados WHERE id = ${id}
-      `;
+      // this.sql es la instancia correcta; sin this. falla en runtime
+      const result = await this.sql`SELECT * FROM asociados WHERE id = ${id}` as any[];
       return result.length ? this.mapRowToAsociado(result[0]) : null;
     } catch (error) {
       throw new AsociadoDAOError('Error al obtener el asociado por ID', 'DATABASE_ERROR', error);
@@ -95,18 +94,13 @@ export class AsociadoDAO {
     try {
       const result = await this.sql`
         SELECT * FROM asociados WHERE cedula = ${cedula}
-      `;
+      ` as any[];
       return result.length ? this.mapRowToAsociado(result[0]) : null;
     } catch (error) {
       throw new AsociadoDAOError('Error al obtener el asociado por cédula', 'DATABASE_ERROR', error);
     }
   }
 
-  /**
-   * Lista asociados con filtros opcionales y paginación.
-   * Soporta: estado, nombreCompleto (ILIKE), cedula (ILIKE), ministerio (ILIKE),
-   * fechaIngresoDesde, fechaIngresoHasta.
-   */
   async obtenerTodos(
     page: number = 1,
     limit: number = 10,
@@ -116,7 +110,6 @@ export class AsociadoDAO {
     try {
       const offset = (page - 1) * limit;
 
-      /* Construir condiciones dinámicas */
       const conditions: string[] = [];
       const values: any[]        = [];
 
@@ -147,18 +140,15 @@ export class AsociadoDAO {
 
       const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
-      /* Neon no acepta query dinámica con tagged template en este caso,
-         usamos sql.query para poder pasar parámetros posicionales */
-      const dataResult = await this.sql.query(
+            const dataResult = await this.sql.query(
         `SELECT * FROM asociados ${where} ORDER BY id DESC LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
         [...values, limit, offset]
-      );
+      ) as { rows: any[] };
 
       const countResult = await this.sql.query(
         `SELECT COUNT(*) as count FROM asociados ${where}`,
         values
-      );
-
+      ) as { rows: any[] };
       const total      = parseInt(countResult.rows[0].count);
       const totalPages = Math.max(1, Math.ceil(total / limit));
 
@@ -195,13 +185,13 @@ export class AsociadoDAO {
           estado          = ${data.estado ?? existente.estado}
         WHERE id = ${id}
         RETURNING *
-      `;
+      ` as any[];
 
-      if (!result || (result as any[]).length === 0) {
+      if (!result || result.length === 0) {
         throw new AsociadoDAOError('Error al actualizar el asociado', 'UPDATE_FAILED');
       }
 
-      return this.mapRowToAsociado((result as any[])[0]);
+      return this.mapRowToAsociado(result[0]);
     } catch (error: any) {
       if (error instanceof AsociadoDAOError) throw error;
       if (error.code === '23505') {
@@ -215,7 +205,7 @@ export class AsociadoDAO {
     try {
       const result = await this.sql`
         UPDATE asociados SET estado = 0 WHERE id = ${id} RETURNING id
-      `;
+      ` as any[];
       return result.length > 0;
     } catch (error) {
       throw new AsociadoDAOError('Error al eliminar el asociado', 'DATABASE_ERROR', error);
@@ -226,7 +216,7 @@ export class AsociadoDAO {
     try {
       const result = await this.sql`
         DELETE FROM asociados WHERE id = ${id} RETURNING id
-      `;
+      ` as any[];
       return result.length > 0;
     } catch (error) {
       throw new AsociadoDAOError('Error al eliminar permanentemente el asociado', 'DATABASE_ERROR', error);
@@ -237,8 +227,8 @@ export class AsociadoDAO {
     try {
       const result = await this.sql`
         SELECT * FROM asociados ORDER BY nombre_completo
-      `;
-      return (result as any[]).map((row: any) => this.mapRowToAsociado(row));
+      ` as any[];
+      return result.map((row: any) => this.mapRowToAsociado(row));
     } catch (error) {
       throw new AsociadoDAOError('Error al listar todos los asociados', 'DATABASE_ERROR', error);
     }
@@ -251,8 +241,8 @@ export class AsociadoDAO {
         WHERE nombre_completo ILIKE ${'%' + nombre + '%'} AND estado = 1
         ORDER BY nombre_completo
         LIMIT ${limit}
-      `;
-      return (result as any[]).map((row: any) => this.mapRowToAsociado(row));
+      ` as any[];
+      return result.map((row: any) => this.mapRowToAsociado(row));
     } catch (error) {
       throw new AsociadoDAOError('Error al buscar asociados por nombre', 'DATABASE_ERROR', error);
     }
@@ -266,10 +256,10 @@ export class AsociadoDAO {
           COUNT(*) FILTER (WHERE estado = 1) as activos,
           COUNT(*) FILTER (WHERE estado = 0) as inactivos
         FROM asociados
-      `;
+      ` as any[];
       return {
-        total:    parseInt(result[0].total),
-        activos:  parseInt(result[0].activos),
+        total:     parseInt(result[0].total),
+        activos:   parseInt(result[0].activos),
         inactivos: parseInt(result[0].inactivos),
       };
     } catch (error) {
