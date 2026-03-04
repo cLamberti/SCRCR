@@ -6,17 +6,19 @@ import { usePathname } from 'next/navigation';
 import {
   FaHome, FaUserPlus, FaList,
   FaSignOutAlt, FaBars, FaTimes, FaChurch,
-  FaCalendarAlt,
+  FaCalendarAlt, FaUsers, FaChartLine,
 } from 'react-icons/fa';
 import { useAuth } from '@/contexts/AuthContext';
 
-// Un item puede ser un Link (href) o un botón (onClick)
+type Role = 'admin' | 'tesorero' | 'pastorGeneral';
+
 type NavItem = {
   id: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   href?: string;
   onClick?: () => void;
+  roles: Role[];
 };
 
 interface SidebarProps {
@@ -24,19 +26,81 @@ interface SidebarProps {
   pageTitle?: string;
 }
 
+const NAV_ITEMS: Omit<NavItem, 'onClick'>[] = [
+  {
+    id: 'inicio',
+    href: '/',
+    icon: FaHome,
+    label: 'Inicio',
+    roles: ['admin', 'tesorero', 'pastorGeneral'],
+  },
+  {
+    id: 'registro-asociados',
+    href: '/registro-asociados',
+    icon: FaUserPlus,
+    label: 'Registro Asociados',
+    roles: ['admin', 'pastorGeneral'],
+  },
+  {
+    id: 'listado',
+    href: '/consulta-asociados',
+    icon: FaList,
+    label: 'Listado Asociados',
+    roles: ['admin', 'tesorero', 'pastorGeneral'],
+  },
+  {
+    id: 'eventos',
+    href: '/eventos',
+    icon: FaCalendarAlt,
+    label: 'Eventos',
+    roles: ['admin', 'tesorero', 'pastorGeneral'],
+  },
+  {
+    id: 'gestion-usuarios',
+    href: '/gestion-usuarios',
+    icon: FaUsers,
+    label: 'Gestión de Usuarios',
+    roles: ['admin', 'pastorGeneral'],
+  },
+  {
+    id: 'reportes',
+    href: '/reportes',
+    icon: FaChartLine,
+    label: 'Reportes',
+    roles: ['admin', 'tesorero', 'pastorGeneral'],
+  },
+];
+
+const ROL_LABEL: Record<Role, string> = {
+  admin: 'Administrador',
+  tesorero: 'Tesorero',
+  pastorGeneral: 'Pastor General',
+};
+
 export default function Sidebar({ activeItem, pageTitle = 'SCRCR' }: SidebarProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
-  const { logout } = useAuth(); // se llama dentro del componente, no afuera
+  const { logout, usuario, loading } = useAuth();
+
+  const rol = usuario?.rol as Role | undefined;
+
+  // Solo filtra cuando el contexto ya resolvió la sesión
+  const itemsFiltrados: NavItem[] = !loading && rol
+    ? NAV_ITEMS.filter(item => item.roles.includes(rol))
+    : [];
 
   const menuItems: NavItem[] = [
-    { id: 'inicio',           href: '/',                   icon: FaHome,        label: 'Inicio'              },
-    { id: 'registro-asociados', href: '/registro-asociados', icon: FaUserPlus,    label: 'Registro Asociados'  },
-    { id: 'listado',          href: '/consulta-asociados', icon: FaList,        label: 'Listado Asociados'   },
-    { id: 'eventos',          href: '/eventos',            icon: FaCalendarAlt, label: 'Eventos'             },
-    { id: 'gestion-usuarios', href: '/gestion-usuarios',   icon: FaUserPlus,    label: 'Gestión de Usuarios' },
-    { id: 'reportes',         href: '/reportes',           icon: FaList,        label: 'Reportes'            },
-    { id: 'cerrar',           onClick: logout,             icon: FaSignOutAlt,  label: 'Cerrar Sesión'       },
+    ...itemsFiltrados,
+    // Cerrar sesión siempre al final, solo si hay sesión activa
+    ...(usuario && !loading
+      ? [{
+          id: 'cerrar',
+          onClick: logout,
+          icon: FaSignOutAlt,
+          label: 'Cerrar Sesión',
+          roles: ['admin', 'tesorero', 'pastorGeneral'] as Role[],
+        }]
+      : []),
   ];
 
   useEffect(() => { setOpen(false); }, [pathname]);
@@ -58,6 +122,7 @@ export default function Sidebar({ activeItem, pageTitle = 'SCRCR' }: SidebarProp
   const NavContent = () => (
     <div className="flex flex-col h-full">
 
+      {/* Encabezado con logo */}
       <div className="px-4 pt-6 pb-5 border-b border-white/10">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0">
@@ -70,17 +135,49 @@ export default function Sidebar({ activeItem, pageTitle = 'SCRCR' }: SidebarProp
         </div>
       </div>
 
-      <p className="px-4 pt-5 pb-2 text-[10px] font-bold tracking-widest text-white/30 uppercase">
+      {/* Datos del usuario autenticado */}
+      {!loading && usuario && (
+        <div className="px-4 pt-4 pb-3 border-b border-white/10">
+          <p className="text-white/80 text-xs font-semibold truncate">{usuario.nombreCompleto}</p>
+          <p className="text-white/40 text-[10px] mt-0.5">
+            {rol ? ROL_LABEL[rol] : ''}
+          </p>
+        </div>
+      )}
+
+      {/* Skeleton mientras el AuthContext verifica la sesión */}
+      {loading && (
+        <div className="px-4 pt-4 pb-3 border-b border-white/10 space-y-1.5">
+          <div className="h-3 w-32 rounded bg-white/15 animate-pulse" />
+          <div className="h-2.5 w-20 rounded bg-white/10 animate-pulse" />
+        </div>
+      )}
+
+      <p className="px-4 pt-4 pb-2 text-[10px] font-bold tracking-widest text-white/30 uppercase">
         Módulos
       </p>
 
       <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
-        {menuItems.map((item) => {
+
+        {/* Placeholders animados mientras carga */}
+        {loading && (
+          <div className="space-y-1 pt-1">
+            {[...Array(5)].map((_, i) => (
+              <div
+                key={i}
+                className="h-9 rounded-xl bg-white/10 animate-pulse"
+                style={{ opacity: 1 - i * 0.12 }}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Items reales una vez resuelto el usuario */}
+        {!loading && menuItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item);
           const isCerrar = item.id === 'cerrar';
 
-          // Items con onClick se renderizan como botón
           if (item.onClick) {
             return (
               <button
@@ -102,7 +199,6 @@ export default function Sidebar({ activeItem, pageTitle = 'SCRCR' }: SidebarProp
             );
           }
 
-          // Items con href se renderizan como Link
           return (
             <Link
               key={item.id}
@@ -137,6 +233,7 @@ export default function Sidebar({ activeItem, pageTitle = 'SCRCR' }: SidebarProp
 
   return (
     <>
+      {/* Barra superior móvil */}
       <header className="md:hidden fixed top-0 inset-x-0 z-40 h-14 bg-[#003366] flex items-center gap-3 px-4 shadow-lg">
         <button
           onClick={() => setOpen(true)}
@@ -151,6 +248,7 @@ export default function Sidebar({ activeItem, pageTitle = 'SCRCR' }: SidebarProp
         </div>
       </header>
 
+      {/* Overlay móvil */}
       <div
         className={`md:hidden fixed inset-0 z-50 bg-black/55 backdrop-blur-[2px] transition-opacity duration-300 ${
           open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
@@ -158,6 +256,7 @@ export default function Sidebar({ activeItem, pageTitle = 'SCRCR' }: SidebarProp
         onClick={() => setOpen(false)}
       />
 
+      {/* Aside principal */}
       <aside
         className={`
           fixed md:static top-0 left-0
