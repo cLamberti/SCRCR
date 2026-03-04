@@ -6,7 +6,10 @@ import { usePathname } from 'next/navigation';
 import {
   FaHome, FaUserPlus, FaList, FaTrash,
   FaSignOutAlt, FaBars, FaTimes, FaChurch,
+    FaCalendarAlt,
 } from 'react-icons/fa';
+import { useAuth } from '@/contexts/AuthContext';
+const {logout} = useAuth();
 
 type MenuItem = {
   id: string;
@@ -14,12 +17,15 @@ type MenuItem = {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
 };
+type LogOutItem = MenuItem & { id: 'cerrar'; onclick: () => void; icon: React.ComponentType<{ className?: string }>; label: string; };
 
-const defaultMenuItems: MenuItem[] = [
+const defaultMenuItems: MenuItem[], LogOutItem[] = [
   { id: 'inicio',             href: '/',                   icon: FaHome,       label: 'Inicio'                },
-  { id: 'registro-asociados', href: '/registro-asociados', icon: FaUserPlus,   label: 'Registro de Asociados' },
-  { id: 'listado',            href: '/consulta-asociados', icon: FaList,       label: 'Listado General'       },
-  { id: 'cerrar',             href: '#',                   icon: FaSignOutAlt, label: 'Cerrar Sesión'         },
+  { id: 'listado',            href: '/consulta-asociados', icon: FaList,       label: 'Listado Asociados'       },
+  { id: 'Eventos',            href: '/eventos',           icon: FaCalendarAlt, label: 'Eventos'               },
+  {id: 'Gestión Usuarios', href: '/gestion-usuarios', icon: FaUserPlus,   label: 'Gestión de Usuarios'  },
+  { id: 'Reportes',            href: '/reportes',         icon: FaList,       label: 'Reportes'              },
+  { id: 'cerrar',             onclick: () => {logout},             icon: FaSignOutAlt, label: 'Cerrar Sesión'         },
 ];
 
 interface SidebarProps {

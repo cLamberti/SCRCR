@@ -66,11 +66,11 @@ export class AsociadoDAO {
         RETURNING *
       `;
 
-      if (!result || result.length === 0) {
+      if (!result || (result as any[]).length === 0) {
         throw new AsociadoDAOError('No se pudo crear el asociado', 'CREATE_FAILED');
       }
 
-      return this.mapRowToAsociado(result[0]);
+      return this.mapRowToAsociado((result as any[])[0]);
     } catch (error: any) {
       if (error instanceof AsociadoDAOError) throw error;
       if (error.code === '23505') {
@@ -197,11 +197,11 @@ export class AsociadoDAO {
         RETURNING *
       `;
 
-      if (!result || result.length === 0) {
+      if (!result || (result as any[]).length === 0) {
         throw new AsociadoDAOError('Error al actualizar el asociado', 'UPDATE_FAILED');
       }
 
-      return this.mapRowToAsociado(result[0]);
+      return this.mapRowToAsociado((result as any[])[0]);
     } catch (error: any) {
       if (error instanceof AsociadoDAOError) throw error;
       if (error.code === '23505') {
@@ -238,7 +238,7 @@ export class AsociadoDAO {
       const result = await this.sql`
         SELECT * FROM asociados ORDER BY nombre_completo
       `;
-      return result.map((row: any) => this.mapRowToAsociado(row));
+      return (result as any[]).map((row: any) => this.mapRowToAsociado(row));
     } catch (error) {
       throw new AsociadoDAOError('Error al listar todos los asociados', 'DATABASE_ERROR', error);
     }
@@ -252,7 +252,7 @@ export class AsociadoDAO {
         ORDER BY nombre_completo
         LIMIT ${limit}
       `;
-      return result.map((row: any) => this.mapRowToAsociado(row));
+      return (result as any[]).map((row: any) => this.mapRowToAsociado(row));
     } catch (error) {
       throw new AsociadoDAOError('Error al buscar asociados por nombre', 'DATABASE_ERROR', error);
     }

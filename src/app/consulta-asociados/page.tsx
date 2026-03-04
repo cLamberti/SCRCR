@@ -5,17 +5,20 @@ import Image from 'next/image';
 import {
   FaHome, FaUserPlus, FaList, FaSignOutAlt,
   FaSearch, FaEdit, FaTrash, FaUsers,
-  FaChevronLeft, FaChevronRight, FaExclamationTriangle,
+  FaChevronLeft, FaChevronRight, FaExclamationTriangle, 
+FaCalendarAlt
 } from 'react-icons/fa';
 import { AsociadoResponse } from '@/dto/asociado.dto';
 import Sidebar from '@/components/SideBar';
 
 /* ─── Menú (sin "Eliminar Asociados" porque ahora esta vista lo maneja) ─── */
 const menuItems = [
-  { id: 'inicio',             href: '/',                   icon: FaHome,       label: 'Inicio'                },
-  { id: 'registro-asociados', href: '/registro-asociados', icon: FaUserPlus,   label: 'Registro de Asociados' },
-  { id: 'listado',            href: '/consulta-asociados', icon: FaList,       label: 'Listado General'       },
-  { id: 'cerrar',             href: '#',                   icon: FaSignOutAlt, label: 'Cerrar Sesión'         },
+    { id: 'inicio',             href: '/',                   icon: FaHome,       label: 'Inicio'                },
+    { id: 'listado',            href: '/consulta-asociados', icon: FaList,       label: 'Listado Asociados'       },
+    { id: 'Eventos',            href: '/eventos',           icon: FaCalendarAlt, label: 'Eventos'               },
+    {id: 'Gestión Usuarios', href: '/gestion-usuarios', icon: FaUserPlus,   label: 'Gestión de Usuarios'  },
+    { id: 'Reportes',            href: '/reportes',         icon: FaList,       label: 'Reportes'              },
+    { id: 'cerrar',             href: '#',                   icon: FaSignOutAlt, label: 'Cerrar Sesión'         },
 ];
 
 type AsociadoRow = {

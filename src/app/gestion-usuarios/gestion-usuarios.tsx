@@ -1,10 +1,13 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { FaArrowLeft, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  FaUsers, FaUserPlus, FaChevronLeft, FaChevronRight,
+  FaEye, FaEyeSlash, FaSearch, FaFilter,
+} from "react-icons/fa";
+import Sidebar from "@/components/SideBar";
 
-// Definimos un tipo para los datos del usuario que mostraremos en la tabla
 type UsuarioRow = {
   id: number;
   nombreCompleto: string;
@@ -14,332 +17,316 @@ type UsuarioRow = {
   estado: number;
 };
 
-// Definimos un tipo para los datos del formulario
 type FormState = {
   nombreCompleto: string;
   username: string;
   email: string;
   password: string;
-  rol: 'admin' | 'tesorero' | 'pastorGeneral';
+  rol: "admin" | "tesorero" | "pastorGeneral";
 };
 
-// Tipo para la respuesta de la API con paginación
-type ApiResponse = {
-  success: boolean;
-  data: UsuarioRow[];
-  message?: string;
-  pagination?: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
+const ROL_LABELS: Record<string, string> = {
+  admin: "Administrador",
+  tesorero: "Tesorero",
+  pastorGeneral: "Pastor General",
+};
+
+const ROL_COLORS: Record<string, string> = {
+  admin: "bg-purple-100 text-purple-800",
+  tesorero: "bg-blue-100 text-blue-800",
+  pastorGeneral: "bg-amber-100 text-amber-800",
 };
 
 export default function GestionUsuariosPage() {
   const router = useRouter();
   const [usuarios, setUsuarios] = useState<UsuarioRow[]>([]);
   const [loading, setLoading] = useState(false);
-  const [mensaje, setMensaje] = useState('');
+  const [mensaje, setMensaje] = useState("");
+  const [mensajeOk, setMensajeOk] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [busqueda, setBusqueda] = useState("");
+  const [rolFiltro, setRolFiltro] = useState("");
+
   const [formState, setFormState] = useState<FormState>({
-    nombreCompleto: '',
-    username: '',
-    email: '',
-    password: '',
-    rol: 'tesorero', // Rol por defecto
+    nombreCompleto: "", username: "", email: "", password: "", rol: "tesorero",
   });
 
-  // Estados para paginación
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
+  const [enviando, setEnviando] = useState(false);
 
-  // Función para cargar la lista de usuarios con paginación
-  const cargarUsuarios = async (page: number = currentPage, limit: number = itemsPerPage) => {
+  const cargarUsuarios = async (page = currentPage, limit = itemsPerPage) => {
     setLoading(true);
-    setMensaje('');
+    setMensaje("");
     try {
       const res = await fetch(`/api/usuarios?page=${page}&limit=${limit}`);
-      const json: ApiResponse = await res.json();
-
-      if (!res.ok || !json.success) {
-        setMensaje(json.message || 'Error al obtener usuarios');
-        setUsuarios([]);
-        return;
-      }
-      
+      const json = await res.json();
+      if (!res.ok || !json.success) { setMensaje(json.message || "Error al obtener usuarios"); setMensajeOk(false); return; }
       setUsuarios(json.data || []);
-      
-      // Actualizar información de paginación
-      if (json.pagination) {
-        setCurrentPage(json.pagination.page);
-        setTotalPages(json.pagination.totalPages);
-        setTotalItems(json.pagination.total);
-      }
-    } catch (e) {
-      console.error('Error cargando usuarios:', e);
-      setMensaje('Error de conexión. Intenta de nuevo.');
-    } finally {
-      setLoading(false);
-    }
+      if (json.pagination) { setCurrentPage(json.pagination.page); setTotalPages(json.pagination.totalPages); setTotalItems(json.pagination.total); }
+    } catch { setMensaje("Error de conexión."); setMensajeOk(false); }
+    finally { setLoading(false); }
   };
 
-  // Cargar usuarios cuando el componente se monta
-  useEffect(() => {
-    cargarUsuarios();
-  }, []);
-
-  // Recargar cuando cambia la página o items por página
-  useEffect(() => {
-    cargarUsuarios(currentPage, itemsPerPage);
-  }, [currentPage, itemsPerPage]);
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormState(prevState => ({
-      ...prevState,
-      [name]: value,
-    }));
-  };
+  useEffect(() => { cargarUsuarios(); }, []);
+  useEffect(() => { cargarUsuarios(currentPage, itemsPerPage); }, [currentPage, itemsPerPage]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setMensaje('');
-
+    setEnviando(true);
+    setMensaje("");
     try {
-      const res = await fetch('/api/usuarios', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/usuarios", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formState),
       });
-
       const json = await res.json();
-
       if (!res.ok || !json.success) {
-        // Si hay errores de validación, los mostramos
-        if (json.errors) {
-          const errorMessages = Object.values(json.errors).flat().join(' ');
-          setMensaje(`Error: ${errorMessages}`);
-        } else {
-          setMensaje(json.message || 'Error al crear el usuario');
-        }
-        return;
+        const errMsg = json.errors ? Object.values(json.errors).flat().join(" ") : json.message || "Error al crear el usuario";
+        setMensaje(String(errMsg)); setMensajeOk(false); return;
       }
-
-      setMensaje('Usuario creado exitosamente');
-      // Limpiar formulario
-      setFormState({
-        nombreCompleto: '',
-        username: '',
-        email: '',
-        password: '',
-        rol: 'tesorero',
-      });
-      // Recargar la lista de usuarios para ver el nuevo
-      setCurrentPage(1); // Volver a la primera página
+      setMensaje("Usuario creado exitosamente."); setMensajeOk(true);
+      setFormState({ nombreCompleto: "", username: "", email: "", password: "", rol: "tesorero" });
+      setShowForm(false);
+      setCurrentPage(1);
       await cargarUsuarios(1, itemsPerPage);
-
-    } catch (error) {
-      console.error('Error en el submit:', error);
-      setMensaje('Error de conexión al crear el usuario.');
-    } finally {
-      setLoading(false);
-    }
+    } catch { setMensaje("Error de conexión."); setMensajeOk(false); }
+    finally { setEnviando(false); }
   };
 
-  // Funciones de paginación
-  const handlePreviousPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-    }
-  };
+  const filtrados = usuarios.filter(u => {
+    const q = busqueda.toLowerCase();
+    const matchQ = !q || u.nombreCompleto.toLowerCase().includes(q) || u.username.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+    const matchRol = !rolFiltro || u.rol === rolFiltro;
+    return matchQ && matchRol;
+  });
 
-  const handleNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
-    }
-  };
-
-  const handleItemsPerPageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newLimit = parseInt(e.target.value);
-    setItemsPerPage(newLimit);
-    setCurrentPage(1); // Resetear a la primera página
-  };
-
-  const formInputClass = "shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-200";
+  const inputCls = "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#17609c] focus:border-transparent transition";
+  const labelCls = "block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1";
 
   return (
-    <div className="flex bg-[#f2f2f2] min-h-screen font-['Segoe_UI',sans-serif]">
-      <div className="flex-grow p-4">
-        <div className="max-w-7xl mx-auto">
-          {/* Botón de Volver */}
+    <div className="flex min-h-screen bg-gray-50">
+      <Sidebar pageTitle="Gestión de Usuarios" />
+
+      <div className="flex-1 pt-14 md:pt-0 flex flex-col min-h-screen">
+        {/* Header */}
+        <header className="hidden md:flex items-center justify-between bg-white border-b border-gray-200 px-8 py-4 sticky top-0 z-10">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-[#003366] rounded-lg flex items-center justify-center">
+              <FaUsers className="text-white text-sm" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-gray-900">Gestión de Usuarios</h1>
+              <p className="text-xs text-gray-400">Administra los accesos al sistema</p>
+            </div>
+          </div>
           <button
-            onClick={() => router.back()}
-            className="inline-flex items-center gap-2 text-[#003366] hover:text-[#17609c] mb-4 transition-colors"
+            onClick={() => { setShowForm(v => !v); setMensaje(""); }}
+            className="inline-flex items-center gap-2 bg-[#003366] hover:bg-[#004488] text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
           >
-            <FaArrowLeft /> Volver
+            <FaUserPlus className="text-xs" />
+            Nuevo usuario
           </button>
+        </header>
 
-          <div className="p-[30px] bg-white rounded-lg my-[30px] shadow-md">
-            <div className="text-2xl font-bold border-b-2 border-gray-300 pb-2 mb-[20px] text-[#003366]">
-              Gestión de Usuarios
+        <main className="flex-1 px-4 md:px-8 py-6 space-y-5">
+          {/* Mensaje */}
+          {mensaje && (
+            <div className={`rounded-lg px-4 py-3 text-sm font-medium border ${mensajeOk ? "bg-green-50 text-green-800 border-green-200" : "bg-red-50 text-red-800 border-red-200"}`}>
+              {mensaje}
             </div>
+          )}
 
-            {/* Mensaje de estado */}
-            {mensaje && (
-              <div className={`mb-4 p-4 rounded ${
-                mensaje.toLowerCase().includes('error')
-                  ? 'bg-red-100 text-red-700 border border-red-300'
-                  : 'bg-green-100 text-green-700 border border-green-300'
-              }`}>
-                {mensaje}
+          {/* Form crear */}
+          {showForm && (
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="bg-[#003366] px-6 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FaUserPlus className="text-white text-sm" />
+                  <h2 className="text-white font-semibold text-sm">Nuevo usuario</h2>
+                </div>
+                <button onClick={() => setShowForm(false)} className="text-white/70 hover:text-white transition text-sm">✕</button>
               </div>
-            )}
+              <form onSubmit={handleSubmit} className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className={labelCls}>Nombre completo *</label>
+                  <input type="text" value={formState.nombreCompleto} onChange={e => setFormState(p => ({ ...p, nombreCompleto: e.target.value }))} className={inputCls} required placeholder="Juan Pérez López" />
+                </div>
+                <div>
+                  <label className={labelCls}>Nombre de usuario *</label>
+                  <input type="text" value={formState.username} onChange={e => setFormState(p => ({ ...p, username: e.target.value }))} className={inputCls} required placeholder="juan_perez" />
+                </div>
+                <div>
+                  <label className={labelCls}>Correo electrónico *</label>
+                  <input type="email" value={formState.email} onChange={e => setFormState(p => ({ ...p, email: e.target.value }))} className={inputCls} required placeholder="juan@ejemplo.com" />
+                </div>
+                <div>
+                  <label className={labelCls}>Contraseña *</label>
+                  <div className="relative">
+                    <input type={showPassword ? "text" : "password"} value={formState.password} onChange={e => setFormState(p => ({ ...p, password: e.target.value }))} className={inputCls + " pr-10"} required placeholder="••••••••" />
+                    <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition">
+                      {showPassword ? <FaEyeSlash className="text-sm" /> : <FaEye className="text-sm" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="sm:col-span-2">
+                  <label className={labelCls}>Rol *</label>
+                  <div className="grid grid-cols-3 gap-3">
+                    {(["tesorero", "pastorGeneral", "admin"] as const).map(r => (
+                      <label key={r} className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 cursor-pointer transition ${formState.rol === r ? "border-[#003366] bg-[#003366]/5" : "border-gray-200 hover:border-gray-300"}`}>
+                        <input type="radio" name="rol" value={r} checked={formState.rol === r} onChange={() => setFormState(p => ({ ...p, rol: r }))} className="sr-only" />
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${ROL_COLORS[r]}`}>{ROL_LABELS[r]}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div className="sm:col-span-2 flex justify-end gap-3">
+                  <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition">Cancelar</button>
+                  <button type="submit" disabled={enviando} className="px-5 py-2 text-sm font-semibold text-white bg-[#17609c] hover:bg-[#0f4c7a] disabled:opacity-50 rounded-lg transition">
+                    {enviando ? "Creando..." : "Crear usuario"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
 
-            {/* Formulario de creación */}
-            <form onSubmit={handleSubmit} className="mb-8 p-4 border rounded-lg bg-gray-50">
-              <h3 className="text-xl font-semibold mb-4 text-gray-800">Crear Nuevo Usuario</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-gray-700 text-sm font-bold mb-2">Nombre Completo</label>
-                  <input type="text" name="nombreCompleto" value={formState.nombreCompleto} onChange={handleInputChange} className={formInputClass} required />
-                </div>
-                <div>
-                  <label className="block text-gray-700 text-sm font-bold mb-2">Nombre de Usuario</label>
-                  <input type="text" name="username" value={formState.username} onChange={handleInputChange} className={formInputClass} required />
-                </div>
-                <div>
-                  <label className="block text-gray-700 text-sm font-bold mb-2">Email</label>
-                  <input type="email" name="email" value={formState.email} onChange={handleInputChange} className={formInputClass} required />
-                </div>
-                <div>
-                  <label className="block text-gray-700 text-sm font-bold mb-2">Contraseña</label>
-                  <input type="password" name="password" value={formState.password} onChange={handleInputChange} className={formInputClass} required />
-                </div>
-                <div>
-                  <label className="block text-gray-700 text-sm font-bold mb-2">Rol</label>
-                  <select name="rol" value={formState.rol} onChange={handleInputChange} className={formInputClass} required>
-                    <option value="tesorero">Tesorero</option>
-                    <option value="pastorGeneral">Pastor General</option>
-                    <option value="admin">Administrador</option>
-                  </select>
-                </div>
+          {/* Filtros */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
+                <input type="text" value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por nombre, usuario o correo…" className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#17609c]" />
               </div>
-              <div className="mt-4">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className={`px-4 py-2 rounded ${
-                    loading
-                      ? 'bg-gray-400 cursor-not-allowed'
-                      : 'bg-blue-600 hover:bg-blue-700 text-white'
-                  }`}
-                >
-                  {loading ? 'Creando...' : 'Crear Usuario'}
-                </button>
-              </div>
-            </form>
-
-            {/* Controles de paginación superiores */}
-            <div className="flex justify-between items-center mb-4">
+              <select value={rolFiltro} onChange={e => setRolFiltro(e.target.value)} className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#17609c]">
+                <option value="">Todos los roles</option>
+                <option value="admin">Administrador</option>
+                <option value="tesorero">Tesorero</option>
+                <option value="pastorGeneral">Pastor General</option>
+              </select>
               <div className="flex items-center gap-2">
-                <label className="text-sm text-gray-700">Mostrar:</label>
-                <select
-                  value={itemsPerPage}
-                  onChange={handleItemsPerPageChange}
-                  className="border border-gray-300 rounded px-2 py-1 text-sm"
-                >
-                  <option value={5}>5</option>
-                  <option value={10}>10</option>
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
+                <select value={itemsPerPage} onChange={e => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }} className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none">
+                  {[5, 10, 25, 50].map(n => <option key={n} value={n}>{n}/pág.</option>)}
                 </select>
-                <span className="text-sm text-gray-700">registros por página</span>
-              </div>
-              <div className="text-sm text-gray-700">
-                Total: {totalItems} usuario{totalItems !== 1 ? 's' : ''}
-              </div>
-            </div>
-
-            {/* Tabla de usuarios */}
-            <div className="overflow-x-auto">
-              <table className="min-w-full bg-white border border-gray-200">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="py-2 px-4 border-b text-left text-gray-700 font-semibold">ID</th>
-                    <th className="py-2 px-4 border-b text-left text-gray-700 font-semibold">Nombre Completo</th>
-                    <th className="py-2 px-4 border-b text-left text-gray-700 font-semibold">Username</th>
-                    <th className="py-2 px-4 border-b text-left text-gray-700 font-semibold">Email</th>
-                    <th className="py-2 px-4 border-b text-left text-gray-700 font-semibold">Rol</th>
-                    <th className="py-2 px-4 border-b text-left text-gray-700 font-semibold">Estado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {usuarios.length > 0 ? (
-                    usuarios.map(usuario => (
-                      <tr key={usuario.id} className="hover:bg-gray-50">
-                        <td className="py-2 px-4 border-b">{usuario.id}</td>
-                        <td className="py-2 px-4 border-b">{usuario.nombreCompleto}</td>
-                        <td className="py-2 px-4 border-b">{usuario.username}</td>
-                        <td className="py-2 px-4 border-b">{usuario.email}</td>
-                        <td className="py-2 px-4 border-b">{usuario.rol}</td>
-                        <td className="py-2 px-4 border-b">
-                          {usuario.estado === 1 ? (
-                            <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Activo</span>
-                          ) : (
-                            <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">Inactivo</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={6} className="py-4 px-4 text-center text-gray-500">
-                        {loading ? 'Cargando usuarios...' : 'No hay usuarios registrados.'}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Controles de paginación inferiores */}
-            <div className="flex justify-between items-center mt-4">
-              <div className="text-sm text-gray-700">
-                Mostrando {usuarios.length} de {totalItems} usuarios
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handlePreviousPage}
-                  disabled={currentPage === 1}
-                  className={`p-2 rounded ${
-                    currentPage === 1
-                      ? 'text-gray-400 cursor-not-allowed'
-                      : 'text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  <FaChevronLeft />
-                </button>
-                <span className="text-sm text-gray-700">
-                  Página {currentPage} de {totalPages}
-                </span>
-                <button
-                  onClick={handleNextPage}
-                  disabled={currentPage === totalPages}
-                  className={`p-2 rounded ${
-                    currentPage === totalPages
-                      ? 'text-gray-400 cursor-not-allowed'
-                      : 'text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  <FaChevronRight />
-                </button>
               </div>
             </div>
           </div>
-        </div>
+
+          {/* Estadísticas rápidas */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label: "Total", value: totalItems, color: "bg-[#003366]" },
+              { label: "Admins", value: usuarios.filter(u => u.rol === "admin").length, color: "bg-purple-600" },
+              { label: "Pastores", value: usuarios.filter(u => u.rol === "pastorGeneral").length, color: "bg-amber-500" },
+              { label: "Tesoreros", value: usuarios.filter(u => u.rol === "tesorero").length, color: "bg-blue-500" },
+            ].map(stat => (
+              <div key={stat.label} className="bg-white rounded-xl border border-gray-200 p-4">
+                <div className={`w-8 h-1 ${stat.color} rounded-full mb-2`} />
+                <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+                <p className="text-xs text-gray-400 font-medium">{stat.label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Tabla */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <span className="text-sm font-semibold text-gray-700">
+                {loading ? "Cargando..." : `${filtrados.length} usuario${filtrados.length !== 1 ? "s" : ""}`}
+              </span>
+              <button onClick={() => { setShowForm(v => !v); setMensaje(""); }} className="md:hidden inline-flex items-center gap-1.5 bg-[#003366] text-white text-xs font-semibold px-3 py-1.5 rounded-lg">
+                <FaUserPlus /> Nuevo
+              </button>
+            </div>
+
+            {loading ? (
+              <div className="p-12 text-center text-gray-400 text-sm">Cargando usuarios...</div>
+            ) : filtrados.length === 0 ? (
+              <div className="p-12 text-center">
+                <FaUsers className="mx-auto text-gray-300 text-3xl mb-3" />
+                <p className="text-gray-500 text-sm">No hay usuarios para mostrar.</p>
+              </div>
+            ) : (
+              <>
+                {/* Desktop */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-100">
+                        {["ID", "Nombre completo", "Usuario", "Correo", "Rol", "Estado"].map(h => (
+                          <th key={h} className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {filtrados.map(u => (
+                        <tr key={u.id} className="hover:bg-gray-50 transition">
+                          <td className="px-6 py-4 text-gray-400 text-xs font-mono">{u.id}</td>
+                          <td className="px-6 py-4 font-medium text-gray-900">{u.nombreCompleto}</td>
+                          <td className="px-6 py-4 text-gray-600 font-mono text-xs">@{u.username}</td>
+                          <td className="px-6 py-4 text-gray-600 text-xs">{u.email}</td>
+                          <td className="px-6 py-4">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${ROL_COLORS[u.rol] || "bg-gray-100 text-gray-600"}`}>
+                              {ROL_LABELS[u.rol] || u.rol}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${u.estado === 1 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${u.estado === 1 ? "bg-green-500" : "bg-red-500"}`} />
+                              {u.estado === 1 ? "Activo" : "Inactivo"}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile cards */}
+                <div className="md:hidden divide-y divide-gray-100">
+                  {filtrados.map(u => (
+                    <div key={u.id} className="p-4">
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <p className="font-semibold text-gray-900 text-sm">{u.nombreCompleto}</p>
+                          <p className="text-xs text-gray-500 font-mono mt-0.5">@{u.username}</p>
+                        </div>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${u.estado === 1 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
+                          {u.estado === 1 ? "Activo" : "Inactivo"}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mb-2">{u.email}</p>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${ROL_COLORS[u.rol] || "bg-gray-100 text-gray-600"}`}>
+                        {ROL_LABELS[u.rol] || u.rol}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* Paginación */}
+            {!loading && totalItems > 0 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-6 py-4 border-t border-gray-100">
+                <span className="text-xs text-gray-500">
+                  Mostrando {filtrados.length} de {totalItems} usuarios
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 transition">
+                    <FaChevronLeft className="text-xs" />
+                  </button>
+                  <span className="text-xs text-gray-500 px-2">Página {currentPage} de {totalPages}</span>
+                  <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 transition">
+                    <FaChevronRight className="text-xs" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </main>
       </div>
     </div>
   );
