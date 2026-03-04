@@ -2,44 +2,31 @@
 
 import { useState, Suspense } from 'react';
 import { FaChurch, FaUser, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth } from '@/contexts/AuthContext';
 
 function LoginForm() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect') || '/';
+
+  // Usar el login del contexto para que el usuario quede seteado
+  // en el estado global antes de navegar
+  const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setSuccess('');
     setLoading(true);
 
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ username: username.trim(), password }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || 'Error al iniciar sesión');
-      }
-
-      if (data.token) localStorage.setItem('auth-token', data.token);
-
-      setSuccess('¡Inicio de sesión exitoso! Redirigiendo...');
-      setTimeout(() => { router.push(redirect); router.refresh(); }, 1500);
+      await login(username.trim(), password);
+      // login() ya hace router.push('/') internamente
     } catch (err: any) {
       setError(err.message || 'Error al iniciar sesión');
     } finally {
@@ -49,7 +36,7 @@ function LoginForm() {
 
   return (
     <div className="min-h-screen flex bg-gradient-to-br from-[#001f4d] via-[#003366] to-[#004080]">
-      {/* Panel izquierdo - solo desktop */}
+      {/* Panel izquierdo — solo desktop */}
       <div className="hidden lg:flex lg:w-1/2 flex-col items-center justify-center p-12 text-white">
         <FaChurch className="text-7xl mb-6 opacity-90" />
         <h1 className="text-4xl font-bold mb-3 text-center">SCRCR</h1>
@@ -58,7 +45,6 @@ function LoginForm() {
         </p>
         <p className="mt-4 text-white/50 text-sm">Iglesia Bíblica Emanuel de Liberia</p>
 
-        {/* Decoración */}
         <div className="mt-12 grid grid-cols-3 gap-4 opacity-20">
           {[...Array(9)].map((_, i) => (
             <div key={i} className="w-8 h-8 rounded-full bg-white" />
@@ -66,10 +52,10 @@ function LoginForm() {
         </div>
       </div>
 
-      {/* Panel derecho - formulario */}
+      {/* Panel derecho — formulario */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6">
         <div className="w-full max-w-md">
-          {/* Logo visible solo en móvil */}
+          {/* Logo móvil */}
           <div className="lg:hidden text-center mb-8">
             <FaChurch className="text-5xl text-white mx-auto mb-3" />
             <h1 className="text-2xl font-bold text-white">SCRCR</h1>
@@ -83,7 +69,6 @@ function LoginForm() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Username */}
               <div>
                 <label htmlFor="username" className="block text-sm font-semibold text-gray-700 mb-1.5">
                   Nombre de Usuario
@@ -95,7 +80,7 @@ function LoginForm() {
                     type="text"
                     required
                     value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    onChange={e => setUsername(e.target.value)}
                     className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-[#003366] focus:border-transparent transition-all"
                     placeholder="su_usuario"
                     autoComplete="username"
@@ -103,7 +88,6 @@ function LoginForm() {
                 </div>
               </div>
 
-              {/* Password */}
               <div>
                 <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-1.5">
                   Contraseña
@@ -115,7 +99,7 @@ function LoginForm() {
                     type={showPassword ? 'text' : 'password'}
                     required
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={e => setPassword(e.target.value)}
                     className="w-full pl-10 pr-11 py-2.5 border border-gray-300 rounded-lg text-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-[#003366] focus:border-transparent transition-all"
                     placeholder="••••••••"
                     autoComplete="current-password"
@@ -131,19 +115,12 @@ function LoginForm() {
                 </div>
               </div>
 
-              {/* Mensajes */}
               {error && (
                 <div className="p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg">
                   {error}
                 </div>
               )}
-              {success && (
-                <div className="p-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg">
-                  {success}
-                </div>
-              )}
 
-              {/* Botón */}
               <button
                 type="submit"
                 disabled={loading}
