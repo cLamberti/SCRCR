@@ -1,632 +1,600 @@
-"use client";
+'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import Image from 'next/image';
-import { FaHome, FaUserPlus, FaUsers, FaList, FaCog, FaSignOutAlt, FaSearch, FaEdit, FaTrash } from 'react-icons/fa';
+import {
+  FaHome, FaUserPlus, FaList, FaSignOutAlt,
+  FaSearch, FaEdit, FaTrash, FaUsers,
+  FaChevronLeft, FaChevronRight, FaExclamationTriangle,
+} from 'react-icons/fa';
 import { AsociadoResponse } from '@/dto/asociado.dto';
+import Sidebar from '@/components/SideBar';
 
-// Componente para el menú lateral (sidebar)
-const Sidebar = () => {
-  const [activeItem, setActiveItem] = useState('listado');
-
-  const menuItems = [
-    { id: 'inicio', href: '/', icon: FaHome, label: 'Inicio' },
-    { id: 'registro-asociados', href: '/registro-asociados', icon: FaUserPlus, label: 'Registro de Asociados' },
-    { id: 'listado', href: '/consulta-asociados', icon: FaList, label: 'Listado General' },
-    { id: 'eliminar-asociado', href: '/eliminar-asociados', icon: FaTrash, label: 'Eliminar Asociados' },
-    { id: 'cerrar', href: '#', icon: FaSignOutAlt, label: 'Cerrar Sesión' }
-  ];
-
-
-  return (
-    <div className="w-[220px] bg-[#003366] text-white min-h-screen pt-[30px] flex flex-col shadow-lg">
-      <div className="px-5 mb-8">
-        <h4 className="text-center text-lg font-semibold">Bienvenido</h4>
-        <div className="w-full h-px bg-[#005599] mt-2"></div>
-      </div>
-
-      <nav className="flex-1">
-        {menuItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = activeItem === item.id;
-          
-          return (
-            <a
-              key={item.id}
-              href={item.href}
-              onClick={() => setActiveItem(item.id)}
-              className={`
-                text-white no-underline flex items-center py-3 px-5 transition-all duration-200 group relative
-                ${isActive 
-                  ? 'bg-[#005599] border-r-4 border-white shadow-inner' 
-                  : 'hover:bg-[#004488] hover:pl-6'
-                }
-              `}
-            >
-              <Icon className={`
-                mr-3 transition-all duration-200
-                ${isActive ? 'text-white scale-110' : 'text-gray-300 group-hover:text-white'}
-              `} />
-              <span className={`
-                transition-all duration-200
-                ${isActive ? 'font-semibold' : 'group-hover:font-medium'}
-              `}>
-                {item.label}
-              </span>
-            </a>
-          );
-        })}
-      </nav>
-    </div>
-  );
-};
+/* ─── Menú (sin "Eliminar Asociados" porque ahora esta vista lo maneja) ─── */
+const menuItems = [
+  { id: 'inicio',             href: '/',                   icon: FaHome,       label: 'Inicio'                },
+  { id: 'registro-asociados', href: '/registro-asociados', icon: FaUserPlus,   label: 'Registro de Asociados' },
+  { id: 'listado',            href: '/consulta-asociados', icon: FaList,       label: 'Listado General'       },
+  { id: 'cerrar',             href: '#',                   icon: FaSignOutAlt, label: 'Cerrar Sesión'         },
+];
 
 type AsociadoRow = {
-  id: number;
-  nombreCompleto: string;
-  cedula: string;
-  correo?: string;
-  telefono?: string;
-  ministerio?: string;
-  direccion?: string;
-  fechaIngreso: string;
-  estado: number;
+  id: number; nombreCompleto: string; cedula: string;
+  correo?: string; telefono?: string; ministerio?: string;
+  direccion?: string; fechaIngreso: string; estado: number;
 };
 
 type FormularioEdicion = {
-  nombreCompleto: string;
-  cedula: string;
-  correo: string;
-  telefono: string;
-  ministerio: string;
-  direccion: string;
-  fechaIngreso: string;
-  estado: number;
+  nombreCompleto: string; cedula: string; correo: string;
+  telefono: string; ministerio: string; direccion: string;
+  fechaIngreso: string; estado: number;
 };
 
-export default function ConsultarAsociadosPage() {
-  const [data, setData] = useState<AsociadoRow[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [mensaje, setMensaje] = useState('');
-  const [filtros, setFiltros] = useState({
-    nombreCompleto: '',
-    cedula: '',
-    estado: 'todos',
-  });
+type PageSize = 10 | 25 | 50;
 
-  // Estados para el modal de edición
-  const [modalOpen, setModalOpen] = useState(false);
-  const [asociadoEditando, setAsociadoEditando] = useState<AsociadoRow | null>(null);
-  const [formulario, setFormulario] = useState<FormularioEdicion>({
-    nombreCompleto: '',
-    cedula: '',
-    correo: '',
-    telefono: '',
-    ministerio: '',
-    direccion: '',
-    fechaIngreso: '',
-    estado: 1,
+const inputClass =
+  'shadow-sm border rounded-lg w-full py-2 px-3 text-gray-700 text-sm leading-tight ' +
+  'focus:outline-none focus:ring-2 focus:ring-[#003366]/30 focus:border-[#003366] border-gray-300 transition-colors';
+
+/* ─── Helpers ─── */
+const formatFecha = (iso: string) =>
+  iso ? new Date(iso).toLocaleDateString('es-CR') : '-';
+
+const Badge = ({ activo }: { activo: boolean }) => (
+  <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${
+    activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+  }`}>
+    {activo ? 'Activo' : 'Eliminado'}
+  </span>
+);
+
+/* ══════════════════════════════════════════════════════════════════════════
+   COMPONENTE PRINCIPAL
+══════════════════════════════════════════════════════════════════════════ */
+export default function ConsultarAsociadosPage() {
+  const [data,      setData]      = useState<AsociadoRow[]>([]);
+  const [loading,   setLoading]   = useState(false);
+  const [mensaje,   setMensaje]   = useState('');
+  const [esError,   setEsError]   = useState(false);
+
+  /* Filtros */
+  const [filtros, setFiltros] = useState({ nombreCompleto: '', cedula: '', estado: 'todos' });
+
+  /* Paginación */
+  const [pagina,    setPagina]    = useState(1);
+  const [pageSize,  setPageSize]  = useState<PageSize>(10);
+
+  /* Selección múltiple */
+  const [seleccionados, setSeleccionados] = useState<Set<number>>(new Set());
+
+  /* Modal edición */
+  const [modalEditOpen,     setModalEditOpen]     = useState(false);
+  const [asociadoEditando,  setAsociadoEditando]  = useState<AsociadoRow | null>(null);
+  const [formulario,        setFormulario]        = useState<FormularioEdicion>({
+    nombreCompleto: '', cedula: '', correo: '', telefono: '',
+    ministerio: '', direccion: '', fechaIngreso: '', estado: 1,
   });
   const [guardando, setGuardando] = useState(false);
 
-  // Estados para eliminar
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-  const [asociadoAEliminar, setAsociadoAEliminar] = useState<AsociadoRow | null>(null);
-  const [eliminacionPermanente, setEliminacionPermanente] = useState(false);
+  /* Modal confirmación eliminación masiva */
+  const [modalDeleteOpen,    setModalDeleteOpen]    = useState(false);
+  const [eliminacionPerm,    setEliminacionPerm]    = useState(false);
+  const [eliminando,         setEliminando]         = useState(false);
 
-  const cargar = async () => {
+  /* ─── Carga de datos ─── */
+  const cargar = useCallback(async () => {
     try {
-      setLoading(true);
-      setMensaje('');
-      const res = await fetch('/api/asociados', { method: 'GET' });
+      setLoading(true); setMensaje(''); setEsError(false);
+      const res  = await fetch('/api/asociados');
       const json = await res.json();
-      console.log('Asociados:', json.data);
       if (!res.ok || !json.success) {
         setMensaje(json.message || 'Error al consultar asociados');
-        setData([]);
-        return;
+        setEsError(true); setData([]); return;
       }
-      const rows: AsociadoRow[] = (json.data || []).map((a: AsociadoResponse) => ({
-        ...a,
-        fechaIngreso: a.fechaIngreso
-          ? new Date(a.fechaIngreso).toISOString()
-          : '',
-      }));
-      setData(rows);
+      setData(
+        (json.data || []).map((a: AsociadoResponse) => ({
+          ...a,
+          fechaIngreso: a.fechaIngreso ? new Date(a.fechaIngreso).toISOString() : '',
+        }))
+      );
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Error de conexión.';
-      setMensaje(errorMessage);
-      setData([]);
+      setMensaje(err instanceof Error ? err.message : 'Error de conexión.');
+      setEsError(true); setData([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { cargar(); }, []);
+  useEffect(() => { cargar(); }, [cargar]);
 
+  /* Resetear página y selección cuando cambian filtros o pageSize */
+  useEffect(() => { setPagina(1); setSeleccionados(new Set()); }, [filtros, pageSize]);
+
+  /* ─── Filtrado y paginación ─── */
   const filtrados = useMemo(() => {
     const n = filtros.nombreCompleto.trim().toLowerCase();
     const c = filtros.cedula.trim().toLowerCase();
-    const e = filtros.estado;
-
-    return data.filter((r) => {
-      const okNombre = !n || r.nombreCompleto?.toLowerCase().includes(n);
-      const okCedula = !c || r.cedula?.toLowerCase().includes(c);
-      const okEstado = e === 'todos' ? true : String(r.estado) === e;
-      return okNombre && okCedula && okEstado;
+    return data.filter(r => {
+      const okN = !n || r.nombreCompleto?.toLowerCase().includes(n);
+      const okC = !c || r.cedula?.toLowerCase().includes(c);
+      const okE = filtros.estado === 'todos' || String(r.estado) === filtros.estado;
+      return okN && okC && okE;
     });
   }, [data, filtros]);
 
-  const onSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-  };
+  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / pageSize));
+  const paginaActual = Math.min(pagina, totalPaginas);
 
-  const limpiarFiltros = () => {
-    setFiltros({ nombreCompleto: '', cedula: '', estado: 'todos' });
-  };
+  const paginados = useMemo(() => {
+    const inicio = (paginaActual - 1) * pageSize;
+    return filtrados.slice(inicio, inicio + pageSize);
+  }, [filtrados, paginaActual, pageSize]);
 
-  // Abrir modal de edición
-  const abrirModalEdicion = (asociado: AsociadoRow) => {
-    setAsociadoEditando(asociado);
-    setFormulario({
-      nombreCompleto: asociado.nombreCompleto || '',
-      cedula: asociado.cedula || '',
-      correo: asociado.correo || '',
-      telefono: asociado.telefono || '',
-      ministerio: asociado.ministerio || '',
-      direccion: asociado.direccion || '',
-      fechaIngreso: asociado.fechaIngreso 
-        ? new Date(asociado.fechaIngreso).toISOString().split('T')[0] 
-        : '',
-      estado: asociado.estado,
+  /* ─── Selección ─── */
+  const toggleFila = (id: number) => {
+    setSeleccionados(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
     });
-    setModalOpen(true);
-    setMensaje('');
   };
 
-  // Cerrar modal
-  const cerrarModal = () => {
-    setModalOpen(false);
-    setAsociadoEditando(null);
-    setGuardando(false);
+  const limpiarSeleccion = () => setSeleccionados(new Set());
+
+  /* Asociados seleccionados con sus datos (para el modal) */
+  const seleccionadosData = useMemo(
+    () => data.filter(r => seleccionados.has(r.id)),
+    [data, seleccionados]
+  );
+
+  /* ─── Edición ─── */
+  const abrirModalEdicion = (a: AsociadoRow) => {
+    setAsociadoEditando(a);
+    setFormulario({
+      nombreCompleto: a.nombreCompleto || '',
+      cedula:         a.cedula         || '',
+      correo:         a.correo         || '',
+      telefono:       a.telefono       || '',
+      ministerio:     a.ministerio     || '',
+      direccion:      a.direccion      || '',
+      fechaIngreso:   a.fechaIngreso
+        ? new Date(a.fechaIngreso).toISOString().split('T')[0]
+        : '',
+      estado: a.estado,
+    });
+    setModalEditOpen(true); setMensaje(''); setEsError(false);
   };
 
-  // Guardar cambios
   const guardarCambios = async () => {
     if (!asociadoEditando) return;
-
     try {
-      setGuardando(true);
-      setMensaje('');
-
-      const res = await fetch(`/api/asociados/update?id=${asociadoEditando.id}`, {
+      setGuardando(true); setMensaje(''); setEsError(false);
+      const res  = await fetch(`/api/asociados/update?id=${asociadoEditando.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formulario),
       });
-
       const json = await res.json();
-
       if (!res.ok || !json.success) {
-        setMensaje(json.message || 'Error al actualizar el asociado');
-        return;
+        setMensaje(json.message || 'Error al actualizar'); setEsError(true); return;
       }
-
-      setMensaje('Asociado actualizado exitosamente');
-      cerrarModal();
+      setMensaje('Asociado actualizado exitosamente.');
+      setModalEditOpen(false); setAsociadoEditando(null);
       await cargar();
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Error de conexión al actualizar.';
-      setMensaje(errorMessage);
-    } finally {
-      setGuardando(false);
-    }
+      setMensaje(err instanceof Error ? err.message : 'Error de conexión.'); setEsError(true);
+    } finally { setGuardando(false); }
   };
 
-  // Funciones para eliminar
-  const abrirConfirmacionEliminar = (asociado: AsociadoRow) => {
-    setAsociadoAEliminar(asociado);
-    setEliminacionPermanente(false);
-    setConfirmDeleteOpen(true);
-  };
-
-  const cerrarConfirmacionEliminar = () => {
-    setConfirmDeleteOpen(false);
-    setAsociadoAEliminar(null);
-    setEliminacionPermanente(false);
-  };
-
-  const eliminarAsociado = async () => {
-    if (!asociadoAEliminar) return;
-    
+  /* ─── Eliminación masiva ─── */
+  const eliminarSeleccionados = async () => {
     try {
-      setLoading(true);
-      setMensaje('');
-      
-      const url = `/api/asociados/delete?id=${asociadoAEliminar.id}${eliminacionPermanente ? '&permanente=true' : ''}`;
-      const res = await fetch(url, { method: 'DELETE' });
-      const json = await res.json();
-      
-      if (!res.ok || !json.success) {
-        setMensaje(json.message || 'Error al eliminar el asociado');
-        return;
+      setEliminando(true); setMensaje(''); setEsError(false);
+      const ids = [...seleccionados];
+
+      /* Llamadas en paralelo */
+      const resultados = await Promise.allSettled(
+        ids.map(id =>
+          fetch(
+            `/api/asociados/delete?id=${id}${eliminacionPerm ? '&permanente=true' : ''}`,
+            { method: 'DELETE' }
+          ).then(r => r.json())
+        )
+      );
+
+      const fallidos = resultados.filter(r => r.status === 'rejected').length;
+
+      if (fallidos > 0) {
+        setMensaje(`${ids.length - fallidos} eliminado(s), ${fallidos} con error.`);
+        setEsError(true);
+      } else {
+        setMensaje(
+          eliminacionPerm
+            ? `${ids.length} asociado(s) eliminado(s) permanentemente.`
+            : `${ids.length} asociado(s) marcado(s) como eliminado(s).`
+        );
       }
-      
-      const mensajeExito = eliminacionPermanente 
-        ? 'Asociado eliminado permanentemente'
-        : 'Asociado marcado como eliminado';
-      setMensaje(mensajeExito);
-      
-      cerrarConfirmacionEliminar();
+
+      setModalDeleteOpen(false);
+      setEliminacionPerm(false);
+      limpiarSeleccion();
       await cargar();
-    } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Error de conexión al eliminar.';
-        setMensaje(errorMessage);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) {
+      setMensaje(err instanceof Error ? err.message : 'Error de conexión.'); setEsError(true);
+    } finally { setEliminando(false); }
   };
 
-  const formInputClass = (hasValue: boolean) =>
-    `shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 transition-colors ${
-      hasValue ? 'border-green-500 focus:ring-green-200' : 'border-gray-300 focus:ring-blue-200'
-    }`;
+  /* ─── Paginación: números visibles ─── */
+  const paginasVisibles = useMemo(() => {
+    const delta = 1;
+    const rango: number[] = [];
+    for (
+      let i = Math.max(1, paginaActual - delta);
+      i <= Math.min(totalPaginas, paginaActual + delta);
+      i++
+    ) rango.push(i);
+    if (rango[0] > 2)          rango.unshift(-1); // ellipsis izquierdo
+    if (rango[0] > 1)          rango.unshift(1);
+    if (rango[rango.length - 1] < totalPaginas - 1) rango.push(-2); // ellipsis derecho
+    if (rango[rango.length - 1] < totalPaginas)     rango.push(totalPaginas);
+    return rango;
+  }, [paginaActual, totalPaginas]);
 
+  /* ══════════════════ RENDER ══════════════════ */
   return (
-    <div className="flex bg-[#f2f2f2] min-h-screen font-['Segoe_UI',sans-serif]">
-      {/* Sidebar */}
-      <Sidebar />
-      
-      {/* Contenido Principal */}
-      <div className="flex-grow p-4">
+    <div className="flex bg-[#f2f2f2] min-h-screen">
+      <Sidebar activeItem="listado" menuItems={menuItems} pageTitle="Consultar Asociados" />
+
+      <div className="flex-grow p-4 pt-16 md:pt-4 min-w-0">
         <div className="max-w-7xl mx-auto">
-          <div className="p-[30px] bg-white rounded-lg my-[30px] shadow-md">
-            
-            {/* Encabezado del Formulario */}
-            <div className="flex items-start justify-between">
-              <div className="text-2xl font-bold border-b-2 border-gray-300 pb-2 mb-[20px] text-[#003366]">
-                Consultar asociados
+          <div className="bg-white rounded-xl shadow-md p-4 sm:p-6 my-4 sm:my-6">
+
+            {/* ── Cabecera ── */}
+            <div className="flex items-start justify-between mb-1">
+              <div>
+                <h1 className="text-xl sm:text-2xl font-bold text-[#003366]">Consultar Asociados</h1>
+                <div className="w-16 h-1 bg-[#003366] rounded mt-1" />
               </div>
-              <div className="mb-[20px]">
-                <Image
-                  src="/logo-iglesia.png"
-                  alt="Logo Iglesia"
-                  width={120}
-                  height={80}
-                  className="object-contain"
-                />
+              <div className="relative w-[80px] h-[55px] hidden sm:block">
+                <Image src="/logo-iglesia.png" alt="Logo" fill className="object-contain" sizes="80px" />
               </div>
             </div>
-
-            {/* Texto explicativo */}
-            <p className="text-gray-600 mb-6">
-              Busca, consulta, edita y gestiona la información de los asociados registrados en el sistema.
+            <p className="text-gray-500 text-sm mb-5">
+              Busca, consulta, edita y gestiona los asociados registrados.
             </p>
 
-            {/* Mensaje de estado */}
+            {/* ── Mensaje global ── */}
             {mensaje && (
-              <div className={`mb-4 p-4 rounded ${
-                mensaje.toLowerCase().includes('error')
-                  ? 'bg-red-100 text-red-700 border border-red-300'
-                  : 'bg-green-100 text-green-700 border border-green-300'
+              <div className={`mb-4 p-3.5 rounded-lg text-sm border ${
+                esError
+                  ? 'bg-red-50 text-red-700 border-red-200'
+                  : 'bg-green-50 text-green-700 border-green-200'
               }`}>
                 {mensaje}
               </div>
             )}
 
-            {/* Sección de Filtros */}
-            <div className="mb-8">
-              <h3 className="text-lg font-semibold text-[#003366] mb-4 flex items-center">
-                <FaSearch className="mr-2" />
-                Filtros de Búsqueda
+            {/* ── Filtros ── */}
+            <div className="mb-5 p-4 bg-gray-50 rounded-xl border border-gray-200">
+              <h3 className="text-sm font-semibold text-[#003366] mb-3 flex items-center gap-2">
+                <FaSearch className="text-xs" /> Filtros de búsqueda
               </h3>
-              
-              <form onSubmit={onSubmit}>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                  <div>
-                    <label className="block text-gray-700 text-sm font-bold mb-2">
-                      Nombre o apellidos
-                    </label>
-                    <input
-                      type="text"
-                      value={filtros.nombreCompleto}
-                      onChange={(e) => setFiltros({ ...filtros, nombreCompleto: e.target.value })}
-                      className={formInputClass(!!filtros.nombreCompleto)}
-                      placeholder="Ej: Ana Mora"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-gray-700 text-sm font-bold mb-2">
-                      Cédula
-                    </label>
-                    <input
-                      type="text"
-                      value={filtros.cedula}
-                      onChange={(e) => setFiltros({ ...filtros, cedula: e.target.value })}
-                      className={formInputClass(!!filtros.cedula)}
-                      placeholder="Ej: 2-0403-6583"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-gray-700 text-sm font-bold mb-2">
-                      Estado
-                    </label>
-                    <select
-                      value={filtros.estado}
-                      onChange={(e) => setFiltros({ ...filtros, estado: e.target.value })}
-                      className={formInputClass(true)}
-                    >
-                      <option value="todos">Todos</option>
-                      <option value="1">Activos</option>
-                      <option value="0">Eliminados</option>
-                    </select>
-                  </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+                <div>
+                  <label className="block text-gray-600 text-xs font-semibold mb-1">Nombre</label>
+                  <input
+                    type="text" placeholder="Ej: Ana Mora"
+                    value={filtros.nombreCompleto}
+                    onChange={e => setFiltros({ ...filtros, nombreCompleto: e.target.value })}
+                    className={inputClass}
+                  />
                 </div>
-
-                <div className="flex flex-wrap gap-3">
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className={`${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#003366] hover:bg-[#004488]'} text-white font-semibold px-6 py-2 rounded shadow transition-colors`}
-                  >
-                    <FaSearch className="inline mr-2" />
-                    {loading ? 'Buscando...' : 'Buscar'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={limpiarFiltros}
-                    className="bg-gray-600 hover:bg-gray-700 text-white font-semibold px-6 py-2 rounded shadow transition-colors"
-                  >
-                    Limpiar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={cargar}
-                    disabled={loading}
-                    className={`${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'} text-white font-semibold px-6 py-2 rounded shadow transition-colors`}
-                  >
-                    {loading ? 'Actualizando…' : 'Recargar'}
-                  </button>
+                <div>
+                  <label className="block text-gray-600 text-xs font-semibold mb-1">Cédula</label>
+                  <input
+                    type="text" placeholder="Ej: 2-0403-6583"
+                    value={filtros.cedula}
+                    onChange={e => setFiltros({ ...filtros, cedula: e.target.value })}
+                    className={inputClass}
+                  />
                 </div>
-              </form>
+                <div>
+                  <label className="block text-gray-600 text-xs font-semibold mb-1">Estado</label>
+                  <select
+                    value={filtros.estado}
+                    onChange={e => setFiltros({ ...filtros, estado: e.target.value })}
+                    className={inputClass}
+                  >
+                    <option value="todos">Todos</option>
+                    <option value="1">Activos</option>
+                    <option value="0">Eliminados</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setFiltros({ nombreCompleto: '', cedula: '', estado: 'todos' })}
+                  className="px-4 py-2 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition-colors"
+                >
+                  Limpiar
+                </button>
+                <button
+                  onClick={cargar} disabled={loading}
+                  className={`px-4 py-2 text-xs font-semibold rounded-lg transition-colors text-white ${
+                    loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#003366] hover:bg-[#004488]'
+                  }`}
+                >
+                  {loading ? 'Actualizando...' : 'Recargar'}
+                </button>
+              </div>
             </div>
 
-            {/* Tabla de resultados */}
-            <div className="mb-8">
-              <h3 className="text-lg font-semibold text-[#003366] mb-4 flex items-center">
-                <FaUsers className="mr-2" />
-                Resultados ({filtrados.length})
-              </h3>
-              
-              <div className="overflow-x-auto border rounded-lg">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-[#003366] text-white">
+            {/* ── Toolbar ── */}
+            <div className="flex flex-col gap-2 mb-3">
+
+              {/* Fila: conteo + filas por página */}
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <span className="flex items-center gap-1.5 text-sm text-gray-600">
+                  <FaUsers className="text-xs text-[#003366]" />
+                  <strong className="text-[#003366]">{filtrados.length}</strong> resultado(s)
+                  {seleccionados.size > 0 && (
+                    <span className="ml-1 text-gray-500">
+                      · <strong className="text-[#003366]">{seleccionados.size}</strong> seleccionado(s)
+                    </span>
+                  )}
+                </span>
+
+                <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                  <span className="hidden sm:inline">Filas:</span>
+                  {([10, 25, 50] as PageSize[]).map(n => (
+                    <button
+                      key={n}
+                      onClick={() => setPageSize(n)}
+                      className={`w-8 h-7 rounded-md font-semibold transition-colors ${
+                        pageSize === n
+                          ? 'bg-[#003366] text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Barra de acción: solo visible cuando hay selección */}
+              {seleccionados.size > 0 && (
+                <div className="flex flex-col gap-2 p-2.5 bg-red-50 border border-red-200 rounded-xl">
+                  <span className="flex items-center gap-1.5 text-xs text-red-700 font-medium">
+                    <FaTrash className="text-red-500 flex-shrink-0" />
+                    {seleccionados.size} asociado(s) seleccionado(s) para eliminar
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => { setEliminacionPerm(false); setModalDeleteOpen(true); }}
+                      className="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      <FaTrash className="text-xs" />
+                      Eliminar seleccionados
+                    </button>
+                    <button
+                      onClick={limpiarSeleccion}
+                      className="text-xs text-red-600 hover:text-red-800 underline transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ── Tabla ── */}
+            <div className="overflow-x-auto rounded-xl border border-gray-200 mb-4">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="bg-[#003366] text-white">
+                    {/* Columna checkbox */}
+                    <th className="px-3 py-3 w-10">
+                      <span className="sr-only">Selección</span>
+                    </th>
+                    {['ID', 'Nombre', 'Cédula', 'Teléfono', 'Ministerio', 'Estado', 'Ingreso', 'Acciones'].map(h => (
+                      <th key={h} className="text-left px-4 py-3 font-semibold whitespace-nowrap text-xs">
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
                     <tr>
-                      <th className="text-left p-3 font-semibold">ID</th>
-                      <th className="text-left p-3 font-semibold">Nombre</th>
-                      <th className="text-left p-3 font-semibold">Cédula</th>
-                      <th className="text-left p-3 font-semibold">Teléfono</th>
-                      <th className="text-left p-3 font-semibold">Ministerio</th>
-                      <th className="text-left p-3 font-semibold">Estado</th>
-                      <th className="text-left p-3 font-semibold">Ingreso</th>
-                      <th className="text-left p-3 font-semibold">Acciones</th>
+                      <td colSpan={9} className="p-8 text-center text-gray-400 text-sm">
+                        Cargando datos...
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {loading ? (
-                      <tr>
-                        <td colSpan={8} className="p-4 text-center text-gray-500">Cargando…</td>
-                      </tr>
-                    ) : filtrados.length > 0 ? (
-                      filtrados.map((r) => (
-                        <tr key={r.id} className={`border-t hover:bg-gray-50 ${r.estado === 0 ? 'bg-red-50 opacity-75' : ''}`}>
-                          <td className="p-3 font-medium">{r.id}</td>
-                          <td className={`p-3 ${r.estado === 0 ? 'line-through text-gray-500' : ''}`}>{r.nombreCompleto}</td>
-                          <td className="p-3">{r.cedula}</td>
-                          <td className="p-3">{r.telefono || '-'}</td>
-                          <td className="p-3">{r.ministerio || '-'}</td>
-                          <td className="p-3">
-                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                              r.estado === 1 
-                                ? 'bg-green-100 text-green-800' 
-                                : 'bg-red-100 text-red-800'
-                            }`}>
-                              {r.estado === 1 ? 'Activo' : 'Eliminado'}
-                            </span>
+                  ) : paginados.length > 0 ? (
+                    paginados.map(r => {
+                      const checked = seleccionados.has(r.id);
+                      return (
+                        <tr
+                          key={r.id}
+                          className={`border-t transition-colors ${
+                            checked
+                              ? 'bg-blue-50'
+                              : r.estado === 0
+                              ? 'bg-red-50/40 hover:bg-red-50/70'
+                              : 'hover:bg-blue-50/30'
+                          }`}
+                        >
+                          {/* Checkbox */}
+                          <td className="px-3 py-3 text-center">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleFila(r.id)}
+                              className="w-4 h-4 accent-[#003366] cursor-pointer"
+                              aria-label={`Seleccionar ${r.nombreCompleto}`}
+                            />
                           </td>
-                          <td className="p-3">
-                            {r.fechaIngreso ? new Date(r.fechaIngreso).toLocaleDateString() : '-'}
+                          <td className="px-4 py-3 font-medium text-gray-500">{r.id}</td>
+                          <td className={`px-4 py-3 font-medium max-w-[160px] truncate ${
+                            r.estado === 0 ? 'line-through text-gray-400' : 'text-gray-800'
+                          }`}>
+                            {r.nombreCompleto}
                           </td>
-                          <td className="p-3">
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => abrirModalEdicion(r)}
-                                className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1 rounded shadow transition-colors flex items-center"
-                              >
-                                <FaEdit className="mr-1" />
-                                Editar
-                              </button>
-                              <button
-                                onClick={() => abrirConfirmacionEliminar(r)}
-                                className="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-1 rounded shadow transition-colors flex items-center"
-                              >
-                                <FaTrash className="mr-1" />
-                                Eliminar
-                              </button>
-                            </div>
+                          <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{r.cedula}</td>
+                          <td className="px-4 py-3 text-gray-600">{r.telefono || '-'}</td>
+                          <td className="px-4 py-3 text-gray-600 max-w-[120px] truncate">{r.ministerio || '-'}</td>
+                          <td className="px-4 py-3">
+                            <Badge activo={r.estado === 1} />
+                          </td>
+                          <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                            {formatFecha(r.fechaIngreso)}
+                          </td>
+                          <td className="px-4 py-3">
+                            <button
+                              onClick={() => abrirModalEdicion(r)}
+                              className="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+                            >
+                              <FaEdit className="text-xs" /> Editar
+                            </button>
                           </td>
                         </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={8} className="p-8 text-center text-gray-500">
-                          <FaSearch className="mx-auto mb-2 text-2xl" />
-                          No se encontraron resultados
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              
-              {/* Información de registros */}
-              <div className="mt-3 text-sm text-gray-500 text-center">
-                Mostrando {filtrados.length} de {data.length} registros
-              </div>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={9} className="p-10 text-center text-gray-400">
+                        <FaSearch className="mx-auto mb-2 text-2xl opacity-30" />
+                        <p className="text-sm">No se encontraron resultados</p>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
 
+            {/* ── Paginación ── */}
+            {totalPaginas > 1 && (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-xs text-gray-400">
+                  Página {paginaActual} de {totalPaginas} ·{' '}
+                  {(paginaActual - 1) * pageSize + 1}–
+                  {Math.min(paginaActual * pageSize, filtrados.length)} de {filtrados.length}
+                </p>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setPagina(p => Math.max(1, p - 1))}
+                    disabled={paginaActual === 1}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    aria-label="Página anterior"
+                  >
+                    <FaChevronLeft className="text-xs" />
+                  </button>
+
+                  {paginasVisibles.map((p, i) =>
+                    p < 0 ? (
+                      <span key={`ellipsis-${i}`} className="w-8 text-center text-gray-400 text-xs">…</span>
+                    ) : (
+                      <button
+                        key={p}
+                        onClick={() => setPagina(p)}
+                        className={`w-8 h-8 rounded-lg text-xs font-semibold transition-colors ${
+                          p === paginaActual
+                            ? 'bg-[#003366] text-white'
+                            : 'border border-gray-200 text-gray-600 hover:bg-gray-100'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    )
+                  )}
+
+                  <button
+                    onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))}
+                    disabled={paginaActual === totalPaginas}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    aria-label="Página siguiente"
+                  >
+                    <FaChevronRight className="text-xs" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Conteo sin paginación */}
+            {totalPaginas <= 1 && filtrados.length > 0 && (
+              <p className="text-xs text-gray-400 text-right">
+                {filtrados.length} de {data.length} registros
+              </p>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Modal de edición */}
-      {modalOpen && asociadoEditando && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl">
-            {/* Header del modal */}
-            <div className="bg-[#003366] text-white p-4">
-              <h2 className="text-lg font-bold">
-                Editar Asociado - ID: {asociadoEditando.id}
+      {/* ══════════════════════════════════════════
+          MODAL EDICIÓN
+      ══════════════════════════════════════════ */}
+      {modalEditOpen && asociadoEditando && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
+            <div className="bg-[#003366] text-white px-6 py-4 flex-shrink-0">
+              <h2 className="text-base font-bold">
+                Editar Asociado — ID: {asociadoEditando.id}
               </h2>
             </div>
-
-            {/* Contenido del modal */}
-            <div className="p-6 max-h-[70vh] overflow-y-auto">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Nombre Completo */}
+            <div className="p-6 overflow-y-auto flex-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[
+                  { label: 'Nombre Completo *', field: 'nombreCompleto', type: 'text'  },
+                  { label: 'Cédula *',           field: 'cedula',         type: 'text'  },
+                  { label: 'Correo Electrónico', field: 'correo',         type: 'email' },
+                  { label: 'Teléfono',           field: 'telefono',       type: 'text'  },
+                  { label: 'Ministerio',         field: 'ministerio',     type: 'text'  },
+                  { label: 'Fecha de Ingreso',   field: 'fechaIngreso',   type: 'date'  },
+                ].map(({ label, field, type }) => (
+                  <div key={field}>
+                    <label className="block text-gray-700 text-xs font-semibold mb-1.5">{label}</label>
+                    <input
+                      type={type}
+                      value={formulario[field as keyof FormularioEdicion] as string}
+                      onChange={e => setFormulario({ ...formulario, [field]: e.target.value })}
+                      className={inputClass}
+                    />
+                  </div>
+                ))}
                 <div>
-                  <label className="block text-gray-700 text-sm font-bold mb-2">
-                    Nombre Completo *
-                  </label>
-                  <input
-                    type="text"
-                    value={formulario.nombreCompleto}
-                    onChange={(e) => setFormulario({ ...formulario, nombreCompleto: e.target.value })}
-                    className={formInputClass(!!formulario.nombreCompleto)}
-                    placeholder="Nombre completo"
-                  />
-                </div>
-
-                {/* Cédula */}
-                <div>
-                  <label className="block text-gray-700 text-sm font-bold mb-2">
-                    Cédula *
-                  </label>
-                  <input
-                    type="text"
-                    value={formulario.cedula}
-                    onChange={(e) => setFormulario({ ...formulario, cedula: e.target.value })}
-                    className={formInputClass(!!formulario.cedula)}
-                    placeholder="Número de cédula"
-                  />
-                </div>
-
-                {/* Correo */}
-                <div>
-                  <label className="block text-gray-700 text-sm font-bold mb-2">
-                    Correo Electrónico
-                  </label>
-                  <input
-                    type="email"
-                    value={formulario.correo}
-                    onChange={(e) => setFormulario({ ...formulario, correo: e.target.value })}
-                    className={formInputClass(!!formulario.correo)}
-                    placeholder="correo@ejemplo.com"
-                  />
-                </div>
-
-                {/* Teléfono */}
-                <div>
-                  <label className="block text-gray-700 text-sm font-bold mb-2">
-                    Teléfono
-                  </label>
-                  <input
-                    type="text"
-                    value={formulario.telefono}
-                    onChange={(e) => setFormulario({ ...formulario, telefono: e.target.value })}
-                    className={formInputClass(!!formulario.telefono)}
-                    placeholder="8888-8888"
-                  />
-                </div>
-
-                {/* Ministerio */}
-                <div>
-                  <label className="block text-gray-700 text-sm font-bold mb-2">
-                    Ministerio
-                  </label>
-                  <input
-                    type="text"
-                    value={formulario.ministerio}
-                    onChange={(e) => setFormulario({ ...formulario, ministerio: e.target.value })}
-                    className={formInputClass(!!formulario.ministerio)}
-                    placeholder="Ministerio asignado"
-                  />
-                </div>
-
-                {/* Fecha de Ingreso */}
-                <div>
-                  <label className="block text-gray-700 text-sm font-bold mb-2">
-                    Fecha de Ingreso
-                  </label>
-                  <input
-                    type="date"
-                    value={formulario.fechaIngreso}
-                    onChange={(e) => setFormulario({ ...formulario, fechaIngreso: e.target.value })}
-                    className={formInputClass(!!formulario.fechaIngreso)}
-                  />
-                </div>
-
-                {/* Estado */}
-                <div>
-                  <label className="block text-gray-700 text-sm font-bold mb-2">
-                    Estado
-                  </label>
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Estado</label>
                   <select
                     value={formulario.estado}
-                    onChange={(e) => setFormulario({ ...formulario, estado: Number(e.target.value) })}
-                    className={formInputClass(true)}
+                    onChange={e => setFormulario({ ...formulario, estado: Number(e.target.value) })}
+                    className={inputClass}
                   >
                     <option value={1}>Activo</option>
                     <option value={0}>Inactivo</option>
                   </select>
                 </div>
-
-                {/* Dirección */}
-                <div className="md:col-span-2">
-                  <label className="block text-gray-700 text-sm font-bold mb-2">
-                    Dirección
-                  </label>
+                <div className="sm:col-span-2">
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Dirección</label>
                   <input
-                    type="text"
-                    value={formulario.direccion}
-                    onChange={(e) => setFormulario({ ...formulario, direccion: e.target.value })}
-                    className={formInputClass(!!formulario.direccion)}
-                    placeholder="Dirección completa"
+                    type="text" value={formulario.direccion}
+                    onChange={e => setFormulario({ ...formulario, direccion: e.target.value })}
+                    className={inputClass}
                   />
                 </div>
               </div>
             </div>
-
-            {/* Botones del modal */}
-            <div className="sticky bottom-0 bg-gray-50 border-t px-6 py-4 flex items-center justify-end gap-3">
+            <div className="bg-gray-50 border-t px-6 py-4 flex justify-end gap-3 flex-shrink-0">
               <button
-                type="button"
-                onClick={cerrarModal}
+                onClick={() => { setModalEditOpen(false); setAsociadoEditando(null); }}
                 disabled={guardando}
-                className="px-4 py-2 rounded border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50 transition-colors"
+                className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50 transition-colors"
               >
                 Cancelar
               </button>
               <button
-                type="button"
-                onClick={guardarCambios}
-                disabled={guardando}
-                className={`px-5 py-2 rounded font-semibold text-white shadow transition-colors ${
-                  guardando
-                    ? 'bg-gray-400 cursor-not-allowed'
-                    : 'bg-[#003366] hover:bg-[#004488]'
+                onClick={guardarCambios} disabled={guardando}
+                className={`px-5 py-2 text-sm rounded-lg font-semibold text-white transition-colors ${
+                  guardando ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#003366] hover:bg-[#004488]'
                 }`}
               >
                 {guardando ? 'Guardando...' : 'Guardar cambios'}
@@ -636,59 +604,88 @@ export default function ConsultarAsociadosPage() {
         </div>
       )}
 
-      {/* Modal de confirmación de eliminación */}
-      {confirmDeleteOpen && asociadoAEliminar && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-[95%] max-w-md shadow-xl">
-            <h2 className="text-lg font-bold text-[#003366] mb-2">
-              Confirmar eliminación
-            </h2>
-            <p className="text-sm text-gray-700 mb-4">
-              ¿Estás seguro de que deseas eliminar al asociado{' '}
-              <strong>{asociadoAEliminar.nombreCompleto}</strong> (ID: {asociadoAEliminar.id})?
-            </p>
-            
-            {/* Opción de eliminación permanente */}
-            <div className="mb-4">
-              <div className="flex items-center gap-2 mb-2">
-                <input
-                  id="eliminacionPermanente"
-                  type="checkbox"
-                  checked={eliminacionPermanente}
-                  onChange={(e) => setEliminacionPermanente(e.target.checked)}
-                />
-                <label htmlFor="eliminacionPermanente" className="text-sm text-gray-700">
-                  Eliminación permanente (hard delete)
+      {/* ══════════════════════════════════════════
+          MODAL CONFIRMACIÓN ELIMINACIÓN MASIVA
+      ══════════════════════════════════════════ */}
+      {modalDeleteOpen && (
+        <div className="fixed inset-0 bg-black/55 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+
+            {/* Cabecera */}
+            <div className="bg-red-600 px-6 py-4 flex items-center gap-3">
+              <FaExclamationTriangle className="text-white text-lg flex-shrink-0" />
+              <h2 className="text-white font-bold text-base">Confirmar eliminación</h2>
+            </div>
+
+            <div className="p-6">
+              <p className="text-sm text-gray-600 mb-4">
+                Se {eliminacionPerm ? 'eliminará permanentemente' : 'marcará como eliminado'} a los siguientes{' '}
+                <strong>{seleccionadosData.length}</strong> asociado(s):
+              </p>
+
+              {/* Lista de seleccionados */}
+              <ul className="mb-5 max-h-40 overflow-y-auto rounded-xl border border-gray-200 divide-y divide-gray-100">
+                {seleccionadosData.map(a => (
+                  <li key={a.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                    <span className="font-medium text-gray-800 truncate">{a.nombreCompleto}</span>
+                    <span className="text-gray-400 text-xs ml-3 flex-shrink-0">{a.cedula}</span>
+                  </li>
+                ))}
+              </ul>
+
+              {/* Toggle permanente */}
+              <div className={`p-3.5 rounded-xl border transition-colors ${
+                eliminacionPerm ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'
+              }`}>
+                <label className="flex items-center gap-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={eliminacionPerm}
+                    onChange={e => setEliminacionPerm(e.target.checked)}
+                    className="w-4 h-4 accent-red-600"
+                  />
+                  <div>
+                    <p className={`text-sm font-semibold ${eliminacionPerm ? 'text-red-700' : 'text-gray-700'}`}>
+                      Eliminación permanente
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {eliminacionPerm
+                        ? 'Se borrarán definitivamente de la base de datos. Esta acción no se puede deshacer.'
+                        : 'Se marcarán como eliminados pero se podrán recuperar.'}
+                    </p>
+                  </div>
                 </label>
-              </div>
-              <div className="text-xs text-gray-500">
-                <strong>Sin marcar:</strong> Marca como "Eliminado" (se puede recuperar)<br/>
-                <strong>Marcado:</strong> Elimina permanentemente de la base de datos
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3">
+            <div className="bg-gray-50 border-t px-6 py-4 flex justify-end gap-3">
               <button
-                className="px-4 py-2 rounded border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors"
-                onClick={cerrarConfirmacionEliminar}
+                onClick={() => { setModalDeleteOpen(false); setEliminacionPerm(false); }}
+                disabled={eliminando}
+                className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50 transition-colors"
               >
                 Cancelar
               </button>
               <button
-                className={`px-4 py-2 rounded text-white font-semibold transition-colors ${
-                  eliminacionPermanente 
-                    ? 'bg-red-700 hover:bg-red-800' 
+                onClick={eliminarSeleccionados} disabled={eliminando}
+                className={`px-5 py-2 text-sm rounded-lg font-semibold text-white transition-colors ${
+                  eliminando
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : eliminacionPerm
+                    ? 'bg-red-700 hover:bg-red-800'
                     : 'bg-red-600 hover:bg-red-700'
                 }`}
-                onClick={eliminarAsociado}
               >
-                {eliminacionPermanente ? 'Eliminar permanentemente' : 'Marcar como eliminado'}
+                {eliminando
+                  ? 'Eliminando...'
+                  : eliminacionPerm
+                  ? 'Eliminar permanentemente'
+                  : 'Confirmar eliminación'}
               </button>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }

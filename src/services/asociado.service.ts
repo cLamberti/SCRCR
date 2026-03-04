@@ -8,10 +8,9 @@ import {
   AllAsociadosResponse
 } from '@/dto/asociado.dto';
 import { AsociadoValidator } from '@/validators/asociado.validator';
-import { AsociadoDAO, AsociadoDAOError } from '@/dao/asociado.dao'; 
-/**
- * Clase de error personalizada para errores del servicio
- */
+import { AsociadoDAO, AsociadoDAOError } from '@/dao/asociado.dao';
+import { Asociado } from '@/models/Asociado';
+
 export class AsociadoServiceError extends Error {
   constructor(
     message: string,
@@ -23,377 +22,178 @@ export class AsociadoServiceError extends Error {
   }
 }
 
-/**
- * Servicio para manejar operaciones CRUD de asociados
- */
 export class AsociadoService {
-  private baseUrl: string;
   private asociadoDAO: AsociadoDAO;
 
-  constructor(baseUrl: string = '/api/asociados') {
-    this.baseUrl = baseUrl;
+  constructor() {
     this.asociadoDAO = new AsociadoDAO();
   }
 
-  /**
-   * Crea un nuevo asociado
-   */
+  /* Convierte un modelo Asociado al DTO de respuesta */
+  private toResponse(asociado: Asociado): AsociadoResponse {
+    return {
+      id:             asociado.id,
+      nombreCompleto: asociado.nombreCompleto,
+      cedula:         asociado.cedula,
+      correo:         asociado.correo,
+      telefono:       asociado.telefono,
+      ministerio:     asociado.ministerio,
+      direccion:      asociado.direccion,
+      fechaIngreso:   asociado.fechaIngreso instanceof Date
+                        ? asociado.fechaIngreso.toISOString()
+                        : asociado.fechaIngreso,
+      estado:         asociado.estado,
+    };
+  }
+
+  /* Relanza errores del DAO como errores del service con código HTTP apropiado */
+  private handleDAOError(error: unknown): never {
+    if (error instanceof AsociadoDAOError) {
+      switch (error.code) {
+        case 'DUPLICATE_KEY':
+          throw new AsociadoServiceError('Ya existe un asociado con esta cédula', 409);
+        case 'NOT_FOUND':
+          throw new AsociadoServiceError('Asociado no encontrado', 404);
+        case 'NO_UPDATES':
+          throw new AsociadoServiceError('No hay campos para actualizar', 400);
+        default:
+          throw new AsociadoServiceError(error.message, 500);
+      }
+    }
+    throw new AsociadoServiceError('Error interno del servidor', 500);
+  }
+
   async crear(data: CrearAsociadoRequest): Promise<AsociadoResponse> {
+    const sanitized  = AsociadoValidator.sanitizarDatos(data);
+    const validation = AsociadoValidator.validarCrearAsociado(sanitized);
+
+    if (!validation.valid) {
+      throw new AsociadoServiceError('Datos de asociado inválidos', 400, validation.errors);
+    }
+
     try {
-      // Sanitizar datos
-      const sanitizedData = AsociadoValidator.sanitizarDatos(data);
-
-      // Validar datos
-      const validation = AsociadoValidator.validarCrearAsociado(sanitizedData);
-      if (!validation.valid) {
-        throw new AsociadoServiceError(
-          'Datos de asociado inválidos',
-          400,
-          validation.errors
-        );
-      }
-
-      const response = await fetch(this.baseUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(sanitizedData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new AsociadoServiceError(
-          errorData.message || 'Error al crear el asociado',
-          response.status,
-          errorData.errors
-        );
-      }
-
-      const result: AsociadoResponseWithMessage = await response.json();
-      
-      if (!result.success || !result.data) {
-        throw new AsociadoServiceError(
-          result.message || 'Error al crear el asociado',
-          500
-        );
-      }
-
-      return result.data;
+      const asociado = await this.asociadoDAO.crear(sanitized);
+      return this.toResponse(asociado);
     } catch (error) {
-      if (error instanceof AsociadoServiceError) {
-        throw error;
-      }
-      throw new AsociadoServiceError(
-        'Error de conexión al crear el asociado',
-        500
-      );
+      this.handleDAOError(error);
     }
   }
 
-  /**
-   * Obtiene un asociado por ID
-   */
   async obtenerPorId(id: number): Promise<AsociadoResponse> {
     try {
-      const response = await fetch(`${this.baseUrl}/${id}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new AsociadoServiceError(
-          errorData.message || 'Error al obtener el asociado',
-          response.status
-        );
+      const asociado = await this.asociadoDAO.obtenerPorId(id);
+      if (!asociado) {
+        throw new AsociadoServiceError('Asociado no encontrado', 404);
       }
-
-      const result: AsociadoResponseWithMessage = await response.json();
-      
-      if (!result.success || !result.data) {
-        throw new AsociadoServiceError(
-          result.message || 'Asociado no encontrado',
-          404
-        );
-      }
-
-      return result.data;
+      return this.toResponse(asociado);
     } catch (error) {
-      if (error instanceof AsociadoServiceError) {
-        throw error;
-      }
-      throw new AsociadoServiceError(
-        'Error de conexión al obtener el asociado',
-        500
-      );
+      if (error instanceof AsociadoServiceError) throw error;
+      this.handleDAOError(error);
     }
   }
 
-  /**
-   * Actualiza un asociado existente
-   */
   async actualizar(id: number, data: ActualizarAsociadoRequest): Promise<AsociadoResponse> {
+    const sanitized  = AsociadoValidator.sanitizarDatos(data);
+    const validation = AsociadoValidator.validarActualizarAsociado(sanitized);
+
+    if (!validation.valid) {
+      throw new AsociadoServiceError('Datos de asociado inválidos', 400, validation.errors);
+    }
+
     try {
-      // Sanitizar datos
-      const sanitizedData = AsociadoValidator.sanitizarDatos(data);
-
-      // Validar datos
-      const validation = AsociadoValidator.validarActualizarAsociado(sanitizedData);
-      if (!validation.valid) {
-        throw new AsociadoServiceError(
-          'Datos de asociado inválidos',
-          400,
-          validation.errors
-        );
-      }
-
-      const response = await fetch(`${this.baseUrl}/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(sanitizedData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new AsociadoServiceError(
-          errorData.message || 'Error al actualizar el asociado',
-          response.status,
-          errorData.errors
-        );
-      }
-
-      const result: AsociadoResponseWithMessage = await response.json();
-      
-      if (!result.success || !result.data) {
-        throw new AsociadoServiceError(
-          result.message || 'Error al actualizar el asociado',
-          500
-        );
-      }
-
-      return result.data;
+      const asociado = await this.asociadoDAO.actualizar(id, sanitized);
+      return this.toResponse(asociado);
     } catch (error) {
-      if (error instanceof AsociadoServiceError) {
-        throw error;
-      }
-      throw new AsociadoServiceError(
-        'Error de conexión al actualizar el asociado',
-        500
-      );
+      if (error instanceof AsociadoServiceError) throw error;
+      this.handleDAOError(error);
     }
   }
 
-  /**
-   * Elimina un asociado (soft delete - cambia estado a inactivo)
-   */
   async eliminar(id: number): Promise<void> {
     try {
-      const response = await fetch(`${this.baseUrl}/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new AsociadoServiceError(
-          errorData.message || 'Error al eliminar el asociado',
-          response.status
-        );
-      }
-
-      const result: AsociadoResponseWithMessage = await response.json();
-      
-      if (!result.success) {
-        throw new AsociadoServiceError(
-          result.message || 'Error al eliminar el asociado',
-          500
-        );
+      const ok = await this.asociadoDAO.eliminar(id);
+      if (!ok) {
+        throw new AsociadoServiceError('Asociado no encontrado', 404);
       }
     } catch (error) {
-      if (error instanceof AsociadoServiceError) {
-        throw error;
-      }
-      throw new AsociadoServiceError(
-        'Error de conexión al eliminar el asociado',
-        500
-      );
+      if (error instanceof AsociadoServiceError) throw error;
+      this.handleDAOError(error);
     }
   }
 
-  /**
-   * Lista todos los asociados con filtros y paginación
-   */
+  async eliminarPermanente(id: number): Promise<void> {
+    try {
+      const ok = await this.asociadoDAO.eliminarPermanente(id);
+      if (!ok) {
+        throw new AsociadoServiceError('Asociado no encontrado', 404);
+      }
+    } catch (error) {
+      if (error instanceof AsociadoServiceError) throw error;
+      this.handleDAOError(error);
+    }
+  }
+
   async listar(filtros?: FiltrosAsociadoRequest): Promise<ListarAsociadosResponse> {
     try {
-      // Construir query params
-      const params = new URLSearchParams();
-        
-      if (filtros) {
-        if (filtros.nombreCompleto) params.append('nombreCompleto', filtros.nombreCompleto);
-        if (filtros.cedula) params.append('cedula', filtros.cedula);
-        if (filtros.ministerio) params.append('ministerio', filtros.ministerio);
-        if (filtros.estado !== undefined) params.append('estado', filtros.estado.toString());
-        if (filtros.fechaIngresoDesde) params.append('fechaIngresoDesde', filtros.fechaIngresoDesde);
-        if (filtros.fechaIngresoHasta) params.append('fechaIngresoHasta', filtros.fechaIngresoHasta);
-        if (filtros.page) params.append('page', filtros.page.toString());
-        if (filtros.limit) params.append('limit', filtros.limit.toString());
-      }
+      const page   = filtros?.page  ?? 1;
+      const limit  = filtros?.limit ?? 10;
+      const estado = filtros?.estado;
 
-      const url = params.toString() ? `${this.baseUrl}?${params.toString()}` : this.baseUrl;
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      const resultado = await this.asociadoDAO.obtenerTodos(page, limit, estado, {
+        nombreCompleto:    filtros?.nombreCompleto,
+        cedula:            filtros?.cedula,
+        ministerio:        filtros?.ministerio,
+        fechaIngresoDesde: filtros?.fechaIngresoDesde,
+        fechaIngresoHasta: filtros?.fechaIngresoHasta,
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new AsociadoServiceError(
-          errorData.message || 'Error al listar los asociados',
-          response.status
-        );
-      }
-
-      const result: ListarAsociadosResponse = await response.json();
-      
-      if (!result.success) {
-        throw new AsociadoServiceError(
-          'Error al listar los asociados',
-          500
-        );
-      }
-
-      return result;
-    } catch (error) {
-      if (error instanceof AsociadoServiceError) {
-        throw error;
-      }
-      throw new AsociadoServiceError(
-        'Error de conexión al listar los asociados',
-        500
-      );
-    }
-  }
-
-  /**
-   * Busca asociados por cédula
-   */
-  async buscarPorCedula(cedula: string): Promise<AsociadoResponse[]> {
-    try {
-      const result = await this.listar({ cedula, limit: 100 });
-      return result.data;
-    } catch (error) {
-      if (error instanceof AsociadoServiceError) {
-        throw error;
-      }
-      throw new AsociadoServiceError(
-        'Error al buscar asociado por cédula',
-        500
-      );
-    }
-  }
-
-  /**
-   * Busca asociados por nombre
-   */
-  async buscarPorNombre(nombreCompleto: string): Promise<AsociadoResponse[]> {
-    try {
-      const result = await this.listar({ nombreCompleto, limit: 100 });
-      return result.data;
-    } catch (error) {
-      if (error instanceof AsociadoServiceError) {
-        throw error;
-      }
-      throw new AsociadoServiceError(
-        'Error al buscar asociado por nombre',
-        500
-      );
-    }
-  }
-
-  /**
-   * Obtiene asociados activos
-   */
-  async obtenerActivos(page: number = 1, limit: number = 10): Promise<ListarAsociadosResponse> {
-    try {
-      return await this.listar({ estado: 1, page, limit });
-    } catch (error) {
-      if (error instanceof AsociadoServiceError) {
-        throw error;
-      }
-      throw new AsociadoServiceError(
-        'Error al obtener asociados activos',
-        500
-      );
-    }
-  }
-
-  /**
-   * Obtiene asociados inactivos
-   */
-  async obtenerInactivos(page: number = 1, limit: number = 10): Promise<ListarAsociadosResponse> {
-    try {
-      return await this.listar({ estado: 0, page, limit });
-    } catch (error) {
-      if (error instanceof AsociadoServiceError) {
-        throw error;
-      }
-      throw new AsociadoServiceError(
-        'Error al obtener asociados inactivos',
-        500
-      );
-    }
-  }
-
-
-  /**
-   * Obtiene todos los asociados sin paginación
-   */
-  async obtenerTodos(): Promise<AllAsociadosResponse> {
-    try {
-      // Llama al nuevo método del DAO
-      const asociados = await this.asociadoDAO.listarTodos(); 
-      
-      const data: AsociadoResponse[] = asociados.map(asociado => ({
-          id: asociado.id,
-          nombreCompleto: asociado.nombreCompleto,
-          cedula: asociado.cedula,
-          correo: asociado.correo,
-          telefono: asociado.telefono,
-          ministerio: asociado.ministerio,
-          direccion: asociado.direccion,
-          // Convertir Date a ISO string para el DTO
-          fechaIngreso: asociado.fechaIngreso.toISOString(), 
-          estado: asociado.estado
-      }));
 
       return {
         success: true,
-        data: data,
-        message: `Se encontraron ${data.length} asociados.`
+        data:    resultado.data.map(a => this.toResponse(a)),
+        pagination: {
+          page:       resultado.page,
+          limit:      resultado.limit,
+          total:      resultado.total,
+          totalPages: resultado.totalPages,
+        },
       };
     } catch (error) {
-      if (error instanceof AsociadoServiceError) {
-        throw error;
-      }
-      throw new AsociadoServiceError(
-        'Error al obtener todos los asociados',
-        500
-      );
+      if (error instanceof AsociadoServiceError) throw error;
+      this.handleDAOError(error);
     }
   }
 
+  async obtenerTodos(): Promise<AllAsociadosResponse> {
+    try {
+      const asociados = await this.asociadoDAO.listarTodos();
+      return {
+        success: true,
+        data:    asociados.map(a => this.toResponse(a)),
+        message: `Se encontraron ${asociados.length} asociados.`,
+      };
+    } catch (error) {
+      if (error instanceof AsociadoServiceError) throw error;
+      this.handleDAOError(error);
+    }
+  }
+
+  async buscarPorCedula(cedula: string): Promise<AsociadoResponse[]> {
+    const resultado = await this.listar({ cedula, limit: 100 });
+    return resultado.data;
+  }
+
+  async buscarPorNombre(nombreCompleto: string): Promise<AsociadoResponse[]> {
+    const resultado = await this.listar({ nombreCompleto, limit: 100 });
+    return resultado.data;
+  }
+
+  async obtenerActivos(page = 1, limit = 10): Promise<ListarAsociadosResponse> {
+    return this.listar({ estado: 1, page, limit });
+  }
+
+  async obtenerInactivos(page = 1, limit = 10): Promise<ListarAsociadosResponse> {
+    return this.listar({ estado: 0, page, limit });
+  }
 }
 
-
-// Exportar una instancia singleton del servicio
 export const asociadoService = new AsociadoService();
