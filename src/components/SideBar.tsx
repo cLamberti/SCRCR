@@ -31,6 +31,7 @@ export default function Sidebar({ activeItem, pageTitle = 'SCRCR' }: SidebarProp
 
   const menuItems: NavItem[] = [
     { id: 'inicio',           href: '/',                   icon: FaHome,        label: 'Inicio'              },
+    { id: 'registro-asociados', href: '/registro-asociados', icon: FaUserPlus,    label: 'Registro Asociados'  },
     { id: 'listado',          href: '/consulta-asociados', icon: FaList,        label: 'Listado Asociados'   },
     { id: 'eventos',          href: '/eventos',            icon: FaCalendarAlt, label: 'Eventos'             },
     { id: 'gestion-usuarios', href: '/gestion-usuarios',   icon: FaUserPlus,    label: 'Gestión de Usuarios' },
