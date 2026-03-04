@@ -103,7 +103,7 @@ export default function RegistroAsociadosPage() {
 
   return (
     <div className="flex bg-[#f2f2f2] min-h-screen">
-      <Sidebar activeItem="registro-asociados" menuItems={menuItems} />
+      <Sidebar activeItem="registro-asociados" pageTitle="Registro asociado" />
 
       {/* Spacer móvil para el botón hamburguesa */}
       <div className="flex-grow p-4 pt-16 md:pt-4">
