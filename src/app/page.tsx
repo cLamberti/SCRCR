@@ -11,9 +11,7 @@ import {
 } from 'react-icons/fa';
 
 const modulos = [
-  { titulo: 'Registro de Asociados', descripcion: 'Registrar nuevos asociados en el sistema', icono: <FaUserPlus className="text-3xl" />, href: '/registro-asociados', roles: ['admin', 'tesorero', 'pastorGeneral'], color: 'from-[#003366] to-[#004488]' },
   { titulo: 'Consulta de Asociados', descripcion: 'Buscar y consultar información de asociados', icono: <FaSearch className="text-3xl" />, href: '/consulta-asociados', roles: ['admin', 'tesorero', 'pastorGeneral'], color: 'from-[#17609c] to-[#2070ac]' },
-  { titulo: 'Eliminar Asociados', descripcion: 'Gestionar la eliminación de asociados', icono: <FaUserMinus className="text-3xl" />, href: '/eliminar-asociados', roles: ['admin', 'pastorGeneral'], color: 'from-gray-600 to-gray-700' },
   { titulo: 'Gestión de Usuarios', descripcion: 'Administrar usuarios del sistema', icono: <FaUsers className="text-3xl" />, href: '/gestion-usuarios', roles: ['admin', 'pastorGeneral'], color: 'from-slate-600 to-slate-700' },
   { titulo: 'Reportes', descripcion: 'Generar reportes y estadísticas', icono: <FaChartLine className="text-3xl" />, href: '/reportes', roles: ['admin', 'tesorero', 'pastorGeneral'], color: 'from-[#2070ac] to-[#3080bc]' },
   { titulo: 'Configuración', descripcion: 'Configurar parámetros del sistema', icono: <FaCog className="text-3xl" />, href: '/configuracion', roles: ['admin'], color: 'from-gray-700 to-gray-800' },
