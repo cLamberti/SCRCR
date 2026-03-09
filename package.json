@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
-    "start": "next start"
+    "start": "next start",
+    "test": "vitest",
+     "test:ui": "vitest --ui"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
