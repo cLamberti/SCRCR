@@ -11,6 +11,7 @@ import {
 } from 'react-icons/fa';
 
 const modulos = [
+  {  titulo: "Congregados",descripcion: "Registra, consulta y gestiona los congregados",icono: <FaUsers className="text-3xl" />,href: "/congregados",roles: ["admin", "tesorero", "pastorGeneral"],color: "from-[#17609c] to-[#2070ac]",},
   { titulo: 'Consulta de Asociados', descripcion: 'Buscar y consultar información de asociados', icono: <FaSearch className="text-3xl" />, href: '/consulta-asociados', roles: ['admin', 'tesorero', 'pastorGeneral'], color: 'from-[#17609c] to-[#2070ac]' },
   { titulo: 'Gestión de Usuarios', descripcion: 'Administrar usuarios del sistema', icono: <FaUsers className="text-3xl" />, href: '/gestion-usuarios', roles: ['admin', 'pastorGeneral'], color: 'from-slate-600 to-slate-700' },
   { titulo: 'Reportes', descripcion: 'Generar reportes y estadísticas', icono: <FaChartLine className="text-3xl" />, href: '/reportes', roles: ['admin', 'tesorero', 'pastorGeneral'], color: 'from-[#2070ac] to-[#3080bc]' },

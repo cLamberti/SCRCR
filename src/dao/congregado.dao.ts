@@ -1,4 +1,4 @@
-import { neon } from '@neondatabase/serverless';
+import { db } from '@/lib/db';
 import {
     CrearCongregadoRequest,
     ActualizarCongregadoRequest,
@@ -26,71 +26,68 @@ export class CongregadoDAOError extends Error {
 }
 
 export class CongregadoDAO {
-    private sql: ReturnType<typeof neon>;
-
-    constructor(connectionString?: string) {
-        const url = connectionString || process.env.POSTGRES_URL || '';
-        this.sql = neon(url);
-    }
 
     private mapRowToCongregado(row: any): Congregado {
         return new CongregadoModel({
-            id: row.id,
-            nombre: row.nombre,
-            cedula: row.cedula,
-            fechaIngreso: row.fecha_ingreso,
-            telefono: row.telefono,
-            segundoTelefono: row.segundo_telefono,
-            estadoCivil: row.estado_civil,
-            ministerio: row.ministerio,
+            id:                row.id,
+            nombre:            row.nombre,
+            cedula:            row.cedula,
+            fechaIngreso:      row.fecha_ingreso,
+            telefono:          row.telefono,
+            segundoTelefono:   row.segundo_telefono,
+            estadoCivil:       row.estado_civil,
+            ministerio:        row.ministerio,
             segundoMinisterio: row.segundo_ministerio,
-            urlFotoCedula: row.url_foto_cedula,
-            estado: row.estado,
-            createdAt: row.created_at,
-            updatedAt: row.updated_at,
+            urlFotoCedula:     row.url_foto_cedula,
+            estado:            row.estado,
+            createdAt:         row.created_at,
+            updatedAt:         row.updated_at,
         });
     }
 
     async crear(data: CrearCongregadoRequest): Promise<Congregado> {
         try {
-            const result = await this.sql`
-        INSERT INTO congregados (
-          nombre, cedula, fecha_ingreso, telefono,
-          segundo_telefono, estado_civil, ministerio,
-          segundo_ministerio, url_foto_cedula, estado
-        ) VALUES (
-          ${data.nombre},
-          ${data.cedula},
-          ${data.fechaIngreso ? new Date(data.fechaIngreso) : new Date()},
-          ${data.telefono},
-          ${data.segundoTelefono || null},
-          ${data.estadoCivil},
-          ${data.ministerio},
-          ${data.segundoMinisterio || null},
-          ${data.urlFotoCedula},
-          ${data.estado ?? EstadoCongregado.ACTIVO}
-        )
-        RETURNING *
-      ` as any[];
+            const result = await db.query(
+                `INSERT INTO congregados (
+                    nombre, cedula, fecha_ingreso, telefono,
+                    segundo_telefono, estado_civil, ministerio,
+                    segundo_ministerio, url_foto_cedula, estado
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                RETURNING *`,
+                [
+                    data.nombre,
+                    data.cedula,
+                    data.fechaIngreso ? new Date(data.fechaIngreso) : new Date(),
+                    data.telefono,
+                    data.segundoTelefono   || null,
+                    data.estadoCivil,
+                    data.ministerio,
+                    data.segundoMinisterio || null,
+                    data.urlFotoCedula,
+                    data.estado ?? EstadoCongregado.ACTIVO,
+                ]
+            );
 
-            if (!result || result.length === 0) {
+            if (!result.rows.length) {
                 throw new CongregadoDAOError('No se pudo crear el congregado', 'CREATE_FAILED');
             }
-
-            return this.mapRowToCongregado(result[0]);
+            return this.mapRowToCongregado(result.rows[0]);
         } catch (error: any) {
             if (error instanceof CongregadoDAOError) throw error;
             if (error.code === '23505') {
                 throw new CongregadoDAOError('Ya existe un congregado con esta cédula', 'DUPLICATE_KEY', error);
             }
-            throw new CongregadoDAOError('Error al crear el congregado en la base de datos', 'DATABASE_ERROR', error);
+            throw new CongregadoDAOError('Error al crear el congregado', 'DATABASE_ERROR', error);
         }
     }
 
     async obtenerPorId(id: number): Promise<Congregado | null> {
         try {
-            const result = await this.sql`SELECT * FROM congregados WHERE id = ${id}` as any[];
-            return result.length ? this.mapRowToCongregado(result[0]) : null;
+            const result = await db.query(
+                'SELECT * FROM congregados WHERE id = $1',
+                [id]
+            );
+            return result.rows.length ? this.mapRowToCongregado(result.rows[0]) : null;
         } catch (error) {
             throw new CongregadoDAOError('Error al obtener el congregado por ID', 'DATABASE_ERROR', error);
         }
@@ -98,8 +95,11 @@ export class CongregadoDAO {
 
     async obtenerPorCedula(cedula: string): Promise<Congregado | null> {
         try {
-            const result = await this.sql`SELECT * FROM congregados WHERE cedula = ${cedula}` as any[];
-            return result.length ? this.mapRowToCongregado(result[0]) : null;
+            const result = await db.query(
+                'SELECT * FROM congregados WHERE cedula = $1',
+                [cedula]
+            );
+            return result.rows.length ? this.mapRowToCongregado(result.rows[0]) : null;
         } catch (error) {
             throw new CongregadoDAOError('Error al obtener el congregado por cédula', 'DATABASE_ERROR', error);
         }
@@ -112,10 +112,9 @@ export class CongregadoDAO {
         filtros?: Pick<FiltrosCongregadoRequest, 'nombre' | 'cedula' | 'estadoCivil' | 'ministerio' | 'fechaIngresoDesde' | 'fechaIngresoHasta'>
     ): Promise<PaginacionResultado<Congregado>> {
         try {
-            const offset = (page - 1) * limit;
-
+            const offset     = (page - 1) * limit;
             const conditions: string[] = [];
-            const values: any[] = [];
+            const values: any[]        = [];
 
             if (estado !== undefined) {
                 values.push(estado);
@@ -151,18 +150,17 @@ export class CongregadoDAO {
 
             const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
-            const dataResult = await this.sql.query(
-                `SELECT * FROM congregados ${where} ORDER BY id DESC LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
-                [...values, limit, offset]
-            ) as { rows: any[] };
-
-            const countResult = await this.sql.query(
+            const countResult = await db.query(
                 `SELECT COUNT(*) as count FROM congregados ${where}`,
                 values
-            ) as { rows: any[] };
-
-            const total = parseInt(countResult.rows[0].count);
+            );
+            const total      = parseInt(countResult.rows[0].count, 10);
             const totalPages = Math.max(1, Math.ceil(total / limit));
+
+            const dataResult = await db.query(
+                `SELECT * FROM congregados ${where} ORDER BY nombre ASC LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
+                [...values, limit, offset]
+            );
 
             return {
                 data: dataResult.rows.map((row: any) => this.mapRowToCongregado(row)),
@@ -183,32 +181,43 @@ export class CongregadoDAO {
                 throw new CongregadoDAOError('Congregado no encontrado', 'NOT_FOUND');
             }
 
-            // Manejo especial para validación de nulos explícitos (borrar campo) en DTO
-            const segundoTelefono = data.segundoTelefono === null ? null : (data.segundoTelefono ?? existente.segundoTelefono);
+            const segundoTelefono   = data.segundoTelefono   === null ? null : (data.segundoTelefono   ?? existente.segundoTelefono);
             const segundoMinisterio = data.segundoMinisterio === null ? null : (data.segundoMinisterio ?? existente.segundoMinisterio);
 
-            const result = await this.sql`
-        UPDATE congregados SET
-          nombre              = ${data.nombre ?? existente.nombre},
-          cedula              = ${data.cedula ?? existente.cedula},
-          fecha_ingreso       = ${data.fechaIngreso ? new Date(data.fechaIngreso) : existente.fechaIngreso},
-          telefono            = ${data.telefono ?? existente.telefono},
-          segundo_telefono    = ${segundoTelefono},
-          estado_civil        = ${data.estadoCivil ?? existente.estadoCivil},
-          ministerio          = ${data.ministerio ?? existente.ministerio},
-          segundo_ministerio  = ${segundoMinisterio},
-          url_foto_cedula     = ${data.urlFotoCedula ?? existente.urlFotoCedula},
-          estado              = ${data.estado ?? existente.estado},
-          updated_at          = CURRENT_TIMESTAMP
-        WHERE id = ${id}
-        RETURNING *
-      ` as any[];
+            const result = await db.query(
+                `UPDATE congregados SET
+                    nombre             = $1,
+                    cedula             = $2,
+                    fecha_ingreso      = $3,
+                    telefono           = $4,
+                    segundo_telefono   = $5,
+                    estado_civil       = $6,
+                    ministerio         = $7,
+                    segundo_ministerio = $8,
+                    url_foto_cedula    = $9,
+                    estado             = $10,
+                    updated_at         = CURRENT_TIMESTAMP
+                WHERE id = $11
+                RETURNING *`,
+                [
+                    data.nombre        ?? existente.nombre,
+                    data.cedula        ?? existente.cedula,
+                    data.fechaIngreso  ? new Date(data.fechaIngreso) : existente.fechaIngreso,
+                    data.telefono      ?? existente.telefono,
+                    segundoTelefono,
+                    data.estadoCivil   ?? existente.estadoCivil,
+                    data.ministerio    ?? existente.ministerio,
+                    segundoMinisterio,
+                    data.urlFotoCedula ?? existente.urlFotoCedula,
+                    data.estado        ?? existente.estado,
+                    id,
+                ]
+            );
 
-            if (!result || result.length === 0) {
+            if (!result.rows.length) {
                 throw new CongregadoDAOError('Error al actualizar el congregado', 'UPDATE_FAILED');
             }
-
-            return this.mapRowToCongregado(result[0]);
+            return this.mapRowToCongregado(result.rows[0]);
         } catch (error: any) {
             if (error instanceof CongregadoDAOError) throw error;
             if (error.code === '23505') {
@@ -220,10 +229,11 @@ export class CongregadoDAO {
 
     async eliminar(id: number): Promise<boolean> {
         try {
-            const result = await this.sql`
-        UPDATE congregados SET estado = ${EstadoCongregado.INACTIVO}, updated_at = CURRENT_TIMESTAMP WHERE id = ${id} RETURNING id
-      ` as any[];
-            return result.length > 0;
+            const result = await db.query(
+                'UPDATE congregados SET estado = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id',
+                [EstadoCongregado.INACTIVO, id]
+            );
+            return result.rows.length > 0;
         } catch (error) {
             throw new CongregadoDAOError('Error al eliminar el congregado', 'DATABASE_ERROR', error);
         }
@@ -231,10 +241,11 @@ export class CongregadoDAO {
 
     async eliminarPermanente(id: number): Promise<boolean> {
         try {
-            const result = await this.sql`
-        DELETE FROM congregados WHERE id = ${id} RETURNING id
-      ` as any[];
-            return result.length > 0;
+            const result = await db.query(
+                'DELETE FROM congregados WHERE id = $1 RETURNING id',
+                [id]
+            );
+            return result.rows.length > 0;
         } catch (error) {
             throw new CongregadoDAOError('Error al eliminar permanentemente el congregado', 'DATABASE_ERROR', error);
         }
@@ -242,10 +253,10 @@ export class CongregadoDAO {
 
     async listarTodos(): Promise<Congregado[]> {
         try {
-            const result = await this.sql`
-        SELECT * FROM congregados ORDER BY nombre
-      ` as any[];
-            return result.map((row: any) => this.mapRowToCongregado(row));
+            const result = await db.query(
+                'SELECT * FROM congregados ORDER BY nombre ASC'
+            );
+            return result.rows.map((row: any) => this.mapRowToCongregado(row));
         } catch (error) {
             throw new CongregadoDAOError('Error al listar todos los congregados', 'DATABASE_ERROR', error);
         }
@@ -253,13 +264,14 @@ export class CongregadoDAO {
 
     async buscarPorNombre(nombre: string, limit: number = 10): Promise<Congregado[]> {
         try {
-            const result = await this.sql`
-        SELECT * FROM congregados
-        WHERE nombre ILIKE ${'%' + nombre + '%'} AND estado = ${EstadoCongregado.ACTIVO}
-        ORDER BY nombre
-        LIMIT ${limit}
-      ` as any[];
-            return result.map((row: any) => this.mapRowToCongregado(row));
+            const result = await db.query(
+                `SELECT * FROM congregados
+                 WHERE nombre ILIKE $1 AND estado = $2
+                 ORDER BY nombre ASC
+                 LIMIT $3`,
+                [`%${nombre}%`, EstadoCongregado.ACTIVO, limit]
+            );
+            return result.rows.map((row: any) => this.mapRowToCongregado(row));
         } catch (error) {
             throw new CongregadoDAOError('Error al buscar congregados por nombre', 'DATABASE_ERROR', error);
         }
@@ -267,17 +279,18 @@ export class CongregadoDAO {
 
     async obtenerEstadisticas(): Promise<{ total: number; activos: number; inactivos: number }> {
         try {
-            const result = await this.sql`
-        SELECT
-          COUNT(*) as total,
-          COUNT(*) FILTER (WHERE estado = ${EstadoCongregado.ACTIVO}) as activos,
-          COUNT(*) FILTER (WHERE estado = ${EstadoCongregado.INACTIVO}) as inactivos
-        FROM congregados
-      ` as any[];
+            const result = await db.query(
+                `SELECT
+                    COUNT(*) as total,
+                    COUNT(*) FILTER (WHERE estado = $1) as activos,
+                    COUNT(*) FILTER (WHERE estado = $2) as inactivos
+                 FROM congregados`,
+                [EstadoCongregado.ACTIVO, EstadoCongregado.INACTIVO]
+            );
             return {
-                total: parseInt(result[0].total),
-                activos: parseInt(result[0].activos),
-                inactivos: parseInt(result[0].inactivos),
+                total:     parseInt(result.rows[0].total,    10),
+                activos:   parseInt(result.rows[0].activos,  10),
+                inactivos: parseInt(result.rows[0].inactivos, 10),
             };
         } catch (error) {
             throw new CongregadoDAOError('Error al obtener estadísticas', 'DATABASE_ERROR', error);

@@ -49,6 +49,13 @@ const NAV_ITEMS: Omit<NavItem, 'onClick'>[] = [
     roles: ['admin', 'tesorero', 'pastorGeneral'],
   },
   {
+  id: "congregados",
+  href: "/congregados",
+  icon: FaUsers,
+  label: "Congregados",
+  roles: ["admin", "tesorero", "pastorGeneral"] as Role[],
+},
+  {
     id: 'eventos',
     href: '/eventos',
     icon: FaCalendarAlt,
@@ -69,6 +76,7 @@ const NAV_ITEMS: Omit<NavItem, 'onClick'>[] = [
     label: 'Reportes',
     roles: ['admin', 'tesorero', 'pastorGeneral'],
   },
+  
 ];
 
 const ROL_LABEL: Record<Role, string> = {
