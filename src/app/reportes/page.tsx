@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import toast from "react-hot-toast";
 import Swal from "sweetalert2";
 import {
-  FaCalendarAlt, FaHome, FaCheckCircle, FaTimesCircle,
+  FaCalendarAlt, FaCheckCircle, FaTimesCircle,
   FaExclamationCircle, FaSpinner, FaUsers, FaSearch,
   FaRedo,
 } from "react-icons/fa";
@@ -198,7 +197,11 @@ export default function ReportesPage() {
     } catch { toast.error("Error de conexión", { id: toastId }); }
   };
 
-  const obtenerEstado = (asociadoId: number) => registros.find(r => r.asociadoId === asociadoId)?.estado;
+  const obtenerRegistro = (asociadoId: number) =>
+    registros.find(r => r.asociadoId === asociadoId);
+
+  const obtenerEstado = (asociadoId: number) =>
+    obtenerRegistro(asociadoId)?.estado;
 
   const estadisticas = {
     presentes: registros.filter(r => r.estado === EstadoAsistencia.Presente).length,
@@ -220,7 +223,6 @@ export default function ReportesPage() {
       <Sidebar pageTitle="Reportes de Asistencia" />
 
       <div className="flex-1 pt-14 md:pt-0 flex flex-col min-h-screen">
-        {/* Header */}
         <header className="hidden md:flex items-center justify-between bg-white border-b border-gray-200 px-8 py-4 sticky top-0 z-10">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 bg-[#003366] rounded-lg flex items-center justify-center">
@@ -341,7 +343,7 @@ export default function ReportesPage() {
                   <table className="min-w-full text-sm">
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-100">
-                        {["Nombre", "Cédula", "Ministerio", "Estado", "Acción"].map(h => (
+                        {["Nombre", "Cédula", "Ministerio", "Estado", "Justificación", "Acción"].map(h => (
                           <th key={h} className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
                         ))}
                       </tr>
@@ -349,6 +351,7 @@ export default function ReportesPage() {
                     <tbody className="divide-y divide-gray-50">
                       {filtrados.map(a => {
                         const estado = obtenerEstado(a.id);
+                        const registro = obtenerRegistro(a.id);
                         const isProcesando = procesando.has(a.id);
                         return (
                           <tr key={a.id} className="hover:bg-gray-50 transition">
@@ -361,7 +364,22 @@ export default function ReportesPage() {
                                   {ESTADO_CONFIG[estado].label}
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">Sin registro</span>
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">
+                                  Sin registro
+                                </span>
+                              )}
+                            </td>
+                            {/* columna justificacion */}
+                            <td className="px-6 py-4 max-w-[200px]">
+                              {estado === EstadoAsistencia.Justificado && registro?.justificacion ? (
+                                <span
+                                  className="block text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 italic truncate cursor-help"
+                                  title={registro.justificacion}
+                                >
+                                  {registro.justificacion}
+                                </span>
+                              ) : (
+                                <span className="text-gray-300 text-xs">—</span>
                               )}
                             </td>
                             <td className="px-6 py-4">
@@ -396,22 +414,33 @@ export default function ReportesPage() {
                 <div className="md:hidden divide-y divide-gray-100">
                   {filtrados.map(a => {
                     const estado = obtenerEstado(a.id);
+                    const registro = obtenerRegistro(a.id);
                     const isProcesando = procesando.has(a.id);
                     return (
                       <div key={a.id} className="p-4">
-                        <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-start justify-between mb-2">
                           <div>
                             <p className="font-semibold text-gray-900 text-sm">{a.nombreCompleto}</p>
                             <p className="text-xs text-gray-500 mt-0.5">{a.cedula} {a.ministerio && `· ${a.ministerio}`}</p>
                           </div>
-                          {estado ? (
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${ESTADO_CONFIG[estado].badge}`}>
-                              {ESTADO_CONFIG[estado].label}
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">Sin registro</span>
-                          )}
+                          <div className="flex flex-col items-end gap-1">
+                            {estado ? (
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${ESTADO_CONFIG[estado].badge}`}>
+                                {ESTADO_CONFIG[estado].label}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">
+                                Sin registro
+                              </span>
+                            )}
+                          </div>
                         </div>
+                        {/* justificacion en mobile */}
+                        {estado === EstadoAsistencia.Justificado && registro?.justificacion && (
+                          <div className="mb-3 px-2.5 py-1.5 bg-amber-50 border border-amber-200 rounded-lg">
+                            <p className="text-xs text-amber-700 italic">{registro.justificacion}</p>
+                          </div>
+                        )}
                         <div className="grid grid-cols-3 gap-2">
                           {Object.values(EstadoAsistencia).map(e => {
                             const cfg = ESTADO_CONFIG[e];
