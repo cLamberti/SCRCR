@@ -1,27 +1,13 @@
+import { neon, NeonQueryFunction } from "@neondatabase/serverless";
 
-import { Pool, PoolClient } from 'pg';
+const sql: NeonQueryFunction<false, false> = neon(process.env.POSTGRES_URL!);
 
-/**
- * Clase para manejar la conexión a la base de datos PostgreSQL (Neon DB)
- */
 class DatabaseConnection {
   private static instance: DatabaseConnection;
-  private pool: Pool;
+  private sql: NeonQueryFunction<false, false>;
 
   private constructor() {
-    this.pool = new Pool({
-      connectionString: process.env.POSTGRES_URL,
-      ssl: {
-        rejectUnauthorized: false
-      },
-      max: 20,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 2000,
-    });
-
-    this.pool.on('error', (err) => {
-      console.error('Error inesperado en el pool de conexiones:', err);
-    });
+    this.sql = sql;
   }
 
   public static getInstance(): DatabaseConnection {
@@ -31,45 +17,42 @@ class DatabaseConnection {
     return DatabaseConnection.instance;
   }
 
-  public getPool(): Pool {
-    return this.pool;
-  }
-
   public async query(text: string, params?: any[]) {
     const start = Date.now();
     try {
-      const result = await this.pool.query(text, params);
+      // sql.query acepta el formato convencional con $1, $2...
+      const result = await (this.sql as any).query(text, params ?? []);
+      const rows = result.rows ?? result;
       const duration = Date.now() - start;
-      console.log('Consulta ejecutada:', { text, duration, rows: result.rowCount });
-      return result;
+      console.log("Consulta ejecutada:", { text, duration, rows: rows.length });
+      return { rows, rowCount: rows.length };
     } catch (error) {
-      console.error('Error en la consulta:', { text, error });
+      console.error("Error en la consulta:", { text, error });
       throw error;
     }
   }
 
-  public async getClient(): Promise<PoolClient> {
-    return await this.pool.connect();
+  public async getClient() {
+    throw new Error("getClient no está disponible con Neon serverless, usa db.query directamente");
   }
 
   public async close(): Promise<void> {
-    await this.pool.end();
+    // sin-op: neon serverless no mantiene conexiones persistentes
   }
 
   public async testConnection(): Promise<boolean> {
     try {
-      const result = await this.pool.query('SELECT NOW()');
-      console.log('Conexión exitosa a la base de datos:', result.rows[0]);
+      const result = await (this.sql as any).query("SELECT NOW()");
+      const rows = result.rows ?? result;
+      console.log("Conexión exitosa a la base de datos:", rows[0]);
       return true;
     } catch (error) {
-      console.error('Error al conectar con la base de datos:', error);
+      console.error("Error al conectar con la base de datos:", error);
       return false;
     }
   }
 }
 
-// Exportar la instancia única
 export const db = DatabaseConnection.getInstance();
 
-// Exportar el pool directamente para compatibilidad
-export const pool = db.getPool();
+export const pool = db;
