@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitest/config';
+import react from '@vitejs/plugin-react';
 import tsconfigPaths from 'vite-tsconfig-paths';
 import { config } from 'dotenv';
 
@@ -6,11 +7,12 @@ import { config } from 'dotenv';
 const loadedEnv = config({ path: '.env.local' }).parsed;
 
 export default defineConfig({
-    plugins: [tsconfigPaths()],
+    plugins: [react(), tsconfigPaths()],
     test: {
-        environment: 'node',
+        globals: true,
+        environment: 'jsdom',
         setupFiles: ['./vitest.setup.ts'],
         env: loadedEnv as any,
-        include: ['src/__tests__/**/*.test.ts'],
+        include: ['src/__tests__/**/*.{test,spec}.{ts,tsx}'],
     },
 });
