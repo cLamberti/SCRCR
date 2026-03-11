@@ -59,15 +59,14 @@ const formatFecha = (iso: string) =>
   iso ? new Date(iso).toLocaleDateString("es-CR") : "-";
 
 const Badge = ({ activo }: { activo: boolean }) => (
-  <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${
-    activo ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-  }`}>
+  <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${activo ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+    }`}>
     {activo ? "Activo" : "Inactivo"}
   </span>
 );
 
 export default function CongregadosPage() {
-  const [data,    setData]    = useState<CongregadoRow[]>([]);
+  const [data, setData] = useState<CongregadoRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [mensaje, setMensaje] = useState("");
   const [esError, setEsError] = useState(false);
@@ -76,28 +75,28 @@ export default function CongregadosPage() {
   const [filtros, setFiltros] = useState({ nombre: "", cedula: "", estado: "todos" });
 
   // paginación
-  const [pagina,   setPagina]   = useState(1);
+  const [pagina, setPagina] = useState(1);
   const [pageSize, setPageSize] = useState<PageSize>(10);
 
   // selección múltiple
   const [seleccionados, setSeleccionados] = useState<Set<number>>(new Set());
 
   // modal crear/editar
-  const [showForm,       setShowForm]       = useState(false);
-  const [editando,       setEditando]       = useState<CongregadoRow | null>(null);
-  const [form,           setForm]           = useState<FormState>(FORM_INICIAL);
-  const [guardando,      setGuardando]      = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [editando, setEditando] = useState<CongregadoRow | null>(null);
+  const [form, setForm] = useState<FormState>(FORM_INICIAL);
+  const [guardando, setGuardando] = useState(false);
 
   // modal eliminar masivo
-  const [modalDelete,    setModalDelete]    = useState(false);
-  const [elimPerm,       setElimPerm]       = useState(false);
-  const [eliminando,     setEliminando]     = useState(false);
+  const [modalDelete, setModalDelete] = useState(false);
+  const [elimPerm, setElimPerm] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
 
   // ── Carga ──────────────────────────────────────────────────────────────────
   const cargar = useCallback(async () => {
     try {
       setLoading(true); setMensaje(""); setEsError(false);
-      const res  = await fetch("/api/congregados?all=true");
+      const res = await fetch("/api/congregados?all=true");
       const json = await res.json();
       if (!res.ok || !json.success) {
         setMensaje(json.message || "Error al cargar congregados"); setEsError(true); setData([]); return;
@@ -125,9 +124,9 @@ export default function CongregadosPage() {
     });
   }, [data, filtros]);
 
-  const totalPaginas  = Math.max(1, Math.ceil(filtrados.length / pageSize));
-  const paginaActual  = Math.min(pagina, totalPaginas);
-  const paginados     = useMemo(() => {
+  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / pageSize));
+  const paginaActual = Math.min(pagina, totalPaginas);
+  const paginados = useMemo(() => {
     const ini = (paginaActual - 1) * pageSize;
     return filtrados.slice(ini, ini + pageSize);
   }, [filtrados, paginaActual, pageSize]);
@@ -153,16 +152,16 @@ export default function CongregadosPage() {
   const abrirEditar = (row: CongregadoRow) => {
     setEditando(row);
     setForm({
-      nombre:           row.nombre          || "",
-      cedula:           row.cedula          || "",
-      fechaIngreso:     row.fechaIngreso ? new Date(row.fechaIngreso).toISOString().split("T")[0] : "",
-      telefono:         row.telefono        || "",
-      segundoTelefono:  row.segundoTelefono || "",
-      estadoCivil:      row.estadoCivil     || EstadoCivil.SOLTERO,
-      ministerio:       row.ministerio      || "",
+      nombre: row.nombre || "",
+      cedula: row.cedula || "",
+      fechaIngreso: row.fechaIngreso ? new Date(row.fechaIngreso).toISOString().split("T")[0] : "",
+      telefono: row.telefono || "",
+      segundoTelefono: row.segundoTelefono || "",
+      estadoCivil: row.estadoCivil || EstadoCivil.SOLTERO,
+      ministerio: row.ministerio || "",
       segundoMinisterio: row.segundoMinisterio || "",
-      urlFotoCedula:    row.urlFotoCedula   || "",
-      estado:           row.estado,
+      urlFotoCedula: row.urlFotoCedula || "",
+      estado: row.estado,
     });
     setShowForm(true);
     setMensaje(""); setEsError(false);
@@ -173,14 +172,14 @@ export default function CongregadosPage() {
     try {
       const body = {
         ...form,
-        segundoTelefono:   form.segundoTelefono   || null,
+        segundoTelefono: form.segundoTelefono || null,
         segundoMinisterio: form.segundoMinisterio || null,
       };
 
-      const url    = editando ? `/api/congregados/${editando.id}` : "/api/congregados";
+      const url = editando ? `/api/congregados/${editando.id}` : "/api/congregados";
       const method = editando ? "PUT" : "POST";
 
-      const res  = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const json = await res.json();
 
       if (!res.ok || !json.success) {
@@ -219,10 +218,10 @@ export default function CongregadosPage() {
   const paginasVisibles = useMemo(() => {
     const delta = 1; const rango: number[] = [];
     for (let i = Math.max(1, paginaActual - delta); i <= Math.min(totalPaginas, paginaActual + delta); i++) rango.push(i);
-    if (rango[0] > 2)                              rango.unshift(-1);
-    if (rango[0] > 1)                              rango.unshift(1);
+    if (rango[0] > 2) rango.unshift(-1);
+    if (rango[0] > 1) rango.unshift(1);
     if (rango[rango.length - 1] < totalPaginas - 1) rango.push(-2);
-    if (rango[rango.length - 1] < totalPaginas)     rango.push(totalPaginas);
+    if (rango[rango.length - 1] < totalPaginas) rango.push(totalPaginas);
     return rango;
   }, [paginaActual, totalPaginas]);
 
@@ -259,10 +258,10 @@ export default function CongregadosPage() {
 
             {/* Mensaje global */}
             {mensaje && (
-              <div className={`mb-4 p-3.5 rounded-lg text-sm border ${
-                esError ? "bg-red-50 text-red-700 border-red-200" : "bg-green-50 text-green-700 border-green-200"
-              }`}>
+              <div className={`mb-4 p-3.5 rounded-lg text-sm border ${esError ? "bg-red-50 text-red-700 border-red-200" : "bg-green-50 text-green-700 border-green-200"
+                }`}>
                 {mensaje}
+                {esError && <button onClick={cargar} className="ml-4 underline font-bold">Reintentar</button>}
               </div>
             )}
 
@@ -338,6 +337,7 @@ export default function CongregadosPage() {
                   </span>
                   <div className="flex items-center gap-2">
                     <button onClick={() => { setElimPerm(false); setModalDelete(true); }}
+                      aria-label="Eliminar seleccionados"
                       className="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition">
                       <FaTrash className="text-xs" /> Eliminar seleccionados
                     </button>
@@ -360,16 +360,15 @@ export default function CongregadosPage() {
                     ))}
                   </tr>
                 </thead>
-                <tbody>
+                <tbody data-testid="table-body">
                   {loading ? (
                     <tr><td colSpan={10} className="p-8 text-center text-gray-400 text-sm">Cargando datos...</td></tr>
                   ) : paginados.length > 0 ? (
                     paginados.map(r => {
                       const checked = seleccionados.has(r.id);
                       return (
-                        <tr key={r.id} className={`border-t transition-colors ${
-                          checked ? "bg-blue-50" : r.estado === 0 ? "bg-red-50/40 hover:bg-red-50/70" : "hover:bg-blue-50/30"
-                        }`}>
+                        <tr key={r.id} className={`border-t transition-colors ${checked ? "bg-blue-50" : r.estado === 0 ? "bg-red-50/40 hover:bg-red-50/70" : "hover:bg-blue-50/30"
+                          }`}>
                           <td className="px-3 py-3 text-center">
                             <input type="checkbox" checked={checked} onChange={() => toggleFila(r.id)}
                               className="w-4 h-4 accent-[#003366] cursor-pointer" />
@@ -442,7 +441,7 @@ export default function CongregadosPage() {
 
       {/* ── MODAL CREAR / EDITAR ────────────────────────────────────────────── */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" data-testid="modal-form">
           <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[92vh] overflow-hidden shadow-2xl flex flex-col">
             <div className="bg-[#003366] text-white px-6 py-4 flex items-center justify-between flex-shrink-0">
               <h2 className="text-base font-bold flex items-center gap-2">
@@ -457,8 +456,8 @@ export default function CongregadosPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Nombre */}
                 <div className="sm:col-span-2">
-                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Nombre completo *</label>
-                  <input type="text" value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} className={inputClass} placeholder="Ej: María Fernanda Solano Mora" />
+                  <label htmlFor="nombre" className="block text-gray-700 text-xs font-semibold mb-1.5">Nombre completo *</label>
+                  <input id="nombre" type="text" value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} className={inputClass} placeholder="Ej: María Fernanda Solano Mora" />
                 </div>
 
                 {/* Cédula */}
@@ -541,7 +540,7 @@ export default function CongregadosPage() {
 
       {/* ── MODAL ELIMINAR ─────────────────────────────────────────────────── */}
       {modalDelete && (
-        <div className="fixed inset-0 bg-black/55 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/55 flex items-center justify-center z-50 p-4" data-testid="modal-delete">
           <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
             <div className="bg-red-600 px-6 py-4 flex items-center gap-3">
               <FaExclamationTriangle className="text-white text-lg flex-shrink-0" />
