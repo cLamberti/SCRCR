@@ -16,21 +16,40 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(result, { status: 200 });
     }
 
-    const page  = parseInt(searchParams.get('page')  || '1',  10);
-    const limit = parseInt(searchParams.get('limit') || '10', 10);
+    const pageParam = searchParams.get('page');
+    const limitParam = searchParams.get('limit');
+    
+    const page  = pageParam ? parseInt(pageParam, 10) : 1;
+    const limit = limitParam ? parseInt(limitParam, 10) : 10;
+    
+    if (isNaN(page) || isNaN(limit)) {
+      return NextResponse.json({ success: false, message: 'Parámetros de paginación inválidos' }, { status: 400 });
+    }
+
     const nombre     = searchParams.get('nombre')     || undefined;
     const cedula     = searchParams.get('cedula')     || undefined;
     const ministerio = searchParams.get('ministerio') || undefined;
     const estadoParam = searchParams.get('estado');
-    const estado = estadoParam !== null ? Number(estadoParam) as 0 | 1 : undefined;
+    
+    let estado: 0 | 1 | undefined = undefined;
+    if (estadoParam !== null && estadoParam !== 'todos' && estadoParam !== '') {
+      const e = Number(estadoParam);
+      if (!isNaN(e)) {
+        estado = e as 0 | 1;
+      }
+    }
 
     const result = await congregadoService.listar({ page, limit, nombre, cedula, ministerio, estado });
     return NextResponse.json(result, { status: 200 });
 
   } catch (error: any) {
-    console.error('Error en GET /api/congregados:', error);
+    console.error('CRITICAL: Error en GET /api/congregados:', error);
     return NextResponse.json(
-      { success: false, message: error.message || 'Error al obtener congregados' },
+      { 
+        success: false, 
+        message: error.message || 'Error al obtener congregados',
+        debug: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      },
       { status: error instanceof CongregadoServiceError ? (error.statusCode || 500) : 500 }
     );
   }
