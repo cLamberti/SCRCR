@@ -5,8 +5,8 @@ import { EstadoCivil, EstadoCongregado } from '@/models/Congregado';
 import { CongregadoDAO } from '@/dao/congregado.dao';
 
 // Datos de prueba garantizados para no chocar con datos reales
-const TEST_CEDULA = '1-0000-0000';
-const TEST_CEDULA_UPDATE = '1-1111-1111';
+const TEST_CEDULA = '5-0432-0123';
+const TEST_CEDULA_UPDATE = '5-0110-0113';
 let createdId: number;
 const congregadoService = new CongregadoService();
 
@@ -62,6 +62,29 @@ describe('CongregadoService - Pruebas de Integración con BD Real', () => {
         expect(resultado.estado).toBe(EstadoCongregado.ACTIVO);
 
         createdId = resultado.id;
+    });
+
+    it('2.1. Debe manejar valores null en campos opcionales correctamente', async () => {
+        const tempCedula = '2-0000-0000';
+        const conNulls: CrearCongregadoRequest = {
+            nombre: 'Usuario Con Nulls',
+            cedula: tempCedula,
+            fechaIngreso: new Date().toISOString().split('T')[0],
+            telefono: '7777-7777',
+            estadoCivil: EstadoCivil.SOLTERO,
+            ministerio: 'Ministerio Null',
+            urlFotoCedula: 'https://ejemplo.com/null.jpg',
+            segundoTelefono: null as any,
+            segundoMinisterio: null as any
+        };
+
+        const resultado = await congregadoService.crear(conNulls);
+        expect(resultado).toBeDefined();
+        expect(resultado.id).toBeGreaterThan(0);
+
+        // Limpiar
+        const dao = new CongregadoDAO();
+        await dao.eliminarPermanente(resultado.id);
     });
 
     it('3. Debe fallar al intentar insertar la misma cédula (Duplicado)', async () => {

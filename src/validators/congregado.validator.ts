@@ -74,7 +74,7 @@ export class CongregadoValidator {
         }
 
         // Segundo teléfono (opcional)
-        if (data.segundoTelefono !== undefined && data.segundoTelefono !== '') {
+        if (data.segundoTelefono !== undefined && data.segundoTelefono !== null && data.segundoTelefono !== '') {
             const cleanPhone2 = data.segundoTelefono.replace(/[\s\-+()]/g, '');
             if (!PHONE_REGEX.test(data.segundoTelefono)) {
                 errors.push('El segundo teléfono contiene caracteres no válidos');
@@ -100,7 +100,7 @@ export class CongregadoValidator {
         }
 
         // Segundo ministerio (opcional, string libre)
-        if (data.segundoMinisterio !== undefined && data.segundoMinisterio !== '') {
+        if (data.segundoMinisterio !== undefined && data.segundoMinisterio !== null && data.segundoMinisterio !== '') {
             if (data.segundoMinisterio.length > 50) {
                 errors.push('El segundo ministerio no puede exceder 50 caracteres');
             } else if (data.segundoMinisterio.trim().toLowerCase() === data.ministerio.trim().toLowerCase()) {
