@@ -4,17 +4,19 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { FaChurch, FaUser, FaSignOutAlt, FaBars, FaTimes, FaCog } from 'react-icons/fa';
 import { useAuth } from '@/hooks/useAuth';
+import { usePathname } from 'next/navigation';
 
 export default function Navbar() {
   const { user, isAuthenticated, logout, loading } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const pathname = usePathname() || '/';
 
   return (
     <nav className="bg-[#003366] text-white shadow-lg relative z-50">
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+          <Link href={isAuthenticated ? '/' : pathname} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             <FaChurch className="text-2xl flex-shrink-0" />
             <span className="font-bold text-xl">SCRCR</span>
           </Link>

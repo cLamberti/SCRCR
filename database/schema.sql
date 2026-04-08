@@ -164,6 +164,35 @@ CREATE UNIQUE INDEX "usuarios_email_key" ON "usuarios" ("email");
 CREATE UNIQUE INDEX "usuarios_pkey" ON "usuarios" ("id");
 CREATE UNIQUE INDEX "usuarios_username_key" ON "usuarios" ("username");
 
+-- Descripción: Registra solicitudes de permisos de ausencia del personal administrativo.
+-- Propósito: Permitir flujo de solicitud, revisión y aprobación/rechazo de permisos.
+-- Relaciones:
+--   - usuario_id (FK): Referencia a usuarios(id)
+-- Campos clave:
+--   - estado: PENDIENTE/APROBADO/RECHAZADO
+--   - fecha_inicio/fecha_fin: Rango solicitado para control de traslapes
+CREATE TABLE "permisos" (
+    "id" serial PRIMARY KEY,
+    "usuario_id" integer NOT NULL,
+    "fecha_inicio" date NOT NULL,
+    "fecha_fin" date NOT NULL,
+    "motivo" text NOT NULL,
+    "documento_url" text,
+    "estado" varchar(20) DEFAULT 'PENDIENTE' NOT NULL,
+    "observaciones_resolucion" text,
+    "created_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updated_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT "chk_permisos_estado_values" CHECK (CHECK (((estado)::text = ANY ((ARRAY['PENDIENTE'::character varying, 'APROBADO'::character varying, 'RECHAZADO'::character varying])::text[])))),
+    CONSTRAINT "chk_permisos_rango_fechas" CHECK (CHECK ((fecha_inicio <= fecha_fin)))
+);
+
+CREATE UNIQUE INDEX "permisos_pkey" ON "permisos" ("id");
+CREATE INDEX "idx_permisos_usuario_id" ON "permisos" ("usuario_id");
+CREATE INDEX "idx_permisos_estado" ON "permisos" ("estado");
+CREATE INDEX "idx_permisos_fechas" ON "permisos" ("fecha_inicio", "fecha_fin");
+
+ALTER TABLE "permisos" ADD CONSTRAINT "permisos_usuario_id_fkey" FOREIGN KEY ("usuario_id") REFERENCES "usuarios"("id") ON DELETE CASCADE;
+
 -- Descripción: Almacena información detallada de los congregados de la organización.
 -- Propósito: Mantener un registro centralizado de datos personales y de contacto específicos.
 -- Campos clave:
