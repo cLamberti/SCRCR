@@ -16,7 +16,7 @@ function getUserFromToken(req: NextRequest) {
   }
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = getUserFromToken(req);
     if (!user) {
@@ -35,7 +35,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       return NextResponse.json({ success: false, errors: validation.issues }, { status: 400 });
     }
 
-    const permisoId = parseInt(params.id, 10);
+    const { id } = await params;
+    const permisoId = parseInt(id, 10);
+
     const permiso = await permisoService.aprobarRechazarPermiso(permisoId, {
       estado: body.estado,
       observacionesResolucion: body.observacionesResolucion
