@@ -16,7 +16,6 @@ export default function RegistroPermisoPage() {
     fechaInicio: '',
     fechaFin: '',
     motivo: '',
-    documentoUrl: '',
   });
   const [loading, setLoading] = useState(false);
   const [mensaje, setMensaje] = useState({ text: '', isError: false });
@@ -51,21 +50,7 @@ export default function RegistroPermisoPage() {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      setMensaje({ text: 'El archivo no debe superar los 5MB', isError: true });
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setFormData(prev => ({ ...prev, documentoUrl: event.target?.result as string }));
-    };
-    reader.readAsDataURL(file);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -191,18 +176,7 @@ export default function RegistroPermisoPage() {
                   />
                 </div>
 
-                <div>
-                  <label htmlFor="documentoUrl" className="block text-gray-700 text-xs font-semibold mb-1.5">Documento Adjunto (Opcional)</label>
-                  <input
-                    id="documentoUrl"
-                    type="file"
-                    accept=".pdf, image/jpeg, image/png, image/jpg"
-                    onChange={handleFileChange}
-                    disabled={loading}
-                    className="block w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#003366]/10 file:text-[#003366] hover:file:bg-[#003366]/20 transition-colors"
-                  />
-                  <p className="text-xs text-gray-400 mt-1">Formatos permitidos: PDF, JPG, PNG. Máx 5MB.</p>
-                </div>
+
 
                 <div className="pt-4 border-t flex justify-end">
                   <button
