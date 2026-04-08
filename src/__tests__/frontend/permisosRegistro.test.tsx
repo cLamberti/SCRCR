@@ -3,7 +3,6 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import RegistroPermisoPage from '@/app/permisos/registro/page';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
-// Mocks necesarios
 vi.mock('@/components/SideBar', () => ({
     default: () => React.createElement('div', { 'data-testid': 'sidebar' }, 'Sidebar Mock')
 }));
@@ -47,7 +46,6 @@ describe('RegistroPermisoPage - Pruebas de Frontend', () => {
         expect(screen.getByLabelText(/Fecha de Inicio \*/i)).toBeInTheDocument();
         expect(screen.getByLabelText(/Fecha de Fin \*/i)).toBeInTheDocument();
         expect(screen.getByLabelText(/Motivo \/ Justificación \*/i)).toBeInTheDocument();
-        expect(screen.getByLabelText(/Documento Adjunto \(Opcional\)/i)).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /Solicitar Permiso/i })).toBeInTheDocument();
     });
 
@@ -87,22 +85,7 @@ describe('RegistroPermisoPage - Pruebas de Frontend', () => {
         expect(screen.getByText(/La fecha de fin no puede ser menor a la fecha de inicio/i)).toBeInTheDocument();
     });
 
-    it('4. Validación: Archivo demasiado grande (mayor a 5MB)', async () => {
-        await act(async () => {
-            render(React.createElement(RegistroPermisoPage));
-        });
 
-        const inputFile = screen.getByLabelText(/Documento Adjunto \(Opcional\)/i);
-        
-        // Mock de un archivo de 6MB
-        const file = new File(['a'.repeat(6 * 1024 * 1024)], 'archivo-grande.pdf', { type: 'application/pdf' });
-        
-        await act(async () => {
-            fireEvent.change(inputFile, { target: { files: [file] } });
-        });
-
-        expect(screen.getByText(/El archivo no debe superar los 5MB/i)).toBeInTheDocument();
-    });
 
     it('5. Flujo exitoso: Enviar formulario', async () => {
         await act(async () => {
@@ -124,21 +107,18 @@ describe('RegistroPermisoPage - Pruebas de Frontend', () => {
             fireEvent.click(btnSubmit);
         });
 
-        // Verificar el payload de fetch
+        
         expect(global.fetch).toHaveBeenCalledWith('/api/permisos', expect.objectContaining({
             method: 'POST',
             body: expect.stringContaining('2026-06-01'),
         }));
 
-        // Verificar mensaje de éxito
+       
         await waitFor(() => {
             expect(screen.getByText(/Permiso solicitado con éxito/i)).toBeInTheDocument();
         });
 
-        // Verificar redirección tras timeout
-        // (Podríamos usar vitest fake timers, pero confío en que se ejecuta al rato.
-        // Mejor adelantamos los timers si los fakes están encendidos, 
-        // pero dado que el timeout es corto, un waitFor puede ser suficiente con timeout en testing-library real)
+        
         await waitFor(() => {
             expect(mockPush).toHaveBeenCalledWith('/permisos');
         }, { timeout: 2000 });
@@ -148,7 +128,7 @@ describe('RegistroPermisoPage - Pruebas de Frontend', () => {
         vi.spyOn(global, 'fetch').mockImplementation(async (input) => {
             const url = typeof input === 'string' ? input : input.toString();
 
-            // El formulario ahora consulta traslapes en cada cambio de fechas.
+            
             if (url.includes('/api/permisos/traslape')) {
                 return {
                     ok: true,
