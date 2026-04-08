@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { FaChurch, FaUser, FaSignOutAlt, FaBars, FaTimes } from 'react-icons/fa';
+import { FaChurch, FaUser, FaSignOutAlt, FaBars, FaTimes, FaCog } from 'react-icons/fa';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function Navbar() {
@@ -19,12 +19,13 @@ export default function Navbar() {
             <span className="font-bold text-xl">SCRCR</span>
           </Link>
 
-          {/* Desktop: usuario y logout */}
-          <div className="hidden md:flex items-center gap-4">
+          {/* Desktop: user info, badge, configuración y logout */}
+          <div className="hidden md:flex items-center gap-6">
             {loading ? (
               <span className="text-sm opacity-70">Cargando...</span>
             ) : isAuthenticated && user ? (
-              <>
+              <>                
+                {/* usuario dinámico + badge */}
                 <div className="flex items-center gap-2">
                   <FaUser className="text-sm opacity-70" />
                   <span className="text-sm font-medium">{user.nombreCompleto}</span>
@@ -32,6 +33,20 @@ export default function Navbar() {
                     {user.rol === 'admin' ? 'Admin' : user.rol === 'tesorero' ? 'Tesorero' : 'Pastor General'}
                   </span>
                 </div>
+
+                {/* Configuración (admin | tesorero | pastorGeneral) */}
+                {['admin', 'tesorero', 'pastorGeneral'].includes(user.rol) && (
+                  <Link
+                    href="/configuracion"
+                    className="flex items-center gap-2 hover:text-gray-300 transition-colors text-sm font-medium"
+                    title="Configuración"
+                  >
+                    <FaCog className="text-lg" />
+                    <span>Configuración</span>
+                  </Link>
+                )}
+
+                {/* Logout */}
                 <button
                   onClick={logout}
                   className="flex items-center gap-2 hover:text-gray-300 transition-colors text-sm"
@@ -72,6 +87,16 @@ export default function Navbar() {
                   {user.rol === 'admin' ? 'Admin' : user.rol === 'tesorero' ? 'Tesorero' : 'Pastor'}
                 </span>
               </div>
+              {user.rol === 'admin' && (
+                <Link
+                  href="/configuracion"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-2 text-sm py-2 hover:text-gray-300 transition-colors"
+                >
+                  <FaCog />
+                  Configuración
+                </Link>
+              )}
               <button
                 onClick={() => { logout(); setMenuOpen(false); }}
                 className="flex items-center gap-2 text-sm py-2 hover:text-gray-300 transition-colors w-full"

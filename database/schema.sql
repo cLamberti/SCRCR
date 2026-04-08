@@ -163,3 +163,33 @@ CREATE INDEX "idx_usuarios_username" ON "usuarios" ("username");
 CREATE UNIQUE INDEX "usuarios_email_key" ON "usuarios" ("email");
 CREATE UNIQUE INDEX "usuarios_pkey" ON "usuarios" ("id");
 CREATE UNIQUE INDEX "usuarios_username_key" ON "usuarios" ("username");
+
+-- Descripción: Almacena información detallada de los congregados de la organización.
+-- Propósito: Mantener un registro centralizado de datos personales y de contacto específicos.
+-- Campos clave:
+--   - cedula: Identificador único nacional (UNIQUE)
+--   - estado: 1=activo, 0=inactivo (soft delete)
+--   - ministerio: varchar libre para no depender de enums en código
+CREATE TABLE "congregados" (
+    "id" serial PRIMARY KEY,
+    "nombre" varchar(100) NOT NULL,
+    "cedula" varchar(20) NOT NULL CONSTRAINT "congregados_cedula_key" UNIQUE,
+    "fecha_ingreso" timestamp DEFAULT CURRENT_TIMESTAMP,
+    "telefono" varchar(20) NOT NULL,
+    "segundo_telefono" varchar(20),
+    "estado_civil" varchar(20) NOT NULL,
+    "ministerio" varchar(50) NOT NULL,
+    "segundo_ministerio" varchar(50),
+    "url_foto_cedula" text NOT NULL,
+    "estado" smallint DEFAULT 1 NOT NULL,
+    "created_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updated_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT "congregados_estado_check" CHECK (CHECK ((estado = ANY (ARRAY[0, 1]))))
+);
+
+-- Índices
+CREATE UNIQUE INDEX "congregados_cedula_key" ON "congregados" ("cedula");
+CREATE UNIQUE INDEX "congregados_pkey" ON "congregados" ("id");
+CREATE INDEX "idx_congregados_cedula" ON "congregados" ("cedula");
+CREATE INDEX "idx_congregados_estado" ON "congregados" ("estado");
+CREATE INDEX "idx_congregados_nombre" ON "congregados" ("nombre");

@@ -1,27 +1,15 @@
+import { config } from 'dotenv';
+config({ path: '.env.local' });
 
-import { Pool, PoolClient } from 'pg';
+import { sql } from '@vercel/postgres';
 
-/**
- * Clase para manejar la conexión a la base de datos PostgreSQL (Neon DB)
- */
 class DatabaseConnection {
   private static instance: DatabaseConnection;
-  private pool: Pool;
 
   private constructor() {
-    this.pool = new Pool({
-      connectionString: process.env.POSTGRES_URL,
-      ssl: {
-        rejectUnauthorized: false
-      },
-      max: 20,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 2000,
-    });
-
-    this.pool.on('error', (err) => {
-      console.error('Error inesperado en el pool de conexiones:', err);
-    });
+    if (!process.env.POSTGRES_URL) {
+      console.error('CRITICAL: POSTGRES_URL is undefined in db.ts');
+    }
   }
 
   public static getInstance(): DatabaseConnection {
@@ -31,36 +19,27 @@ class DatabaseConnection {
     return DatabaseConnection.instance;
   }
 
-  public getPool(): Pool {
-    return this.pool;
-  }
-
   public async query(text: string, params?: any[]) {
-    const start = Date.now();
     try {
-      const result = await this.pool.query(text, params);
-      const duration = Date.now() - start;
-      console.log('Consulta ejecutada:', { text, duration, rows: result.rowCount });
-      return result;
+      return await sql.query(text, params || []);
     } catch (error) {
-      console.error('Error en la consulta:', { text, error });
+      console.error('Error en la consulta SERVERLESS:', { text, error });
       throw error;
     }
   }
 
-  public async getClient(): Promise<PoolClient> {
-    return await this.pool.connect();
+  public async getClient(): Promise<any> {
+    throw new Error('getClient() no soportado con el driver Neon Serverless HTTP directo. Usa query()');
   }
 
   public async close(): Promise<void> {
-    await this.pool.end();
+    // El cliente neon HTTP no tiene conexiones persistentes para cerrar
   }
 
   public async testConnection(): Promise<boolean> {
     try {
-      const result = await this.pool.query('SELECT NOW()');
-      console.log('Conexión exitosa a la base de datos:', result.rows[0]);
-      return true;
+      const result = await sql.query('SELECT NOW()');
+      return !!result.rows[0];
     } catch (error) {
       console.error('Error al conectar con la base de datos:', error);
       return false;
@@ -68,8 +47,5 @@ class DatabaseConnection {
   }
 }
 
-// Exportar la instancia única
 export const db = DatabaseConnection.getInstance();
-
-// Exportar el pool directamente para compatibilidad
-export const pool = db.getPool();
+export const pool = undefined as any;

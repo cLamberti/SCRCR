@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   FaHome, FaUserPlus, FaList,
   FaSignOutAlt, FaBars, FaTimes, FaChurch,
-  FaCalendarAlt, FaUsers, FaChartLine,
+  FaCalendarAlt, FaUsers, FaChartLine, FaCog,
 } from 'react-icons/fa';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -49,6 +49,13 @@ const NAV_ITEMS: Omit<NavItem, 'onClick'>[] = [
     roles: ['admin', 'tesorero', 'pastorGeneral'],
   },
   {
+  id: "congregados",
+  href: "/congregados",
+  icon: FaUsers,
+  label: "Congregados",
+  roles: ["admin", "tesorero", "pastorGeneral"] as Role[],
+},
+  {
     id: 'eventos',
     href: '/eventos',
     icon: FaCalendarAlt,
@@ -68,6 +75,13 @@ const NAV_ITEMS: Omit<NavItem, 'onClick'>[] = [
     icon: FaChartLine,
     label: 'Reportes',
     roles: ['admin', 'tesorero', 'pastorGeneral'],
+  },
+  {
+    id: 'configuracion',
+    href: '/configuracion',
+    icon: FaCog,
+    label: 'Configuración',
+    roles: ['admin'],
   },
 ];
 
