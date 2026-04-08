@@ -107,8 +107,9 @@ export default function RegistroPermisoPage() {
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
-                    <label className="block text-gray-700 text-xs font-semibold mb-1.5">Fecha de Inicio *</label>
+                    <label htmlFor="fechaInicio" className="block text-gray-700 text-xs font-semibold mb-1.5">Fecha de Inicio *</label>
                     <input
+                      id="fechaInicio"
                       type="date"
                       value={formData.fechaInicio}
                       onChange={(e) => setFormData({ ...formData, fechaInicio: e.target.value })}
@@ -117,8 +118,9 @@ export default function RegistroPermisoPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-gray-700 text-xs font-semibold mb-1.5">Fecha de Fin *</label>
+                    <label htmlFor="fechaFin" className="block text-gray-700 text-xs font-semibold mb-1.5">Fecha de Fin *</label>
                     <input
+                      id="fechaFin"
                       type="date"
                       value={formData.fechaFin}
                       onChange={(e) => setFormData({ ...formData, fechaFin: e.target.value })}
@@ -129,8 +131,9 @@ export default function RegistroPermisoPage() {
                 </div>
 
                 <div>
-                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Motivo / Justificación *</label>
+                  <label htmlFor="motivo" className="block text-gray-700 text-xs font-semibold mb-1.5">Motivo / Justificación *</label>
                   <textarea
+                    id="motivo"
                     rows={4}
                     value={formData.motivo}
                     onChange={(e) => setFormData({ ...formData, motivo: e.target.value })}
@@ -141,8 +144,9 @@ export default function RegistroPermisoPage() {
                 </div>
 
                 <div>
-                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Documento Adjunto (Opcional)</label>
+                  <label htmlFor="documentoUrl" className="block text-gray-700 text-xs font-semibold mb-1.5">Documento Adjunto (Opcional)</label>
                   <input
+                    id="documentoUrl"
                     type="file"
                     accept=".pdf, image/jpeg, image/png, image/jpg"
                     onChange={handleFileChange}
