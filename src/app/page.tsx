@@ -7,7 +7,7 @@ import Navbar from '@/components/Navbar';
 import { useEffect, useState } from 'react';
 import {
   FaUserPlus, FaSearch, FaUserMinus, FaUsers,
-  FaChartLine, FaExclamationTriangle, FaCalendarAlt,
+  FaChartLine, FaExclamationTriangle, FaCalendarAlt, FaClipboardList
 } from 'react-icons/fa';
 
 const modulos = [
@@ -16,6 +16,7 @@ const modulos = [
   { titulo: 'Gestión de Usuarios', descripcion: 'Administrar usuarios del sistema', icono: <FaUsers className="text-3xl" />, href: '/gestion-usuarios', roles: ['admin', 'pastorGeneral'], color: 'from-slate-600 to-slate-700' },
   { titulo: 'Reportes', descripcion: 'Generar reportes y estadísticas', icono: <FaChartLine className="text-3xl" />, href: '/reportes', roles: ['admin', 'tesorero', 'pastorGeneral'], color: 'from-[#2070ac] to-[#3080bc]' },
   { titulo: 'Eventos', descripcion: 'Crea, edita y elimina eventos', icono: <FaCalendarAlt className="text-3xl" />, href: '/eventos', roles: ['admin', 'tesorero', 'pastorGeneral'], color: 'from-[#3080bc] to-[#17609c]' },
+  { titulo: 'Permisos', descripcion: 'Gestión de permisos de ausencia', icono: <FaClipboardList className="text-3xl" />, href: '/permisos', roles: ['admin', 'tesorero', 'pastorGeneral', 'asistenteAdministrativo'], color: 'from-slate-700 to-slate-800' },
 ];
 
 export default function HomePage() {

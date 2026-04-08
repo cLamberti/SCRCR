@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   FaHome, FaUserPlus, FaList,
   FaSignOutAlt, FaBars, FaTimes, FaChurch,
-  FaCalendarAlt, FaUsers, FaChartLine, FaCog,
+  FaCalendarAlt, FaUsers, FaChartLine, FaCog, FaClipboardList
 } from 'react-icons/fa';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -77,6 +77,13 @@ const NAV_ITEMS: Omit<NavItem, 'onClick'>[] = [
     roles: ['admin', 'tesorero', 'pastorGeneral'],
   },
   {
+    id: 'permisos',
+    href: '/permisos',
+    icon: FaClipboardList,
+    label: 'Permisos',
+    roles: ['admin', 'tesorero', 'pastorGeneral'] as Role[],
+  },
+  {
     id: 'configuracion',
     href: '/configuracion',
     icon: FaCog,
@@ -138,7 +145,7 @@ export default function Sidebar({ activeItem, pageTitle = 'SCRCR' }: SidebarProp
 
       {/* Encabezado con logo */}
       <div className="px-4 pt-6 pb-5 border-b border-white/10">
-        <div className="flex items-center gap-3">
+        <Link href={usuario && !loading ? '/' : pathname} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
           <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0">
             <FaChurch className="text-white text-sm" />
           </div>
@@ -146,7 +153,7 @@ export default function Sidebar({ activeItem, pageTitle = 'SCRCR' }: SidebarProp
             <p className="text-white font-bold text-sm leading-tight tracking-wide">SCRCR</p>
             <p className="text-white/45 text-[10px] leading-tight mt-0.5">Iglesia Bíblica Emanuel</p>
           </div>
-        </div>
+        </Link>
       </div>
 
       {/* Datos del usuario autenticado */}
@@ -256,10 +263,10 @@ export default function Sidebar({ activeItem, pageTitle = 'SCRCR' }: SidebarProp
         >
           <FaBars className="text-white text-base" />
         </button>
-        <div className="flex items-center gap-2 min-w-0">
+        <Link href={usuario && !loading ? '/' : pathname} className="flex items-center gap-2 min-w-0 hover:opacity-80 transition-opacity">
           <FaChurch className="text-white/60 text-sm flex-shrink-0" />
           <span className="text-white font-semibold text-sm truncate">{pageTitle}</span>
-        </div>
+        </Link>
       </header>
 
       {/* Overlay móvil */}

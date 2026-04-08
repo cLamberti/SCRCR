@@ -10,8 +10,9 @@ const routePermissions: Record<string, string[]> = {
   '/gestion-usuarios': ['admin', 'pastorGeneral'],
   '/reportes': ['admin', 'tesorero', 'pastorGeneral'],
   '/configuracion': ['admin'],
-  '/dashboard': ['admin', 'tesorero', 'pastorGeneral'],
-  '/congregados': ['admin', 'tesorero', 'pastorGeneral'],
+  '/dashboard': ['admin', 'tesorero', 'pastorGeneral', 'asistenteAdministrativo'],
+  '/congregados': ['admin', 'tesorero', 'pastorGeneral', 'asistenteAdministrativo'],
+  '/permisos': ['admin', 'tesorero', 'pastorGeneral', 'asistenteAdministrativo'],
 };
 
 // Rutas que solo pueden acceder usuarios no autenticados
