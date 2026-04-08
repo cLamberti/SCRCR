@@ -145,11 +145,32 @@ describe('RegistroPermisoPage - Pruebas de Frontend', () => {
     });
 
     it('6. Manejo de errores de servidor', async () => {
-        vi.spyOn(global, 'fetch').mockResolvedValueOnce({
-            ok: false,
-            status: 400,
-            json: async () => ({ success: false, message: 'El usuario ya tiene un permiso activo en esas fechas' })
-        } as Response);
+        vi.spyOn(global, 'fetch').mockImplementation(async (input) => {
+            const url = typeof input === 'string' ? input : input.toString();
+
+            // El formulario ahora consulta traslapes en cada cambio de fechas.
+            if (url.includes('/api/permisos/traslape')) {
+                return {
+                    ok: true,
+                    status: 200,
+                    json: async () => ({ success: true, hasOverlap: false })
+                } as Response;
+            }
+
+            if (url === '/api/permisos') {
+                return {
+                    ok: false,
+                    status: 400,
+                    json: async () => ({ success: false, message: 'El usuario ya tiene un permiso activo en esas fechas' })
+                } as Response;
+            }
+
+            return {
+                ok: true,
+                status: 200,
+                json: async () => ({ success: true })
+            } as Response;
+        });
 
         await act(async () => {
             render(React.createElement(RegistroPermisoPage));
