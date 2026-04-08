@@ -39,7 +39,6 @@ export default function PermisosPage() {
   
   const [filtros, setFiltros] = useState({ estado: 'todos' });
 
-  // Modal para aprobar/rechazar
   const [modalEstadoOpen, setModalEstadoOpen] = useState(false);
   const [permisoSeleccionado, setPermisoSeleccionado] = useState<PermisoExtendidoDto | null>(null);
   const [observaciones, setObservaciones] = useState('');
@@ -170,7 +169,7 @@ export default function PermisosPage() {
                     <th className="px-4 py-3 font-semibold text-left">F. Inicio</th>
                     <th className="px-4 py-3 font-semibold text-left">F. Fin</th>
                     <th className="px-4 py-3 font-semibold text-left">Motivo</th>
-                    <th className="px-4 py-3 font-semibold text-center">Doc.</th>
+
                     <th className="px-4 py-3 font-semibold text-left">Estado</th>
                     {isAdminRoles && <th className="px-4 py-3 font-semibold text-center">Acciones</th>}
                   </tr>
@@ -186,15 +185,7 @@ export default function PermisosPage() {
                         <td className="px-4 py-3 text-gray-600">{formatFecha(r.fechaInicio)}</td>
                         <td className="px-4 py-3 text-gray-600">{formatFecha(r.fechaFin)}</td>
                         <td className="px-4 py-3 text-gray-600 max-w-[200px] truncate" title={r.motivo}>{r.motivo}</td>
-                        <td className="px-4 py-3 text-center">
-                          {r.documentoUrl ? (
-                            <a href={r.documentoUrl} target="_blank" rel="noreferrer" className="text-blue-600 hover:text-blue-800" title="Ver Documento">
-                              <FaFileAlt className="mx-auto" />
-                            </a>
-                          ) : (
-                            <span className="text-gray-300">-</span>
-                          )}
-                        </td>
+
                         <td className="px-4 py-3"><BadgeEstado estado={r.estado} /></td>
                         {isAdminRoles && (
                           <td className="px-4 py-3 text-center">
