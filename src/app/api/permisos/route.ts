@@ -8,7 +8,8 @@ const permisoService = new PermisoService();
 function getUserFromToken(req: NextRequest) {
   const token = req.cookies.get('auth-token')?.value;
   if (!token) return null;
-  const secret = process.env.JWT_SECRET || 'uwrT0PdHQ7gkJeoaD3iKqMGk';
+  const secret = process.env.JWT_SECRET;
+  if (!secret) return null;
   try {
     return jwt.verify(token, secret) as { id: number; username: string; rol: string };
   } catch {
@@ -27,9 +28,9 @@ export async function GET(req: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '10');
 
-    // Si es asistenteAdministrativo, admin o pastorGeneral puede ver todos. Si no, solo los suyos.
-    const isAdminRoles = ['admin', 'pastorGeneral', 'asistenteAdministrativo', 'tesorero'].includes(user.rol);
-    const fetchUserId = isAdminRoles ? undefined : user.id;
+    // Solo admin y pastorGeneral pueden ver todos. El resto ve únicamente sus propios permisos.
+    const canViewAll = ['admin', 'pastorGeneral'].includes(user.rol);
+    const fetchUserId = canViewAll ? undefined : user.id;
 
     const result = await permisoService.obtenerPermisos(page, limit, fetchUserId);
 

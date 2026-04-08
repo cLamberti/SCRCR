@@ -46,7 +46,7 @@ export default function PermisosPage() {
   const [nuevoEstado, setNuevoEstado] = useState<'APROBADO' | 'RECHAZADO'>('APROBADO');
   const [guardando, setGuardando] = useState(false);
 
-  const isAdminRoles = ['admin', 'pastorGeneral', 'asistenteAdministrativo'].includes(usuario?.rol || '');
+  const isAdminRoles = ['admin', 'pastorGeneral'].includes(usuario?.rol || '');
 
   const cargar = useCallback(async () => {
     try {
@@ -54,7 +54,10 @@ export default function PermisosPage() {
       const res = await fetch('/api/permisos?limit=100'); // Por simplicidad, limitamos a 100
       const json = await res.json();
       if (!res.ok || !json.success) {
-        setMensaje(json.message || 'Error al consultar permisos');
+        const issueMsg = Array.isArray(json.errors) && json.errors.length > 0
+          ? json.errors.map((i: { message: string }) => i.message).join(' ')
+          : null;
+        setMensaje(issueMsg || json.message || 'Error al consultar permisos');
         setEsError(true); setData([]); return;
       }
       setData(json.data || []);
@@ -90,7 +93,12 @@ export default function PermisosPage() {
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
-        setMensaje(json.message || 'Error al actualizar estado'); setEsError(true); return;
+        const issueMsg = Array.isArray(json.errors) && json.errors.length > 0
+          ? json.errors.map((i: { message: string }) => i.message).join(' ')
+          : null;
+        setMensaje(issueMsg || json.message || 'Error al actualizar estado');
+        setEsError(true);
+        return;
       }
       setMensaje(`Permiso ${nuevoEstado.toLowerCase()} exitosamente.`);
       setModalEstadoOpen(false); setPermisoSeleccionado(null);

@@ -8,7 +8,8 @@ const permisoService = new PermisoService();
 function getUserFromToken(req: NextRequest) {
   const token = req.cookies.get('auth-token')?.value;
   if (!token) return null;
-  const secret = process.env.JWT_SECRET || 'uwrT0PdHQ7gkJeoaD3iKqMGk';
+  const secret = process.env.JWT_SECRET;
+  if (!secret) return null;
   try {
     return jwt.verify(token, secret) as { id: number; username: string; rol: string };
   } catch {
@@ -23,7 +24,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ success: false, message: 'No autenticado' }, { status: 401 });
     }
 
-    const allowedRoles = ['admin', 'pastorGeneral', 'asistenteAdministrativo'];
+    const allowedRoles = ['admin', 'pastorGeneral'];
     if (!allowedRoles.includes(user.rol)) {
       return NextResponse.json({ success: false, message: 'No autorizado para aprobar o rechazar permisos' }, { status: 403 });
     }
@@ -37,6 +38,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     const { id } = await params;
     const permisoId = parseInt(id, 10);
+    if (Number.isNaN(permisoId)) {
+      return NextResponse.json({ success: false, message: 'ID de permiso inválido' }, { status: 400 });
+    }
 
     const permiso = await permisoService.aprobarRechazarPermiso(permisoId, {
       estado: body.estado,

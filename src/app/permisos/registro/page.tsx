@@ -20,6 +20,36 @@ export default function RegistroPermisoPage() {
   });
   const [loading, setLoading] = useState(false);
   const [mensaje, setMensaje] = useState({ text: '', isError: false });
+  const [traslapeAviso, setTraslapeAviso] = useState('');
+  const [validandoTraslape, setValidandoTraslape] = useState(false);
+
+  const validarTraslape = async (fechaInicio: string, fechaFin: string) => {
+    if (!fechaInicio || !fechaFin) {
+      setTraslapeAviso('');
+      return;
+    }
+    if (new Date(fechaInicio) > new Date(fechaFin)) {
+      setTraslapeAviso('');
+      return;
+    }
+
+    try {
+      setValidandoTraslape(true);
+      const res = await fetch(
+        `/api/permisos/traslape?fechaInicio=${encodeURIComponent(fechaInicio)}&fechaFin=${encodeURIComponent(fechaFin)}`
+      );
+      const data = await res.json();
+      if (res.ok && data.success && data.hasOverlap) {
+        setTraslapeAviso('Advertencia: ya tienes un permiso pendiente o aprobado que se traslapa con estas fechas.');
+        return;
+      }
+      setTraslapeAviso('');
+    } catch {
+      setTraslapeAviso('');
+    } finally {
+      setValidandoTraslape(false);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -40,7 +70,7 @@ export default function RegistroPermisoPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMensaje({ text: '', isError: false });
-    
+
     // Validación básica
     if (!formData.fechaInicio || !formData.fechaFin || !formData.motivo) {
       setMensaje({ text: 'Todos los campos son requeridos', isError: true });
@@ -62,7 +92,10 @@ export default function RegistroPermisoPage() {
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.message || 'Error al solicitar el permiso');
+        const issueMsg = Array.isArray(data.errors) && data.errors.length > 0
+          ? data.errors.map((i: { message: string }) => i.message).join(' ')
+          : null;
+        throw new Error(issueMsg || data.message || 'Error al solicitar el permiso');
       }
 
       setMensaje({ text: 'Permiso solicitado con éxito', isError: false });
@@ -82,7 +115,7 @@ export default function RegistroPermisoPage() {
 
       <div className="flex-grow p-4 pt-16 md:pt-4 min-w-0 flex justify-center">
         <div className="max-w-2xl w-full">
-          
+
           <div className="mb-4">
             <Link href="/permisos" className="inline-flex items-center gap-2 text-[#003366] hover:underline text-sm font-semibold">
               <FaArrowLeft /> Regresar a Permisos
@@ -97,9 +130,8 @@ export default function RegistroPermisoPage() {
 
             <div className="p-6">
               {mensaje.text && (
-                <div className={`mb-6 p-4 rounded-lg text-sm border font-medium ${
-                  mensaje.isError ? 'bg-red-50 text-red-700 border-red-200' : 'bg-green-50 text-green-700 border-green-200'
-                }`}>
+                <div className={`mb-6 p-4 rounded-lg text-sm border font-medium ${mensaje.isError ? 'bg-red-50 text-red-700 border-red-200' : 'bg-green-50 text-green-700 border-green-200'
+                  }`}>
                   {mensaje.text}
                 </div>
               )}
@@ -112,7 +144,11 @@ export default function RegistroPermisoPage() {
                       id="fechaInicio"
                       type="date"
                       value={formData.fechaInicio}
-                      onChange={(e) => setFormData({ ...formData, fechaInicio: e.target.value })}
+                      onChange={(e) => {
+                        const next = { ...formData, fechaInicio: e.target.value };
+                        setFormData(next);
+                        void validarTraslape(next.fechaInicio, next.fechaFin);
+                      }}
                       className={inputClass}
                       disabled={loading}
                     />
@@ -123,12 +159,24 @@ export default function RegistroPermisoPage() {
                       id="fechaFin"
                       type="date"
                       value={formData.fechaFin}
-                      onChange={(e) => setFormData({ ...formData, fechaFin: e.target.value })}
+                      onChange={(e) => {
+                        const next = { ...formData, fechaFin: e.target.value };
+                        setFormData(next);
+                        void validarTraslape(next.fechaInicio, next.fechaFin);
+                      }}
                       className={inputClass}
                       disabled={loading}
                     />
                   </div>
                 </div>
+                {validandoTraslape && (
+                  <p className="text-xs text-gray-400 -mt-2">Validando traslape...</p>
+                )}
+                {traslapeAviso && (
+                  <div className="rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
+                    {traslapeAviso}
+                  </div>
+                )}
 
                 <div>
                   <label htmlFor="motivo" className="block text-gray-700 text-xs font-semibold mb-1.5">Motivo / Justificación *</label>
