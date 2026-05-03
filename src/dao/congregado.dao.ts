@@ -5,6 +5,7 @@ import {
     FiltrosCongregadoRequest,
 } from '@/dto/congregado.dto';
 import { Congregado, CongregadoModel, EstadoCongregado } from '@/models/Congregado';
+import { AuditoriaDAO } from './auditoria.dao';
 
 export interface PaginacionResultado<T> {
     data: T[];
@@ -68,10 +69,9 @@ export class CongregadoDAO {
                 ]
             );
 
-            if (!result.rows.length) {
-                throw new CongregadoDAOError('No se pudo crear el congregado', 'CREATE_FAILED');
-            }
-            return this.mapRowToCongregado(result.rows[0]);
+            const congregado = this.mapRowToCongregado(result.rows[0]);
+            await AuditoriaDAO.registrar('congregados', congregado.id, 'creacion', 'Registro inicial del congregado');
+            return congregado;
         } catch (error: any) {
             if (error instanceof CongregadoDAOError) throw error;
             if (error.code === '23505') {
@@ -214,10 +214,9 @@ export class CongregadoDAO {
                 ]
             );
 
-            if (!result.rows.length) {
-                throw new CongregadoDAOError('Error al actualizar el congregado', 'UPDATE_FAILED');
-            }
-            return this.mapRowToCongregado(result.rows[0]);
+            const congregado = this.mapRowToCongregado(result.rows[0]);
+            await AuditoriaDAO.registrar('congregados', congregado.id, 'edicion', 'Actualización de información del congregado');
+            return congregado;
         } catch (error: any) {
             if (error instanceof CongregadoDAOError) throw error;
             if (error.code === '23505') {
@@ -233,7 +232,11 @@ export class CongregadoDAO {
                 'UPDATE congregados SET estado = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id',
                 [EstadoCongregado.INACTIVO, id]
             );
-            return result.rows.length > 0;
+            if (result.rows.length > 0) {
+              await AuditoriaDAO.registrar('congregados', id, 'eliminacion', 'Desactivación del congregado (Inactivo)');
+              return true;
+            }
+            return false;
         } catch (error) {
             throw new CongregadoDAOError('Error al eliminar el congregado', 'DATABASE_ERROR', error);
         }

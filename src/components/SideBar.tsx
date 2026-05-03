@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   FaHome, FaUserPlus, FaList,
   FaSignOutAlt, FaBars, FaTimes, FaChurch,
-  FaCalendarAlt, FaUsers, FaChartLine, FaCog, FaClipboardList
+  FaCalendarAlt, FaUsers, FaChartLine, FaCog, FaClipboardList, FaHistory
 } from 'react-icons/fa';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -81,6 +81,13 @@ const NAV_ITEMS: Omit<NavItem, 'onClick'>[] = [
     href: '/permisos',
     icon: FaClipboardList,
     label: 'Permisos',
+    roles: ['admin', 'tesorero', 'pastorGeneral'] as Role[],
+  },
+  {
+    id: 'historial',
+    href: '/historial',
+    icon: FaHistory,
+    label: 'Historial',
     roles: ['admin', 'tesorero', 'pastorGeneral'] as Role[],
   },
   {

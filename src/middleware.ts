@@ -13,6 +13,7 @@ const routePermissions: Record<string, string[]> = {
   '/dashboard': ['admin', 'tesorero', 'pastorGeneral', 'asistenteAdministrativo'],
   '/congregados': ['admin', 'tesorero', 'pastorGeneral', 'asistenteAdministrativo'],
   '/permisos': ['admin', 'tesorero', 'pastorGeneral', 'asistenteAdministrativo'],
+  '/historial': ['admin', 'tesorero', 'pastorGeneral', 'asistenteAdministrativo'],
 };
 
 // Rutas que solo pueden acceder usuarios no autenticados
@@ -45,7 +46,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Verificar si la ruta requiere autenticación
-  const protectedRoute = Object.keys(routePermissions).find(route => 
+  const protectedRoute = Object.keys(routePermissions).find(route =>
     pathname.startsWith(route)
   );
 
@@ -61,7 +62,7 @@ export async function middleware(request: NextRequest) {
     // Verificar el rol del usuario
     try {
       console.log('Verificando permisos para:', protectedRoute);
-      
+
       // Hacer una petición interna para verificar el usuario y su rol
       const verifyUrl = new URL('/api/auth/verify-role', request.url);
       const verifyResponse = await fetch(verifyUrl, {
@@ -86,11 +87,11 @@ export async function middleware(request: NextRequest) {
       if (!allowedRoles.includes(rol)) {
         console.log('Rol no autorizado, redirigiendo a home');
         const response = NextResponse.redirect(new URL('/', request.url));
-        
+
         // Agregar header para mostrar mensaje de error
         response.headers.set('X-Unauthorized', 'true');
         response.headers.set('X-Unauthorized-Message', 'No tienes permisos para acceder a esta página');
-        
+
         return response;
       }
 

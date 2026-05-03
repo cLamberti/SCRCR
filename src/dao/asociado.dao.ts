@@ -5,6 +5,7 @@ import {
   FiltrosAsociadoRequest,
 } from '@/dto/asociado.dto';
 import { Asociado, AsociadoModel } from '@/models/Asociado';
+import { AuditoriaDAO } from './auditoria.dao';
 
 export interface PaginacionResultado<T> {
   data: T[];
@@ -66,11 +67,9 @@ export class AsociadoDAO {
         RETURNING *
       ` as any[];
 
-      if (!result || result.length === 0) {
-        throw new AsociadoDAOError('No se pudo crear el asociado', 'CREATE_FAILED');
-      }
-
-      return this.mapRowToAsociado(result[0]);
+      const asociado = this.mapRowToAsociado(result[0]);
+      await AuditoriaDAO.registrar('asociados', asociado.id, 'creacion', 'Registro inicial del asociado');
+      return asociado;
     } catch (error: any) {
       if (error instanceof AsociadoDAOError) throw error;
       if (error.code === '23505') {
@@ -187,11 +186,9 @@ export class AsociadoDAO {
         RETURNING *
       ` as any[];
 
-      if (!result || result.length === 0) {
-        throw new AsociadoDAOError('Error al actualizar el asociado', 'UPDATE_FAILED');
-      }
-
-      return this.mapRowToAsociado(result[0]);
+      const asociado = this.mapRowToAsociado(result[0]);
+      await AuditoriaDAO.registrar('asociados', asociado.id, 'edicion', 'Actualización de información del asociado');
+      return asociado;
     } catch (error: any) {
       if (error instanceof AsociadoDAOError) throw error;
       if (error.code === '23505') {
@@ -206,7 +203,11 @@ export class AsociadoDAO {
       const result = await this.sql`
         UPDATE asociados SET estado = 0 WHERE id = ${id} RETURNING id
       ` as any[];
-      return result.length > 0;
+      if (result.length > 0) {
+        await AuditoriaDAO.registrar('asociados', id, 'eliminacion', 'Desactivación del asociado (Inactivo)');
+        return true;
+      }
+      return false;
     } catch (error) {
       throw new AsociadoDAOError('Error al eliminar el asociado', 'DATABASE_ERROR', error);
     }

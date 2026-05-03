@@ -18,6 +18,10 @@ Then commands for dependencies of the proyect
 ```bash
 npm install react-icons
 npm install @neondatabase/serverless
+
+# Módulo de Historial de Personas (US-H01)
+npm install jspdf jspdf-autotable   # Exportación a PDF
+npm install exceljs                  # Exportación a Excel (.xlsx) con estilos
 ```
 
 and for run tests
