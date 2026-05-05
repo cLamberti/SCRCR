@@ -1,7 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { ReporteAsistencia, EstadoAsistencia } from '@/models/ReporteAsistencia';
 import { CrearReporteAsistenciaRequest } from '@/dto/reporteAsistencia.dto';
-import { EstadoAsistencia as PrismaEstadoAsistencia } from '@prisma/client';
 
 export class ReporteAsistenciaDAOError extends Error {
   code: string;
@@ -52,7 +51,7 @@ export class ReporteAsistenciaDAO {
           },
         },
         update: {
-          estado: data.estado as PrismaEstadoAsistencia,
+          estado: data.estado as any,
           justificacion: data.justificacion ?? null,
           horaRegistro: new Date(),
         },
@@ -60,7 +59,7 @@ export class ReporteAsistenciaDAO {
           asociadoId: data.asociado_id,
           eventoId: data.evento_id,
           fecha: new Date(data.fecha),
-          estado: data.estado as PrismaEstadoAsistencia,
+          estado: data.estado as any,
           justificacion: data.justificacion ?? null,
           horaRegistro: new Date(),
         },
@@ -80,7 +79,7 @@ export class ReporteAsistenciaDAO {
       const row = await prisma.reporteAsistencia.update({
         where: { id },
         data: {
-          estado: data.estado as PrismaEstadoAsistencia,
+          estado: data.estado as any,
           justificacion: data.justificacion ?? null,
         },
       });

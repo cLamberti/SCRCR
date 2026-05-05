@@ -1,6 +1,5 @@
 import { prisma } from '@/lib/prisma';
 import { RegistroAsistenciaRequest, AsistenciaResponse } from '@/dto/asistencia.dto';
-import { EstadoAsistencia } from '@prisma/client';
 
 export class AsistenciaDAOError extends Error {
   constructor(
@@ -66,7 +65,7 @@ export class AsistenciaDAO {
           asociadoId: params.id_asociado,
           eventoId: params.id_actividad,
           fechaRegistro: new Date(`${params.fecha_asistencia}T00:00:00.000Z`),
-          estado: EstadoAsistencia.presente,
+          estado: 'presente',
         },
       });
       return mapToResponse(row);
