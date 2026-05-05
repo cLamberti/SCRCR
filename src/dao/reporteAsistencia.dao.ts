@@ -1,7 +1,6 @@
-
+import { prisma } from '@/lib/prisma';
 import { ReporteAsistencia, EstadoAsistencia } from '@/models/ReporteAsistencia';
-import { neon } from '@neondatabase/serverless';
-import { CrearReporteAsistenciaRequest, ActualizarReporteAsistenciaRequest } from '@/dto/reporteAsistencia.dto';
+import { CrearReporteAsistenciaRequest } from '@/dto/reporteAsistencia.dto';
 
 export class ReporteAsistenciaDAOError extends Error {
   code: string;
@@ -15,228 +14,109 @@ export class ReporteAsistenciaDAOError extends Error {
   }
 }
 
+function mapToReporte(row: any): ReporteAsistencia {
+  const estadoValido = [EstadoAsistencia.Presente, EstadoAsistencia.Ausente, EstadoAsistencia.Justificado];
+  const estado = estadoValido.includes(row.estado as EstadoAsistencia)
+    ? (row.estado as EstadoAsistencia)
+    : EstadoAsistencia.Ausente;
+
+  return {
+    id: Number(row.id),
+    asociado_id: Number(row.asociadoId),
+    evento_id: Number(row.eventoId),
+    fecha: row.fecha instanceof Date
+      ? row.fecha.toISOString().split('T')[0]
+      : new Date(row.fecha).toISOString().split('T')[0],
+    estado,
+    hora_registro: row.horaRegistro ?? null,
+    justificacion: row.justificacion ?? null,
+    created_at: row.createdAt instanceof Date
+      ? row.createdAt.toISOString()
+      : new Date(row.createdAt ?? Date.now()).toISOString(),
+    updated_at: row.updatedAt instanceof Date
+      ? row.updatedAt.toISOString()
+      : new Date(row.updatedAt ?? Date.now()).toISOString(),
+  };
+}
+
 export class ReporteAsistenciaDAO {
-  private connectionString: string;
-  private sql: any;
-
-  constructor(connectionString?: string) {
-    this.connectionString = connectionString || process.env.POSTGRES_URL || '';
-    this.sql = neon(this.connectionString);
-  }
-
-  private async getConnection(): Promise<any> {
-    if (!this.sql) {
-      throw new ReporteAsistenciaDAOError(
-        'No se pudo establecer conexión con la base de datos',
-        'CONNECTION_ERROR'
-      );
-    }
-    return this.sql;
-  }
-
-  private mapRowToReporteAsistencia(row: any): ReporteAsistencia {
-    console.log('Mapeando fila:', row); // Debug
-    const estadoValido = ['presente', 'ausente', 'justificado'].includes(row.estado);
-    if (!estadoValido) {
-      console.warn(`Estado inválido encontrado: ${row.estado}, usando 'ausente' por defecto`);
-    }
-
-    return {
-      id: Number(row.id),
-      asociado_id: Number(row.asociado_id),
-      evento_id: Number(row.evento_id),
-      fecha: row.fecha instanceof Date 
-        ? row.fecha.toISOString().split('T')[0]
-        : new Date(row.fecha).toISOString().split('T')[0],
-      estado: estadoValido ? row.estado as EstadoAsistencia : EstadoAsistencia.Ausente,
-      hora_registro: row.hora_registro || null,
-      justificacion: row.justificacion || null,
-      created_at: row.created_at instanceof Date
-        ? row.created_at.toISOString()
-        : new Date(row.created_at).toISOString(),
-      updated_at: row.updated_at instanceof Date
-        ? row.updated_at.toISOString()
-        : new Date(row.updated_at).toISOString(),
-    };
-  }
-
   async crear(data: CrearReporteAsistenciaRequest): Promise<ReporteAsistencia> {
     try {
-      const sql = await this.getConnection();
-      
-      console.log('Creando registro con datos:', data); // Debug
-      
-      const result = await sql`
-        INSERT INTO reportes_asistencia (
-          asociado_id,
-          evento_id,
-          fecha,
-          estado,
-          justificacion,
-          hora_registro
-        ) VALUES (
-          ${data.asociado_id},
-          ${data.evento_id},
-          ${data.fecha},
-          ${data.estado},
-          ${data.justificacion || null},
-          CURRENT_TIME
-        )
-        ON CONFLICT (asociado_id, evento_id, fecha)
-        DO UPDATE SET
-          estado = EXCLUDED.estado,
-          justificacion = EXCLUDED.justificacion,
-          hora_registro = CURRENT_TIME,
-          updated_at = CURRENT_TIMESTAMP
-        RETURNING *
-      `;
-      
-      console.log('Resultado de crear:', result); // Debug
-      
-      if (!result || result.length === 0) {
-        throw new ReporteAsistenciaDAOError(
-          'No se pudo crear el registro de asistencia',
-          'CREATE_FAILED'
-        );
-      }
-
-      return this.mapRowToReporteAsistencia(result[0]);
+      const row = await prisma.reporteAsistencia.upsert({
+        where: {
+          asociadoId_eventoId_fecha: {
+            asociadoId: data.asociado_id,
+            eventoId: data.evento_id,
+            fecha: new Date(data.fecha),
+          },
+        },
+        update: {
+          estado: data.estado as any,
+          justificacion: data.justificacion ?? null,
+          horaRegistro: new Date(),
+        },
+        create: {
+          asociadoId: data.asociado_id,
+          eventoId: data.evento_id,
+          fecha: new Date(data.fecha),
+          estado: data.estado as any,
+          justificacion: data.justificacion ?? null,
+          horaRegistro: new Date(),
+        },
+      });
+      return mapToReporte(row);
     } catch (error: any) {
-      console.error('Error en crear:', error); // Debug
-      
-      if (error instanceof ReporteAsistenciaDAOError) {
-        throw error;
+      if (error instanceof ReporteAsistenciaDAOError) throw error;
+      if (error.code === 'P2003') {
+        throw new ReporteAsistenciaDAOError('El asociado o evento no existe', 'FOREIGN_KEY_VIOLATION', error);
       }
-      
-      if (error.code === '23503') {
-        throw new ReporteAsistenciaDAOError(
-          'El asociado o evento no existe',
-          'FOREIGN_KEY_VIOLATION',
-          error
-        );
-      }
-
-      throw new ReporteAsistenciaDAOError(
-        `Error al crear el registro: ${error.message}`,
-        'DATABASE_ERROR',
-        error
-      );
+      throw new ReporteAsistenciaDAOError(`Error al crear el registro: ${error.message}`, 'DATABASE_ERROR', error);
     }
   }
 
-  /**
- * Actualiza un registro de asistencia existente
- */
-async actualizar(
-  id: number,
-  data: { estado: string; justificacion?: string }
-): Promise<ReporteAsistencia> {
-  try {
-    const sql = await this.getConnection();
-    
-    const result = await sql`
-      UPDATE reportes_asistencia
-      SET 
-        estado = ${data.estado},
-        justificacion = ${data.justificacion || null},
-        updated_at = NOW()
-      WHERE id = ${id}
-      RETURNING *
-    `;
-    
-    if (!result || result.length === 0) {
-      throw new ReporteAsistenciaDAOError(
-        'No se pudo actualizar el registro de asistencia',
-        'UPDATE_FAILED'
-      );
+  async actualizar(id: number, data: { estado: string; justificacion?: string }): Promise<ReporteAsistencia> {
+    try {
+      const row = await prisma.reporteAsistencia.update({
+        where: { id },
+        data: {
+          estado: data.estado as any,
+          justificacion: data.justificacion ?? null,
+        },
+      });
+      return mapToReporte(row);
+    } catch (error: any) {
+      if (error instanceof ReporteAsistenciaDAOError) throw error;
+      throw new ReporteAsistenciaDAOError('Error al actualizar el registro de asistencia en la base de datos', 'DATABASE_ERROR', error);
     }
-
-    return this.mapRowToReporteAsistencia(result[0]);
-  } catch (error: any) {
-    if (error instanceof ReporteAsistenciaDAOError) {
-      throw error;
-    }
-    
-    throw new ReporteAsistenciaDAOError(
-      'Error al actualizar el registro de asistencia en la base de datos',
-      'DATABASE_ERROR',
-      error
-    );
   }
-}
+
   async obtenerPorEventoId(eventoId: number): Promise<ReporteAsistencia[]> {
     try {
-      const sql = await this.getConnection();
-      
-      console.log('Obteniendo registros para evento:', eventoId); // Debug
-      
-      const result = await sql`
-        SELECT * FROM reportes_asistencia
-        WHERE evento_id = ${eventoId}
-        ORDER BY id ASC
-      `;
-      
-      console.log('Registros encontrados:', result.length); // Debug
-      console.log('Primer registro:', result[0]); // Debug
-      
-      return result.map((row: any) => this.mapRowToReporteAsistencia(row));
+      const rows = await prisma.reporteAsistencia.findMany({
+        where: { eventoId },
+        orderBy: { id: 'asc' },
+      });
+      return rows.map(mapToReporte);
     } catch (error: any) {
-      console.error('Error en obtenerPorEventoId:', error); // Debug
-      
-      throw new ReporteAsistenciaDAOError(
-        `Error al obtener registros: ${error.message}`,
-        'DATABASE_ERROR',
-        error
-      );
+      throw new ReporteAsistenciaDAOError(`Error al obtener registros: ${error.message}`, 'DATABASE_ERROR', error);
     }
   }
 
   async eliminarPorEvento(eventoId: number): Promise<number> {
     try {
-      const sql = await this.getConnection();
-      
-      console.log('Eliminando registros del evento:', eventoId); // Debug
-      
-      const result = await sql`
-        DELETE FROM reportes_asistencia
-        WHERE evento_id = ${eventoId}
-        RETURNING id
-      `;
-      
-      console.log('Registros eliminados:', result.length); // Debug
-      
-      return result.length;
+      const result = await prisma.reporteAsistencia.deleteMany({ where: { eventoId } });
+      return result.count;
     } catch (error: any) {
-      console.error('Error en eliminarPorEvento:', error); // Debug
-      
-      throw new ReporteAsistenciaDAOError(
-        `Error al eliminar registros: ${error.message}`,
-        'DATABASE_ERROR',
-        error
-      );
+      throw new ReporteAsistenciaDAOError(`Error al eliminar registros: ${error.message}`, 'DATABASE_ERROR', error);
     }
   }
 
   async obtenerPorId(id: number): Promise<ReporteAsistencia | null> {
     try {
-      const sql = await this.getConnection();
-      
-      const result = await sql`
-        SELECT * FROM reportes_asistencia
-        WHERE id = ${id}
-      `;
-      
-      if (!result || result.length === 0) {
-        return null;
-      }
-
-      return this.mapRowToReporteAsistencia(result[0]);
+      const row = await prisma.reporteAsistencia.findUnique({ where: { id } });
+      return row ? mapToReporte(row) : null;
     } catch (error: any) {
-      throw new ReporteAsistenciaDAOError(
-        `Error al obtener registro por ID: ${error.message}`,
-        'DATABASE_ERROR',
-        error
-      );
+      throw new ReporteAsistenciaDAOError(`Error al obtener registro por ID: ${error.message}`, 'DATABASE_ERROR', error);
     }
   }
 }

@@ -1,0 +1,134 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum EstadoAsistencia {
+  presente
+  ausente
+  justificado
+}
+
+model Usuario {
+  id               Int       @id @default(autoincrement())
+  username         String    @unique @db.VarChar(50)
+  email            String    @unique @db.VarChar(255)
+  passwordHash     String    @map("password_hash") @db.VarChar(255)
+  nombreCompleto   String    @map("nombre_completo") @db.VarChar(255)
+  rol              String    @default("tesorero") @db.VarChar(20)
+  estado           Int       @default(1)
+  ultimoAcceso     DateTime? @map("ultimo_acceso")
+  intentosFallidos Int       @default(0) @map("intentos_fallidos")
+  bloqueadoHasta   DateTime? @map("bloqueado_hasta")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at")
+  permisos         Permiso[]
+
+  @@map("usuarios")
+}
+
+model Congregado {
+  id                Int      @id @default(autoincrement())
+  nombre            String   @db.VarChar(100)
+  cedula            String   @unique @db.VarChar(20)
+  fechaIngreso      DateTime @default(now()) @map("fecha_ingreso")
+  telefono          String   @db.VarChar(20)
+  segundoTelefono   String?  @map("segundo_telefono") @db.VarChar(20)
+  estadoCivil       String   @map("estado_civil") @db.VarChar(20)
+  ministerio        String   @db.VarChar(50)
+  segundoMinisterio String?  @map("segundo_ministerio") @db.VarChar(50)
+  urlFotoCedula     String   @map("url_foto_cedula")
+  estado            Int      @default(1) @db.SmallInt
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("congregados")
+}
+
+model Asociado {
+  id             Int                 @id @default(autoincrement())
+  nombreCompleto String              @map("nombre_completo") @db.VarChar(100)
+  cedula         String              @unique @db.VarChar(20)
+  correo         String?             @db.VarChar(100)
+  telefono       String?             @db.VarChar(20)
+  ministerio     String?             @db.VarChar(50)
+  direccion      String?
+  fechaIngreso   DateTime            @default(now()) @map("fecha_ingreso")
+  estado         Int                 @default(1) @db.SmallInt
+  createdAt      DateTime?           @default(now()) @map("created_at")
+  updatedAt      DateTime?           @default(now()) @updatedAt @map("updated_at")
+  asistencias    Asistencia[]
+  reportes       ReporteAsistencia[]
+
+  @@map("asociados")
+}
+
+model Evento {
+  id          Int                 @id @default(autoincrement())
+  nombre      String              @db.VarChar(255)
+  descripcion String?
+  fecha       DateTime            @db.Date
+  hora        DateTime            @db.Time()
+  activo      Boolean             @default(true)
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @default(now()) @updatedAt @map("updated_at")
+  asistencias Asistencia[]
+  reportes    ReporteAsistencia[]
+
+  @@map("eventos")
+}
+
+model Asistencia {
+  id            Int              @id @default(autoincrement())
+  asociadoId    Int              @map("asociado_id")
+  eventoId      Int              @map("evento_id")
+  fechaRegistro DateTime         @default(now()) @map("fecha_registro")
+  observaciones String?
+  estado        EstadoAsistencia @default(ausente)
+  horaRegistro  DateTime         @default(now()) @map("hora_registro") @db.Time()
+  justificacion String?
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @default(now()) @updatedAt @map("updated_at")
+  asociado      Asociado         @relation(fields: [asociadoId], references: [id], onDelete: Cascade)
+  evento        Evento           @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+
+  @@unique([asociadoId, eventoId])
+  @@map("asistencias")
+}
+
+model ReporteAsistencia {
+  id            Int              @id @default(autoincrement())
+  asociadoId    Int              @map("asociado_id")
+  eventoId      Int              @map("evento_id")
+  fecha         DateTime         @db.Date
+  estado        EstadoAsistencia
+  horaRegistro  DateTime?        @map("hora_registro") @db.Time()
+  observaciones String?
+  justificacion String?
+  createdAt     DateTime?        @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime?        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  asociado      Asociado         @relation(fields: [asociadoId], references: [id], onDelete: Cascade)
+  evento        Evento           @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+
+  @@unique([asociadoId, eventoId, fecha])
+  @@map("reportes_asistencia")
+}
+
+model Permiso {
+  id                     Int       @id @default(autoincrement())
+  usuarioId              Int       @map("usuario_id")
+  fechaInicio            DateTime  @map("fecha_inicio") @db.Date
+  fechaFin               DateTime  @map("fecha_fin") @db.Date
+  motivo                 String
+  documentoUrl           String?   @map("documento_url")
+  estado                 String    @default("PENDIENTE") @db.VarChar(20)
+  observacionesResolucion String?  @map("observaciones_resolucion")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @default(now()) @updatedAt @map("updated_at")
+  usuario                Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@map("permisos")
+}
