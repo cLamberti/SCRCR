@@ -1,38 +1,42 @@
+import { prisma } from '@/lib/prisma';
 import { Usuario } from '@/models/Usuario';
-import { sql } from '@vercel/postgres';
+
+function mapToUsuario(row: any): Usuario {
+  return {
+    id: row.id,
+    nombreCompleto: row.nombreCompleto,
+    username: row.username,
+    email: row.email,
+    passwordHash: row.passwordHash ?? '',
+    rol: row.rol,
+    estado: row.estado,
+    ultimoAcceso: row.ultimoAcceso,
+    intentosFallidos: row.intentosFallidos,
+    bloqueadoHasta: row.bloqueadoHasta,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
 
 export class UsuarioDAO {
   async findAll(): Promise<Omit<Usuario, 'passwordHash'>[]> {
-    const result = await sql`
-      SELECT 
-        id, 
-        nombre_completo, 
-        username, 
-        email, 
-        rol, 
-        estado, 
-        ultimo_acceso, 
-        intentos_fallidos,
-        bloqueado_hasta,
-        created_at, 
-        updated_at
-      FROM usuarios
-      ORDER BY created_at DESC;
-    `;
-
-    return result.rows.map(row => ({
-      id: row.id,
-      nombreCompleto: row.nombre_completo,
-      username: row.username,
-      email: row.email,
-      rol: row.rol,
-      estado: row.estado,
-      ultimoAcceso: row.ultimo_acceso,
-      intentosFallidos: row.intentos_fallidos,
-      bloqueadoHasta: row.bloqueado_hasta,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-    }));
+    const rows = await prisma.usuario.findMany({
+      select: {
+        id: true,
+        nombreCompleto: true,
+        username: true,
+        email: true,
+        rol: true,
+        estado: true,
+        ultimoAcceso: true,
+        intentosFallidos: true,
+        bloqueadoHasta: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return rows as Omit<Usuario, 'passwordHash'>[];
   }
 
   async create(usuarioData: {
@@ -43,200 +47,59 @@ export class UsuarioDAO {
     rol: 'admin' | 'tesorero' | 'pastorGeneral';
     estado: number;
   }): Promise<Usuario> {
-    const { nombreCompleto, username, email, passwordHash, rol, estado } = usuarioData;
-    
-    const result = await sql`
-      INSERT INTO usuarios (nombre_completo, username, email, password_hash, rol, estado)
-      VALUES (${nombreCompleto}, ${username}, ${email}, ${passwordHash}, ${rol}, ${estado})
-      RETURNING id, nombre_completo, username, email, rol, estado, ultimo_acceso, intentos_fallidos, bloqueado_hasta, created_at, updated_at;
-    `;
-
-    const newUser = result.rows[0];
-
-    return {
-      id: newUser.id,
-      nombreCompleto: newUser.nombre_completo,
-      username: newUser.username,
-      email: newUser.email,
-      passwordHash: '', // No devolvemos el hash por seguridad
-      rol: newUser.rol,
-      estado: newUser.estado,
-      ultimoAcceso: newUser.ultimo_acceso,
-      intentosFallidos: newUser.intentos_fallidos || 0,
-      bloqueadoHasta: newUser.bloqueado_hasta,
-      createdAt: newUser.created_at,
-      updatedAt: newUser.updated_at,
-    };
+    const row = await prisma.usuario.create({
+      data: {
+        nombreCompleto: usuarioData.nombreCompleto,
+        username: usuarioData.username,
+        email: usuarioData.email,
+        passwordHash: usuarioData.passwordHash,
+        rol: usuarioData.rol,
+        estado: usuarioData.estado,
+      },
+    });
+    return mapToUsuario({ ...row, passwordHash: '' });
   }
 
   async obtenerPorUsername(username: string): Promise<Usuario | null> {
-    const result = await sql`
-      SELECT 
-        id, 
-        nombre_completo, 
-        username, 
-        email, 
-        password_hash,
-        rol, 
-        estado, 
-        ultimo_acceso,
-        intentos_fallidos,
-        bloqueado_hasta,
-        created_at, 
-        updated_at
-      FROM usuarios
-      WHERE username = ${username}
-      LIMIT 1;
-    `;
-
-    if (result.rows.length === 0) {
-      return null;
-    }
-
-    const row = result.rows[0];
-    return {
-      id: row.id,
-      nombreCompleto: row.nombre_completo,
-      username: row.username,
-      email: row.email,
-      passwordHash: row.password_hash,
-      rol: row.rol,
-      estado: row.estado,
-      ultimoAcceso: row.ultimo_acceso,
-      intentosFallidos: row.intentos_fallidos || 0,
-      bloqueadoHasta: row.bloqueado_hasta,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-    };
+    const row = await prisma.usuario.findUnique({ where: { username } });
+    return row ? mapToUsuario(row) : null;
   }
 
-  /**
-   * Alias para mantener compatibilidad
-   */
   async findByUsername(username: string): Promise<Usuario | null> {
     return this.obtenerPorUsername(username);
   }
 
-  /**
-   * Obtiene un usuario por su ID
-   */
   async obtenerPorId(id: number): Promise<Usuario | null> {
-    const result = await sql`
-      SELECT 
-        id,
-        nombre_completo as "nombreCompleto",
-        username,
-        email,
-        password_hash as "passwordHash",
-        rol,
-        estado,
-        ultimo_acceso as "ultimoAcceso",
-        intentos_fallidos as "intentosFallidos",
-        bloqueado_hasta as "bloqueadoHasta",
-        created_at as "createdAt",
-        updated_at as "updatedAt"
-      FROM usuarios
-      WHERE id = ${id}
-    `;
-
-    if (result.rows.length === 0) {
-      return null;
-    }
-
-    const row = result.rows[0];
-
-    return {
-      id: row.id,
-      username: row.username,
-      email: row.email,
-      passwordHash: row.password_hash,
-      nombreCompleto: row.nombre_completo,
-      rol: row.rol,
-      estado: row.estado,
-      ultimoAcceso: row.ultimo_acceso,
-      intentosFallidos: row.intentos_fallidos,
-      bloqueadoHasta: row.bloqueado_hasta,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-    };
+    const row = await prisma.usuario.findUnique({ where: { id } });
+    return row ? mapToUsuario(row) : null;
   }
 
   async findByEmail(email: string): Promise<Usuario | null> {
-    try {
-      const result = await sql`
-        SELECT 
-          id,
-          nombre_completo as "nombreCompleto",
-          username,
-          email,
-          password_hash as "passwordHash",
-          rol,
-          estado,
-          ultimo_acceso as "ultimoAcceso",
-          intentos_fallidos as "intentosFallidos",
-          bloqueado_hasta as "bloqueadoHasta",
-          created_at as "createdAt",
-          updated_at as "updatedAt"
-        FROM usuarios
-        WHERE email = ${email}
-      `;
-
-      if (result.rows.length === 0) {
-        return null;
-      }
-
-      const row = result.rows[0];
-      return {
-        id: row.id,
-        username: row.username,
-        email: row.email,
-        passwordHash: row.password_hash,
-        nombreCompleto: row.nombre_completo,
-        rol: row.rol,
-        estado: row.estado,
-        ultimoAcceso: row.ultimo_acceso,
-        intentosFallidos: row.intentos_fallidos,
-        bloqueadoHasta: row.bloqueado_hasta,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-      };
-    } catch (error) {
-      console.error('Error en DAO findByEmail:', error);
-      throw error;
-    }
+    const row = await prisma.usuario.findUnique({ where: { email } });
+    return row ? mapToUsuario(row) : null;
   }
 
   async actualizarIntentos(id: number, intentos: number, bloqueadoHasta?: Date | null): Promise<void> {
-    if (bloqueadoHasta) {
-      await sql`
-        UPDATE usuarios
-        SET intentos_fallidos = ${intentos},
-            bloqueado_hasta = ${bloqueadoHasta.toISOString()}
-        WHERE id = ${id};
-      `;
-    } else {
-      await sql`
-        UPDATE usuarios
-        SET intentos_fallidos = ${intentos}
-        WHERE id = ${id};
-      `;
-    }
+    await prisma.usuario.update({
+      where: { id },
+      data: {
+        intentosFallidos: intentos,
+        bloqueadoHasta: bloqueadoHasta ?? null,
+      },
+    });
   }
 
   async resetearIntentos(id: number): Promise<void> {
-    await sql`
-      UPDATE usuarios
-      SET intentos_fallidos = 0,
-          bloqueado_hasta = NULL
-      WHERE id = ${id};
-    `;
+    await prisma.usuario.update({
+      where: { id },
+      data: { intentosFallidos: 0, bloqueadoHasta: null },
+    });
   }
 
   async actualizarUltimoAcceso(id: number): Promise<void> {
-    await sql`
-      UPDATE usuarios
-      SET ultimo_acceso = NOW()
-      WHERE id = ${id};
-    `;
+    await prisma.usuario.update({
+      where: { id },
+      data: { ultimoAcceso: new Date() },
+    });
   }
 }

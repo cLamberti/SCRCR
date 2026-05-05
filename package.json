@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
+    "@prisma/adapter-neon": "^7.8.0",
+    "@prisma/client": "^7.8.0",
     "@types/pg": "^8.15.5",
     "@vercel/postgres": "^0.10.0",
     "bcryptjs": "^3.0.3",
@@ -39,6 +41,7 @@
     "@vitejs/plugin-react": "^5.1.4",
     "@vitest/ui": "^4.0.18",
     "jsdom": "^28.1.0",
+    "prisma": "^7.8.0",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vite-tsconfig-paths": "^6.1.1",

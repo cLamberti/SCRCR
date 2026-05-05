@@ -1,4 +1,4 @@
-import { neon } from '@neondatabase/serverless';
+import { prisma } from '@/lib/prisma';
 import { Permiso, PermisoModel } from '@/models/Permiso';
 import { CrearPermisoRequest, PermisoExtendidoDto } from '@/dto/permiso.dto';
 
@@ -17,66 +17,56 @@ export interface PaginacionResultado<T> {
   totalPages: number;
 }
 
+function formatDate(d: Date | string): string {
+  const date = d instanceof Date ? d : new Date(d);
+  return date.toISOString().split('T')[0];
+}
+
+function mapToPermiso(row: any): Permiso {
+  return new PermisoModel({
+    id: row.id,
+    usuarioId: row.usuarioId,
+    fechaInicio: formatDate(row.fechaInicio),
+    fechaFin: formatDate(row.fechaFin),
+    motivo: row.motivo,
+    documentoUrl: row.documentoUrl ?? null,
+    estado: row.estado,
+    observacionesResolucion: row.observacionesResolucion ?? undefined,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  });
+}
+
+function mapToPermisoExtendido(row: any): PermisoExtendidoDto {
+  return {
+    id: row.id,
+    usuarioId: row.usuarioId,
+    nombreCompleto: row.usuario?.nombreCompleto ?? '',
+    fechaInicio: formatDate(row.fechaInicio),
+    fechaFin: formatDate(row.fechaFin),
+    motivo: row.motivo,
+    documentoUrl: row.documentoUrl ?? null,
+    estado: row.estado,
+    observacionesResolucion: row.observacionesResolucion ?? undefined,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
 export class PermisoDAO {
-  private sql: ReturnType<typeof neon>;
-
-  constructor(connectionString?: string) {
-    const url = connectionString || process.env.POSTGRES_URL || '';
-    this.sql = neon(url);
-  }
-
-  private mapRowToPermiso(row: any): Permiso {
-    return new PermisoModel({
-      id: row.id,
-      usuarioId: row.usuario_id,
-      fechaInicio: row.fecha_inicio.toISOString().split('T')[0],
-      fechaFin: row.fecha_fin.toISOString().split('T')[0],
-      motivo: row.motivo,
-      documentoUrl: row.documento_url || null,
-      estado: row.estado,
-      observacionesResolucion: row.observaciones_resolucion,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-    });
-  }
-
-  private mapRowToPermisoExtendido(row: any): PermisoExtendidoDto {
-    return {
-      id: row.id,
-      usuarioId: row.usuario_id,
-      nombreCompleto: row.nombre_completo,
-      fechaInicio: row.fecha_inicio.toISOString().split('T')[0],
-      fechaFin: row.fecha_fin.toISOString().split('T')[0],
-      motivo: row.motivo,
-      documentoUrl: row.documento_url || null,
-      estado: row.estado,
-      observacionesResolucion: row.observaciones_resolucion,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-    };
-  }
-
   async crear(usuarioId: number, data: CrearPermisoRequest): Promise<Permiso> {
     try {
-      const result = await this.sql`
-        INSERT INTO permisos (
-          usuario_id, fecha_inicio, fecha_fin, motivo, documento_url, estado
-        ) VALUES (
-          ${usuarioId},
-          ${data.fechaInicio},
-          ${data.fechaFin},
-          ${data.motivo},
-          ${data.documentoUrl || null},
-          ${data.estado || 'PENDIENTE'}
-        )
-        RETURNING *
-      ` as any[];
-
-      if (!result || result.length === 0) {
-        throw new PermisoDAOError('No se pudo crear el permiso', 'CREATE_FAILED');
-      }
-
-      return this.mapRowToPermiso(result[0]);
+      const row = await prisma.permiso.create({
+        data: {
+          usuarioId,
+          fechaInicio: new Date(data.fechaInicio),
+          fechaFin: new Date(data.fechaFin),
+          motivo: data.motivo,
+          documentoUrl: data.documentoUrl ?? null,
+          estado: data.estado ?? 'PENDIENTE',
+        },
+      });
+      return mapToPermiso(row);
     } catch (error: any) {
       throw new PermisoDAOError('Error al crear el permiso en la base de datos', 'DATABASE_ERROR', error);
     }
@@ -84,13 +74,11 @@ export class PermisoDAO {
 
   async obtenerPorId(id: number): Promise<PermisoExtendidoDto | null> {
     try {
-      const result = await this.sql`
-        SELECT p.*, u.nombre_completo 
-        FROM permisos p
-        JOIN usuarios u ON p.usuario_id = u.id
-        WHERE p.id = ${id}
-      ` as any[];
-      return result.length ? this.mapRowToPermisoExtendido(result[0]) : null;
+      const row = await prisma.permiso.findUnique({
+        where: { id },
+        include: { usuario: { select: { nombreCompleto: true } } },
+      });
+      return row ? mapToPermisoExtendido(row) : null;
     } catch (error) {
       throw new PermisoDAOError('Error al obtener el permiso por ID', 'DATABASE_ERROR', error);
     }
@@ -98,16 +86,15 @@ export class PermisoDAO {
 
   async verificarTraslape(usuarioId: number, fechaInicio: string, fechaFin: string): Promise<boolean> {
     try {
-      const result = await this.sql`
-        SELECT id FROM permisos
-        WHERE usuario_id = ${usuarioId}
-        AND estado IN ('PENDIENTE', 'APROBADO')
-        AND (
-          (fecha_inicio <= ${fechaFin} AND fecha_fin >= ${fechaInicio})
-        )
-        LIMIT 1
-      ` as any[];
-      return result.length > 0;
+      const count = await prisma.permiso.count({
+        where: {
+          usuarioId,
+          estado: { in: ['PENDIENTE', 'APROBADO'] },
+          fechaInicio: { lte: new Date(fechaFin) },
+          fechaFin: { gte: new Date(fechaInicio) },
+        },
+      });
+      return count > 0;
     } catch (error) {
       throw new PermisoDAOError('Error al verificar traslape de fechas', 'DATABASE_ERROR', error);
     }
@@ -116,50 +103,29 @@ export class PermisoDAO {
   async obtenerTodos(
     page: number = 1,
     limit: number = 10,
-    usuarioId?: number // Si es un usuario normal, listamos solo los suyos
+    usuarioId?: number
   ): Promise<PaginacionResultado<PermisoExtendidoDto>> {
     try {
       const offset = (page - 1) * limit;
+      const where = usuarioId !== undefined ? { usuarioId } : {};
 
-      let dataResult;
-      let countResult;
-
-      if (usuarioId !== undefined) {
-        dataResult = await this.sql`
-          SELECT p.*, u.nombre_completo 
-          FROM permisos p
-          JOIN usuarios u ON p.usuario_id = u.id
-          WHERE p.usuario_id = ${usuarioId}
-          ORDER BY p.id DESC
-          LIMIT ${limit} OFFSET ${offset}
-        ` as any[];
-
-        countResult = await this.sql`
-          SELECT COUNT(*) as count FROM permisos WHERE usuario_id = ${usuarioId}
-        ` as any[];
-      } else {
-        dataResult = await this.sql`
-          SELECT p.*, u.nombre_completo 
-          FROM permisos p
-          JOIN usuarios u ON p.usuario_id = u.id
-          ORDER BY p.id DESC
-          LIMIT ${limit} OFFSET ${offset}
-        ` as any[];
-
-        countResult = await this.sql`
-          SELECT COUNT(*) as count FROM permisos
-        ` as any[];
-      }
-
-      const total = parseInt(countResult[0].count);
-      const totalPages = Math.max(1, Math.ceil(total / limit));
+      const [total, rows] = await Promise.all([
+        prisma.permiso.count({ where }),
+        prisma.permiso.findMany({
+          where,
+          include: { usuario: { select: { nombreCompleto: true } } },
+          orderBy: { id: 'desc' },
+          skip: offset,
+          take: limit,
+        }),
+      ]);
 
       return {
-        data: dataResult.map(row => this.mapRowToPermisoExtendido(row)),
+        data: rows.map(mapToPermisoExtendido),
         total,
         page,
         limit,
-        totalPages,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
       };
     } catch (error) {
       throw new PermisoDAOError('Error al obtener la lista de permisos', 'DATABASE_ERROR', error);
@@ -168,21 +134,18 @@ export class PermisoDAO {
 
   async actualizarEstado(id: number, estado: 'APROBADO' | 'RECHAZADO', observaciones?: string): Promise<Permiso> {
     try {
-      const result = await this.sql`
-        UPDATE permisos SET
-          estado = ${estado},
-          observaciones_resolucion = ${observaciones || null},
-          updated_at = CURRENT_TIMESTAMP
-        WHERE id = ${id}
-        RETURNING *
-      ` as any[];
-
-      if (!result || result.length === 0) {
-        throw new PermisoDAOError('Error al actualizar estado del permiso', 'UPDATE_FAILED');
+      const row = await prisma.permiso.update({
+        where: { id },
+        data: {
+          estado,
+          observacionesResolucion: observaciones ?? null,
+        },
+      });
+      return mapToPermiso(row);
+    } catch (error: any) {
+      if (error.code === 'P2025') {
+        throw new PermisoDAOError('Permiso no encontrado', 'NOT_FOUND', error);
       }
-
-      return this.mapRowToPermiso(result[0]);
-    } catch (error) {
       throw new PermisoDAOError('Error al actualizar estado', 'DATABASE_ERROR', error);
     }
   }
