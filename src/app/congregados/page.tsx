@@ -22,6 +22,11 @@ type CongregadoRow = {
   urlFotoCedula: string;
   fechaIngreso: string;
   estado: number;
+  observaciones?: string;
+  fechaNacimiento?: string;
+  correo?: string;
+  profesion?: string;
+  direccion?: string;
 };
 
 type FormState = {
@@ -35,6 +40,11 @@ type FormState = {
   segundoMinisterio: string;
   urlFotoCedula: string;
   estado: number;
+  observaciones: string;
+  fechaNacimiento: string;
+  correo: string;
+  profesion: string;
+  direccion: string;
 };
 
 const FORM_INICIAL: FormState = {
@@ -42,6 +52,7 @@ const FORM_INICIAL: FormState = {
   segundoTelefono: "", estadoCivil: EstadoCivil.SOLTERO,
   ministerio: "", segundoMinisterio: "",
   urlFotoCedula: "https://placeholder.com/cedula.jpg", estado: 1,
+  observaciones: "", fechaNacimiento: "", correo: "", profesion: "", direccion: "",
 };
 
 const ESTADO_CIVIL_LABELS: Record<string, string> = {
@@ -162,6 +173,11 @@ export default function CongregadosPage() {
       segundoMinisterio: row.segundoMinisterio || "",
       urlFotoCedula: row.urlFotoCedula || "",
       estado: row.estado,
+      observaciones: row.observaciones || "",
+      fechaNacimiento: row.fechaNacimiento ? new Date(row.fechaNacimiento).toISOString().split("T")[0] : "",
+      correo: row.correo || "",
+      profesion: row.profesion || "",
+      direccion: row.direccion || "",
     });
     setShowForm(true);
     setMensaje(""); setEsError(false);
@@ -468,7 +484,7 @@ export default function CongregadosPage() {
 
                 {/* Fecha ingreso */}
                 <div>
-                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Fecha de ingreso *</label>
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Fecha de ingreso a la congregación *</label>
                   <input type="date" value={form.fechaIngreso} onChange={e => setForm({ ...form, fechaIngreso: e.target.value })} className={inputClass} />
                 </div>
 
@@ -519,6 +535,36 @@ export default function CongregadosPage() {
                 <div className="sm:col-span-2">
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">URL foto cédula *</label>
                   <input type="url" value={form.urlFotoCedula} onChange={e => setForm({ ...form, urlFotoCedula: e.target.value })} className={inputClass} placeholder="https://..." />
+                </div>
+
+                {/* Fecha de nacimiento */}
+                <div>
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Fecha de nacimiento</label>
+                  <input type="date" value={form.fechaNacimiento} onChange={e => setForm({ ...form, fechaNacimiento: e.target.value })} className={inputClass} />
+                </div>
+
+                {/* Correo electrónico */}
+                <div>
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Correo electrónico (opcional)</label>
+                  <input type="email" value={form.correo} onChange={e => setForm({ ...form, correo: e.target.value })} className={inputClass} placeholder="Ej: correo@ejemplo.com" />
+                </div>
+
+                {/* Oficio o profesión */}
+                <div>
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Oficio o profesión</label>
+                  <input type="text" value={form.profesion} onChange={e => setForm({ ...form, profesion: e.target.value })} className={inputClass} placeholder="Ej: Estudiante, Ingeniero" />
+                </div>
+
+                {/* Dirección */}
+                <div className="sm:col-span-2">
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Dirección</label>
+                  <input type="text" value={form.direccion} onChange={e => setForm({ ...form, direccion: e.target.value })} className={inputClass} placeholder="Dirección completa" />
+                </div>
+
+                {/* Observaciones */}
+                <div className="sm:col-span-2">
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Observaciones</label>
+                  <textarea value={form.observaciones} onChange={e => setForm({ ...form, observaciones: e.target.value })} rows={3} className={inputClass + ' resize-none'} placeholder="Notas adicionales..." />
                 </div>
               </div>
             </div>

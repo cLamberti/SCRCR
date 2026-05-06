@@ -4,12 +4,11 @@ import type { NextRequest } from 'next/server';
 
 // Definir permisos por ruta y rol
 const routePermissions: Record<string, string[]> = {
-  '/registro-asociados': ['admin', 'tesorero', 'pastorGeneral'],
   '/consulta-asociados': ['admin', 'tesorero', 'pastorGeneral'],
   '/eliminar-asociados': ['admin', 'pastorGeneral'],
   '/gestion-usuarios': ['admin', 'pastorGeneral'],
   '/reportes': ['admin', 'tesorero', 'pastorGeneral'],
-  '/configuracion': ['admin'],
+  '/configuracion': ['admin', 'tesorero', 'pastorGeneral', 'asistenteAdministrativo'],
   '/dashboard': ['admin', 'tesorero', 'pastorGeneral', 'asistenteAdministrativo'],
   '/congregados': ['admin', 'tesorero', 'pastorGeneral', 'asistenteAdministrativo'],
   '/permisos': ['admin', 'tesorero', 'pastorGeneral', 'asistenteAdministrativo'],

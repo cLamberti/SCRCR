@@ -2,7 +2,7 @@
  * Controller para agregar un nuevo asociado
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { AsociadoService } from '@/services/asociado.service';
+import { AsociadoService, AsociadoServiceError } from '@/services/asociado.service';
 import { CrearAsociadoRequest } from '@/dto/asociado.dto';
 import { ZodError } from 'zod';
 
@@ -62,6 +62,17 @@ export async function POST(request: NextRequest) {
           errors: error.issues,
         },
         { status: 400 }
+      );
+    }
+
+    if (error instanceof AsociadoServiceError) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: error.message,
+          errors: error.errors,
+        },
+        { status: error.statusCode || 400 }
       );
     }
 

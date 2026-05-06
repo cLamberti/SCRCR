@@ -35,13 +35,6 @@ const NAV_ITEMS: Omit<NavItem, 'onClick'>[] = [
     roles: ['admin', 'tesorero', 'pastorGeneral'],
   },
   {
-    id: 'registro-asociados',
-    href: '/registro-asociados',
-    icon: FaUserPlus,
-    label: 'Registro Asociados',
-    roles: ['admin', 'pastorGeneral'],
-  },
-  {
     id: 'listado',
     href: '/consulta-asociados',
     icon: FaList,
@@ -88,7 +81,7 @@ const NAV_ITEMS: Omit<NavItem, 'onClick'>[] = [
     href: '/configuracion',
     icon: FaCog,
     label: 'Configuración',
-    roles: ['admin'],
+    roles: ['admin', 'tesorero', 'pastorGeneral'] as Role[],
   },
 ];
 

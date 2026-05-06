@@ -8,6 +8,7 @@ import {
   FaChevronLeft, FaChevronRight, FaExclamationTriangle, 
 FaCalendarAlt
 } from 'react-icons/fa';
+import Swal from 'sweetalert2';
 import { AsociadoResponse } from '@/dto/asociado.dto';
 import Sidebar from '@/components/SideBar';
 
@@ -29,8 +30,11 @@ type AsociadoRow = {
 
 type FormularioEdicion = {
   nombreCompleto: string; cedula: string; correo: string;
-  telefono: string; ministerio: string; direccion: string;
-  fechaIngreso: string; estado: number;
+  telefono: string; telefonoContacto: string; ministerio: string; direccion: string;
+  fechaIngreso: string; fechaNacimiento: string; estadoCivil: string;
+  profesion: string; anosCongregarse: number | ''; fechaAceptacion: string;
+  perteneceJuntaDirectiva: boolean; puestoJuntaDirectiva: string;
+  estado: number; observaciones: string; fechaInactivo: string;
 };
 
 type PageSize = 10 | 25 | 50;
@@ -58,6 +62,7 @@ export default function ConsultarAsociadosPage() {
   const [data,      setData]      = useState<AsociadoRow[]>([]);
   const [loading,   setLoading]   = useState(false);
   const [mensaje,   setMensaje]   = useState('');
+  const [erroresLista, setErroresLista] = useState<string[]>([]);
   const [esError,   setEsError]   = useState(false);
 
   /* Filtros */
@@ -74,8 +79,10 @@ export default function ConsultarAsociadosPage() {
   const [modalEditOpen,     setModalEditOpen]     = useState(false);
   const [asociadoEditando,  setAsociadoEditando]  = useState<AsociadoRow | null>(null);
   const [formulario,        setFormulario]        = useState<FormularioEdicion>({
-    nombreCompleto: '', cedula: '', correo: '', telefono: '',
-    ministerio: '', direccion: '', fechaIngreso: '', estado: 1,
+    nombreCompleto: '', cedula: '', correo: '', telefono: '', telefonoContacto: '',
+    ministerio: '', direccion: '', fechaIngreso: '', fechaNacimiento: '', estadoCivil: 'Soltero(a)',
+    profesion: '', anosCongregarse: '', fechaAceptacion: '', perteneceJuntaDirectiva: false,
+    puestoJuntaDirectiva: '', estado: 1, observaciones: '', fechaInactivo: '',
   });
   const [guardando, setGuardando] = useState(false);
 
@@ -150,7 +157,17 @@ export default function ConsultarAsociadosPage() {
     [data, seleccionados]
   );
 
-  /* ─── Edición ─── */
+  const abrirModalCrear = () => {
+    setAsociadoEditando(null);
+    setFormulario({
+      nombreCompleto: '', cedula: '', correo: '', telefono: '', telefonoContacto: '',
+      ministerio: '', direccion: '', fechaIngreso: '', fechaNacimiento: '', estadoCivil: 'Soltero(a)',
+      profesion: '', anosCongregarse: '', fechaAceptacion: '', perteneceJuntaDirectiva: false,
+      puestoJuntaDirectiva: '', estado: 1, observaciones: '', fechaInactivo: '',
+    });
+    setModalEditOpen(true); setMensaje(''); setErroresLista([]); setEsError(false);
+  };
+
   const abrirModalEdicion = (a: AsociadoRow) => {
     setAsociadoEditando(a);
     setFormulario({
@@ -158,34 +175,58 @@ export default function ConsultarAsociadosPage() {
       cedula:         a.cedula         || '',
       correo:         a.correo         || '',
       telefono:       a.telefono       || '',
+      telefonoContacto: (a as any).telefonoContacto || '',
       ministerio:     a.ministerio     || '',
       direccion:      a.direccion      || '',
       fechaIngreso:   a.fechaIngreso
         ? new Date(a.fechaIngreso).toISOString().split('T')[0]
         : '',
+      fechaNacimiento: (a as any).fechaNacimiento ? new Date((a as any).fechaNacimiento).toISOString().split('T')[0] : '',
+      estadoCivil: (a as any).estadoCivil || 'Soltero(a)',
+      profesion: (a as any).profesion || '',
+      anosCongregarse: (a as any).anosCongregarse || '',
+      fechaAceptacion: (a as any).fechaAceptacion ? new Date((a as any).fechaAceptacion).toISOString().split('T')[0] : '',
+      perteneceJuntaDirectiva: (a as any).perteneceJuntaDirectiva || false,
+      puestoJuntaDirectiva: (a as any).puestoJuntaDirectiva || '',
       estado: a.estado,
+      observaciones: (a as any).observaciones || '',
+      fechaInactivo: (a as any).fechaInactivo
+        ? new Date((a as any).fechaInactivo).toISOString().split('T')[0]
+        : '',
     });
-    setModalEditOpen(true); setMensaje(''); setEsError(false);
+    setModalEditOpen(true); setMensaje(''); setErroresLista([]); setEsError(false);
   };
 
   const guardarCambios = async () => {
-    if (!asociadoEditando) return;
     try {
-      setGuardando(true); setMensaje(''); setEsError(false);
-      const res  = await fetch(`/api/asociados/update?id=${asociadoEditando.id}`, {
-        method: 'PUT',
+      setGuardando(true); setMensaje(''); setErroresLista([]); setEsError(false);
+      
+      const url = asociadoEditando 
+        ? `/api/asociados/update?id=${asociadoEditando.id}`
+        : '/api/asociados';
+      const method = asociadoEditando ? 'PUT' : 'POST';
+
+      const res  = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formulario),
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
-        setMensaje(json.message || 'Error al actualizar'); setEsError(true); return;
+        setMensaje(json.message || 'Error al guardar');
+        setErroresLista(Array.isArray(json.errors) ? json.errors : typeof json.errors === 'string' ? [json.errors] : []);
+        setEsError(true);
+        Swal.fire('Error', json.message || 'Hubo un problema al guardar', 'error');
+        return;
       }
-      setMensaje('Asociado actualizado exitosamente.');
+      
+      Swal.fire('¡Éxito!', asociadoEditando ? 'Asociado actualizado exitosamente.' : 'Asociado registrado exitosamente.', 'success');
       setModalEditOpen(false); setAsociadoEditando(null);
       await cargar();
     } catch (err) {
-      setMensaje(err instanceof Error ? err.message : 'Error de conexión.'); setEsError(true);
+      setMensaje(err instanceof Error ? err.message : 'Error de conexión.'); 
+      setEsError(true);
+      Swal.fire('Error', 'Error de conexión con el servidor', 'error');
     } finally { setGuardando(false); }
   };
 
@@ -255,11 +296,19 @@ export default function ConsultarAsociadosPage() {
             {/* ── Cabecera ── */}
             <div className="flex items-start justify-between mb-1">
               <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-[#003366]">Consultar Asociados</h1>
+                <h1 className="text-xl sm:text-2xl font-bold text-[#003366]">Gestión de Asociados</h1>
                 <div className="w-16 h-1 bg-[#003366] rounded mt-1" />
               </div>
-              <div className="relative w-[80px] h-[55px] hidden sm:block">
-                <Image src="/logo-iglesia.png" alt="Logo" fill className="object-contain" sizes="80px" />
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={abrirModalCrear}
+                  className="inline-flex items-center gap-2 bg-[#003366] hover:bg-[#004488] text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
+                >
+                  <FaUserPlus className="text-xs" /> Nuevo
+                </button>
+                <div className="relative w-[80px] h-[55px] hidden sm:block">
+                  <Image src="/logo-iglesia.png" alt="Logo" fill className="object-contain" sizes="80px" />
+                </div>
               </div>
             </div>
             <p className="text-gray-500 text-sm mb-5">
@@ -267,7 +316,7 @@ export default function ConsultarAsociadosPage() {
             </p>
 
             {/* ── Mensaje global ── */}
-            {mensaje && (
+            {mensaje && !modalEditOpen && (
               <div className={`mb-4 p-3.5 rounded-lg text-sm border ${
                 esError
                   ? 'bg-red-50 text-red-700 border-red-200'
@@ -535,36 +584,109 @@ export default function ConsultarAsociadosPage() {
       </div>
 
       {/* ══════════════════════════════════════════
-          MODAL EDICIÓN
+          MODAL EDICIÓN / CREAR
       ══════════════════════════════════════════ */}
-      {modalEditOpen && asociadoEditando && (
+      {modalEditOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
             <div className="bg-[#003366] text-white px-6 py-4 flex-shrink-0">
               <h2 className="text-base font-bold">
-                Editar Asociado — ID: {asociadoEditando.id}
+                {asociadoEditando ? `Editar Asociado — ID: ${asociadoEditando.id}` : 'Registrar Asociado'}
               </h2>
             </div>
             <div className="p-6 overflow-y-auto flex-1">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {[
-                  { label: 'Nombre Completo *', field: 'nombreCompleto', type: 'text'  },
-                  { label: 'Cédula *',           field: 'cedula',         type: 'text'  },
-                  { label: 'Correo Electrónico', field: 'correo',         type: 'email' },
-                  { label: 'Teléfono',           field: 'telefono',       type: 'text'  },
-                  { label: 'Ministerio',         field: 'ministerio',     type: 'text'  },
-                  { label: 'Fecha de Ingreso',   field: 'fechaIngreso',   type: 'date'  },
-                ].map(({ label, field, type }) => (
-                  <div key={field}>
-                    <label className="block text-gray-700 text-xs font-semibold mb-1.5">{label}</label>
-                    <input
-                      type={type}
-                      value={formulario[field as keyof FormularioEdicion] as string}
-                      onChange={e => setFormulario({ ...formulario, [field]: e.target.value })}
-                      className={inputClass}
-                    />
+              {mensaje && esError && (
+                <div className="mb-4 p-4 rounded-lg text-sm bg-red-50 text-red-700 border border-red-200">
+                  <p className="font-bold mb-1">{mensaje}</p>
+                  {erroresLista.length > 0 && (
+                    <ul className="list-disc pl-5 space-y-1 mt-2">
+                      {erroresLista.map((err, i) => (
+                        <li key={i}>{typeof err === 'object' ? JSON.stringify(err) : err}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+              <form id="asociado-form" onSubmit={(e) => { e.preventDefault(); guardarCambios(); }} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Fila 1 */}
+                <div>
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Nombre Completo *</label>
+                  <input required type="text" value={formulario.nombreCompleto} onChange={e => setFormulario({ ...formulario, nombreCompleto: e.target.value })} className={inputClass} />
+                </div>
+                <div>
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Cédula *</label>
+                  <input required type="text" value={formulario.cedula} onChange={e => setFormulario({ ...formulario, cedula: e.target.value })} className={inputClass} />
+                </div>
+
+                {/* Fila 2 */}
+                <div>
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Correo Electrónico</label>
+                  <input type="email" value={formulario.correo} onChange={e => setFormulario({ ...formulario, correo: e.target.value })} className={inputClass} />
+                </div>
+                <div>
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Teléfono Personal</label>
+                  <input type="text" value={formulario.telefono} onChange={e => setFormulario({ ...formulario, telefono: e.target.value })} className={inputClass} />
+                </div>
+
+                {/* Fila 3 */}
+                <div>
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Teléfono de Contacto (Emergencia)</label>
+                  <input type="text" value={formulario.telefonoContacto} onChange={e => setFormulario({ ...formulario, telefonoContacto: e.target.value })} className={inputClass} />
+                </div>
+                <div>
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Estado Civil</label>
+                  <select value={formulario.estadoCivil} onChange={e => setFormulario({ ...formulario, estadoCivil: e.target.value })} className={inputClass}>
+                    <option value="Soltero(a)">Soltero(a)</option>
+                    <option value="Casado(a)">Casado(a)</option>
+                    <option value="Divorciado(a)">Divorciado(a)</option>
+                    <option value="Viudo(a)">Viudo(a)</option>
+                    <option value="Unión libre">Unión libre</option>
+                  </select>
+                </div>
+
+                {/* Fila 4 */}
+                <div>
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Fecha de Nacimiento</label>
+                  <input type="date" value={formulario.fechaNacimiento} onChange={e => setFormulario({ ...formulario, fechaNacimiento: e.target.value })} className={inputClass} />
+                </div>
+                <div>
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Profesión u Oficio</label>
+                  <input type="text" value={formulario.profesion} onChange={e => setFormulario({ ...formulario, profesion: e.target.value })} className={inputClass} />
+                </div>
+
+                {/* Fila 5 */}
+                <div>
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Años de Congregarse</label>
+                  <input type="number" value={formulario.anosCongregarse} onChange={e => setFormulario({ ...formulario, anosCongregarse: e.target.value === '' ? '' : Number(e.target.value) })} className={inputClass} min="0" />
+                </div>
+                <div>
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Fecha de Aceptación (Asociado)</label>
+                  <input type="date" value={formulario.fechaAceptacion} onChange={e => setFormulario({ ...formulario, fechaAceptacion: e.target.value })} className={inputClass} />
+                </div>
+
+                {/* Fila 6 */}
+                <div>
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Ministerio</label>
+                  <input type="text" value={formulario.ministerio} onChange={e => setFormulario({ ...formulario, ministerio: e.target.value })} className={inputClass} />
+                </div>
+                <div>
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Fecha de Ingreso (Congregación)</label>
+                  <input type="date" value={formulario.fechaIngreso} onChange={e => setFormulario({ ...formulario, fechaIngreso: e.target.value })} className={inputClass} />
+                </div>
+
+                {/* Fila 7 */}
+                <div className="flex items-center gap-2 mt-4">
+                  <input type="checkbox" id="junta" checked={formulario.perteneceJuntaDirectiva} onChange={e => setFormulario({ ...formulario, perteneceJuntaDirectiva: e.target.checked })} className="w-4 h-4 accent-[#003366] rounded" />
+                  <label htmlFor="junta" className="text-gray-700 text-xs font-semibold">¿Pertenece a la Junta Directiva?</label>
+                </div>
+                {formulario.perteneceJuntaDirectiva && (
+                  <div>
+                    <label className="block text-gray-700 text-xs font-semibold mb-1.5">Puesto en Junta Directiva</label>
+                    <input type="text" value={formulario.puestoJuntaDirectiva} onChange={e => setFormulario({ ...formulario, puestoJuntaDirectiva: e.target.value })} className={inputClass} />
                   </div>
-                ))}
+                )}
+
+                {/* Fila 8 */}
                 <div>
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Estado</label>
                   <select
@@ -576,6 +698,16 @@ export default function ConsultarAsociadosPage() {
                     <option value={0}>Inactivo</option>
                   </select>
                 </div>
+                {formulario.estado === 0 && (
+                  <div>
+                    <label className="block text-gray-700 text-xs font-semibold mb-1.5">Fecha de Inactivo</label>
+                    <input
+                      type="date" value={formulario.fechaInactivo}
+                      onChange={e => setFormulario({ ...formulario, fechaInactivo: e.target.value })}
+                      className={inputClass}
+                    />
+                  </div>
+                )}
                 <div className="sm:col-span-2">
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Dirección</label>
                   <input
@@ -584,7 +716,17 @@ export default function ConsultarAsociadosPage() {
                     className={inputClass}
                   />
                 </div>
-              </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Observaciones</label>
+                  <textarea
+                    value={formulario.observaciones}
+                    onChange={e => setFormulario({ ...formulario, observaciones: e.target.value })}
+                    rows={3}
+                    placeholder="Notas adicionales sobre el asociado..."
+                    className={inputClass + ' resize-none'}
+                  />
+                </div>
+              </form>
             </div>
             <div className="bg-gray-50 border-t px-6 py-4 flex justify-end gap-3 flex-shrink-0">
               <button
@@ -595,12 +737,12 @@ export default function ConsultarAsociadosPage() {
                 Cancelar
               </button>
               <button
-                onClick={guardarCambios} disabled={guardando}
+                type="submit" form="asociado-form" disabled={guardando}
                 className={`px-5 py-2 text-sm rounded-lg font-semibold text-white transition-colors ${
                   guardando ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#003366] hover:bg-[#004488]'
                 }`}
               >
-                {guardando ? 'Guardando...' : 'Guardar cambios'}
+                {guardando ? 'Guardando...' : (asociadoEditando ? 'Guardar cambios' : 'Registrar')}
               </button>
             </div>
           </div>

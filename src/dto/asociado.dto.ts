@@ -1,60 +1,75 @@
 import { EstadoAsociado } from '@/models/Asociado';
 
-/**
- * DTO para crear un nuevo asociado
- */
 export interface CrearAsociadoRequest {
   nombreCompleto: string;
   cedula: string;
   correo?: string;
   telefono?: string;
+  telefonoContacto?: string;
   ministerio?: string;
   direccion?: string;
-  fechaIngreso?: string; // ISO string format
+  fechaIngreso?: string;
+  fechaNacimiento?: string;
+  estadoCivil?: string;
+  profesion?: string;
+  anosCongregarse?: number;
+  fechaAceptacion?: string;
+  perteneceJuntaDirectiva?: boolean;
+  puestoJuntaDirectiva?: string;
   estado?: EstadoAsociado;
+  observaciones?: string;
+  fechaInactivo?: string;
 }
 
-/**
- * DTO para actualizar un asociado existente
- */
 export interface ActualizarAsociadoRequest {
   nombreCompleto?: string;
   cedula?: string;
   correo?: string;
   telefono?: string;
+  telefonoContacto?: string;
   ministerio?: string;
   direccion?: string;
-  fechaIngreso?: string; // ISO string format
+  fechaIngreso?: string;
+  fechaNacimiento?: string;
+  estadoCivil?: string;
+  profesion?: string;
+  anosCongregarse?: number;
+  fechaAceptacion?: string;
+  perteneceJuntaDirectiva?: boolean;
+  puestoJuntaDirectiva?: string;
   estado?: EstadoAsociado;
+  observaciones?: string;
+  fechaInactivo?: string;
 }
 
-/**
- * DTO para la respuesta del servidor
- */
 export interface AsociadoResponse {
   id: number;
   nombreCompleto: string;
   cedula: string;
   correo?: string;
   telefono?: string;
+  telefonoContacto?: string;
   ministerio?: string;
   direccion?: string;
-  fechaIngreso: string; // ISO string format
+  fechaIngreso: string;
+  fechaNacimiento?: string;
+  estadoCivil?: string;
+  profesion?: string;
+  anosCongregarse?: number;
+  fechaAceptacion?: string;
+  perteneceJuntaDirectiva: boolean;
+  puestoJuntaDirectiva?: string;
   estado: number;
+  observaciones?: string;
+  fechaInactivo?: string;
 }
 
-/**
- * DTO para respuesta con mensaje
- */
 export interface AsociadoResponseWithMessage {
   success: boolean;
   message: string;
   data?: AsociadoResponse;
 }
 
-/**
- * DTO para listado de asociados con paginación
- */
 export interface ListarAsociadosResponse {
   success: boolean;
   data: AsociadoResponse[];
@@ -66,18 +81,12 @@ export interface ListarAsociadosResponse {
   };
 }
 
-/**
- * DTO para la respuesta de un listado SIN paginación de asociados
- */
 export interface AllAsociadosResponse {
   success: boolean;
   data: AsociadoResponse[];
   message?: string;
 }
 
-/**
- * DTO para filtros de búsqueda
- */
 export interface FiltrosAsociadoRequest {
   nombreCompleto?: string;
   cedula?: string;
@@ -89,20 +98,14 @@ export interface FiltrosAsociadoRequest {
   limit?: number;
 }
 
-/**
- * DTO para eliminar (delete) un asociado
- */
 export interface DeleteAsociadoRequest {
-  id: number; // ID del asociado a eliminar
-  permanente?: boolean; // Si es true, se elimina definitivamente (hard delete)
+  id: number;
+  permanente?: boolean;
 }
 
-/**
- * DTO para respuesta de eliminación de asociado
- */
 export interface DeleteAsociadoResponse {
   success: boolean;
   message: string;
-  id?: number; // ID eliminado (opcional)
-  permanente?: boolean; // Indica si fue hard delete
+  id?: number;
+  permanente?: boolean;
 }

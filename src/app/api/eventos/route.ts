@@ -5,7 +5,18 @@ import {
   ListarEventosResponse,
 } from "@/dto/evento.dto";
 import { EventoValidator } from "@/validators/evento.validator";
-import { db } from "@/lib/db";
+import { prisma } from "@/lib/db";
+import { Prisma } from "@prisma/client";
+
+function mapEventoToResponse(evento: any): EventoResponse {
+  return {
+    ...evento,
+    fecha: evento.fecha instanceof Date ? evento.fecha.toISOString().split('T')[0] : evento.fecha,
+    hora: evento.hora instanceof Date ? evento.hora.toISOString().split('T')[1].substring(0, 8) : evento.hora,
+    created_at: evento.createdAt ? evento.createdAt.toISOString() : evento.created_at,
+    updated_at: evento.updatedAt ? evento.updatedAt.toISOString() : evento.updated_at,
+  };
+}
 
 /**
  * GET /api/eventos - Listar eventos con filtros y paginación
@@ -23,43 +34,34 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "10", 10);
     const offset = (page - 1) * limit;
 
-    let query = "SELECT * FROM eventos WHERE 1=1";
-    const params: any[] = [];
-    let i = 1;
+    const where: Prisma.EventoWhereInput = {};
 
     if (nombre) {
-      query += ` AND nombre ILIKE $${i}`;
-      params.push(`%${nombre}%`);
-      i++;
+      where.nombre = { contains: nombre, mode: 'insensitive' };
     }
-    if (fechaDesde) {
-      query += ` AND fecha >= $${i}`;
-      params.push(fechaDesde);
-      i++;
-    }
-    if (fechaHasta) {
-      query += ` AND fecha <= $${i}`;
-      params.push(fechaHasta);
-      i++;
+    if (fechaDesde || fechaHasta) {
+      where.fecha = {};
+      if (fechaDesde) where.fecha.gte = new Date(fechaDesde);
+      if (fechaHasta) where.fecha.lte = new Date(fechaHasta);
     }
     if (typeof activo === "boolean") {
-      query += ` AND activo = $${i}`;
-      params.push(activo);
-      i++;
+      where.activo = activo;
     }
 
-    const countQuery = query.replace("SELECT *", "SELECT COUNT(*)");
-    const countResult = await db.query(countQuery, params);
-    const total = parseInt(countResult.rows[0].count, 10);
-
-    query += ` ORDER BY fecha DESC, hora DESC NULLS LAST LIMIT $${i} OFFSET $${i + 1}`;
-    params.push(limit, offset);
-
-    const result = await db.query(query, params);
+    const total = await prisma.evento.count({ where });
+    const eventos = await prisma.evento.findMany({
+      where,
+      orderBy: [
+        { fecha: 'desc' },
+        { hora: 'desc' }
+      ],
+      take: limit,
+      skip: offset,
+    });
 
     const response: ListarEventosResponse = {
       success: true,
-      data: result.rows,
+      data: eventos.map(mapEventoToResponse),
       pagination: {
         page,
         limit,
@@ -96,13 +98,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Duplicados (nombre+fecha, solo activos)
-    const dup = await db.query(
-      `SELECT id FROM eventos 
-       WHERE lower(nombre) = lower($1) AND fecha = $2 AND activo = true 
-       LIMIT 1`,
-      [data.nombre, data.fecha]
-    );
-    if (dup.rows.length > 0) {
+    const dup = await prisma.evento.findFirst({
+      where: {
+        nombre: { equals: data.nombre, mode: 'insensitive' },
+        fecha: new Date(data.fecha),
+        activo: true
+      }
+    });
+
+    if (dup) {
       return NextResponse.json(
         {
           success: false,
@@ -112,44 +116,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const insertSQL = `
-      INSERT INTO eventos (nombre, descripcion, fecha, hora, activo, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      RETURNING *
-    `;
-
     const descripcionValue =
       data.descripcion !== undefined && data.descripcion !== null
         ? data.descripcion
         : null;
 
-    const horaValue =
-      data.hora !== undefined && data.hora !== null ? data.hora : null;
+    const horaValue = data.hora ? new Date(`1970-01-01T${data.hora}Z`) : new Date('1970-01-01T00:00:00Z');
+    const activoValue = typeof data.activo === "boolean" ? data.activo : true;
 
-    const activoValue =
-      typeof data.activo === "boolean" ? data.activo : true;
-
-    const values = [
-      data.nombre,
-      descripcionValue,
-      data.fecha,
-      horaValue,
-      activoValue,
-    ];
-
-    const result = await db.query(insertSQL, values);
-    const evento: EventoResponse = result.rows[0];
+    const evento = await prisma.evento.create({
+      data: {
+        nombre: data.nombre,
+        descripcion: descripcionValue,
+        fecha: new Date(data.fecha),
+        hora: horaValue,
+        activo: activoValue,
+      }
+    });
 
     return NextResponse.json(
-      { success: true, message: "Evento creado exitosamente", data: evento },
+      { success: true, message: "Evento creado exitosamente", data: mapEventoToResponse(evento) },
       { status: 201 }
     );
   } catch (error: any) {
-    const msg = error?.message || "";
-    if (
-      msg.includes("uq_eventos_nombre_fecha") ||
-      msg.includes("uq_eventos_nombre_fecha_activo")
-    ) {
+    if (error?.code === 'P2002') {
       return NextResponse.json(
         {
           success: false,

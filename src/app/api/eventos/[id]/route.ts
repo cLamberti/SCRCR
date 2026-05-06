@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ActualizarEventoRequest, EventoResponse } from "@/dto/evento.dto";
 import { EventoValidator } from "@/validators/evento.validator";
-import { db } from "@/lib/db";
+import { prisma } from "@/lib/db";
+
+function mapEventoToResponse(evento: any): EventoResponse {
+  return {
+    ...evento,
+    fecha: evento.fecha instanceof Date ? evento.fecha.toISOString().split('T')[0] : evento.fecha,
+    hora: evento.hora instanceof Date ? evento.hora.toISOString().split('T')[1].substring(0, 8) : evento.hora,
+    created_at: evento.createdAt ? evento.createdAt.toISOString() : evento.created_at,
+    updated_at: evento.updatedAt ? evento.updatedAt.toISOString() : evento.updated_at,
+  };
+}
 
 /** GET /api/eventos/[id] */
 export async function GET(
@@ -19,16 +29,18 @@ export async function GET(
       );
     }
 
-    const result = await db.query("SELECT * FROM eventos WHERE id = $1", [id]);
-    if (result.rows.length === 0) {
+    const evento = await prisma.evento.findUnique({
+      where: { id }
+    });
+
+    if (!evento) {
       return NextResponse.json(
         { success: false, message: "Evento no encontrado" },
         { status: 404 }
       );
     }
 
-    const evento: EventoResponse = result.rows[0];
-    return NextResponse.json({ success: true, data: evento });
+    return NextResponse.json({ success: true, data: mapEventoToResponse(evento) });
   } catch (error) {
     console.error("Error al obtener evento:", error);
     return NextResponse.json(
@@ -54,14 +66,16 @@ export async function PUT(
       );
     }
 
-    const cur = await db.query("SELECT * FROM eventos WHERE id = $1", [id]);
-    if (cur.rows.length === 0) {
+    const actual = await prisma.evento.findUnique({
+      where: { id }
+    });
+
+    if (!actual) {
       return NextResponse.json(
         { success: false, message: "Evento no encontrado" },
         { status: 404 }
       );
     }
-    const actual = cur.rows[0];
 
     const raw: ActualizarEventoRequest = await request.json();
     const data = EventoValidator.sanitizarDatos(raw);
@@ -74,26 +88,24 @@ export async function PUT(
     }
 
     const nombre = data.nombre !== undefined ? data.nombre : actual.nombre;
-    const descripcion =
-      data.descripcion !== undefined ? data.descripcion : actual.descripcion;
-    const fecha = data.fecha !== undefined ? data.fecha : actual.fecha;
-    const horaFinal =
-      data.hora !== undefined
-        ? data.hora !== null
-          ? data.hora
-          : null
-        : actual.hora;
-    const activo =
-      data.activo !== undefined ? Boolean(data.activo) : actual.activo;
+    const descripcion = data.descripcion !== undefined ? data.descripcion : actual.descripcion;
+    const fecha = data.fecha !== undefined ? new Date(data.fecha) : actual.fecha;
+    const horaFinal = data.hora !== undefined 
+      ? (data.hora !== null ? new Date(`1970-01-01T${data.hora}Z`) : null) 
+      : actual.hora;
+    const activo = data.activo !== undefined ? Boolean(data.activo) : actual.activo;
 
     // duplicados contra otros activos
-    const dup = await db.query(
-      `SELECT id FROM eventos 
-       WHERE lower(nombre) = lower($1) AND fecha = $2 AND activo = true AND id <> $3
-       LIMIT 1`,
-      [nombre, fecha, id]
-    );
-    if (dup.rows.length > 0) {
+    const dup = await prisma.evento.findFirst({
+      where: {
+        nombre: { equals: nombre, mode: 'insensitive' },
+        fecha: fecha,
+        activo: true,
+        id: { not: id }
+      }
+    });
+
+    if (dup) {
       return NextResponse.json(
         {
           success: false,
@@ -103,64 +115,32 @@ export async function PUT(
       );
     }
 
-    const campos: string[] = [];
-    const valores: any[] = [];
-    let i = 1;
+    const updateData: any = {};
+    if (data.nombre !== undefined) updateData.nombre = nombre;
+    if (data.descripcion !== undefined) updateData.descripcion = descripcion;
+    if (data.fecha !== undefined) updateData.fecha = fecha;
+    if (data.hora !== undefined) updateData.hora = horaFinal;
+    if (data.activo !== undefined) updateData.activo = activo;
 
-    if (data.nombre !== undefined) {
-      campos.push(`nombre = $${i}`);
-      valores.push(nombre);
-      i++;
-    }
-    if (data.descripcion !== undefined) {
-      campos.push(`descripcion = $${i}`);
-      valores.push(descripcion);
-      i++;
-    }
-    if (data.fecha !== undefined) {
-      campos.push(`fecha = $${i}`);
-      valores.push(fecha);
-      i++;
-    }
-    if (data.hora !== undefined) {
-      campos.push(`hora = $${i}`);
-      valores.push(horaFinal);
-      i++;
-    }
-    if (data.activo !== undefined) {
-      campos.push(`activo = $${i}`);
-      valores.push(activo);
-      i++;
-    }
-
-    if (campos.length === 0) {
+    if (Object.keys(updateData).length === 0) {
       return NextResponse.json(
         { success: false, message: "No hay campos para actualizar" },
         { status: 400 }
       );
     }
 
-    campos.push("updated_at = CURRENT_TIMESTAMP");
-    const sql = `
-      UPDATE eventos 
-      SET ${campos.join(", ")}
-      WHERE id = $${i}
-      RETURNING *
-    `;
-    valores.push(id);
+    const result = await prisma.evento.update({
+      where: { id },
+      data: updateData
+    });
 
-    const result = await db.query(sql, valores);
     return NextResponse.json({
       success: true,
       message: "Evento actualizado exitosamente",
-      data: result.rows[0],
+      data: mapEventoToResponse(result),
     });
   } catch (error: any) {
-    const msg = error?.message || "";
-    if (
-      msg.includes("uq_eventos_nombre_fecha") ||
-      msg.includes("uq_eventos_nombre_fecha_activo")
-    ) {
+    if (error?.code === 'P2002') {
       return NextResponse.json(
         {
           success: false,
@@ -194,26 +174,28 @@ export async function DELETE(
       );
     }
 
-    const check = await db.query("SELECT id FROM eventos WHERE id = $1", [id]);
-    if (check.rows.length === 0) {
+    const actual = await prisma.evento.findUnique({
+      where: { id }
+    });
+
+    if (!actual) {
       return NextResponse.json(
         { success: false, message: "Evento no encontrado" },
         { status: 404 }
       );
     }
 
-    const result = await db.query(
-      `UPDATE eventos 
-       SET activo = false, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $1
-       RETURNING *`,
-      [id]
-    );
+    const result = await prisma.evento.update({
+      where: { id },
+      data: {
+        activo: false
+      }
+    });
 
     return NextResponse.json({
       success: true,
       message: "Evento eliminado exitosamente",
-      data: result.rows[0],
+      data: mapEventoToResponse(result),
     });
   } catch (error) {
     console.error("Error al eliminar evento:", error);

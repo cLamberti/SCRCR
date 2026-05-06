@@ -42,6 +42,11 @@ model Congregado {
   segundoMinisterio String?  @map("segundo_ministerio") @db.VarChar(50)
   urlFotoCedula     String   @map("url_foto_cedula")
   estado            Int      @default(1) @db.SmallInt
+  observaciones     String?
+  fechaNacimiento   DateTime? @map("fecha_nacimiento")
+  correo            String?   @db.VarChar(100)
+  profesion         String?   @db.VarChar(100)
+  direccion         String?
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
 
@@ -49,19 +54,29 @@ model Congregado {
 }
 
 model Asociado {
-  id             Int                 @id @default(autoincrement())
-  nombreCompleto String              @map("nombre_completo") @db.VarChar(100)
-  cedula         String              @unique @db.VarChar(20)
-  correo         String?             @db.VarChar(100)
-  telefono       String?             @db.VarChar(20)
-  ministerio     String?             @db.VarChar(50)
-  direccion      String?
-  fechaIngreso   DateTime            @default(now()) @map("fecha_ingreso")
-  estado         Int                 @default(1) @db.SmallInt
-  createdAt      DateTime?           @default(now()) @map("created_at")
-  updatedAt      DateTime?           @default(now()) @updatedAt @map("updated_at")
-  asistencias    Asistencia[]
-  reportes       ReporteAsistencia[]
+  id                      Int                 @id @default(autoincrement())
+  nombreCompleto          String              @map("nombre_completo") @db.VarChar(100)
+  cedula                  String              @unique @db.VarChar(20)
+  correo                  String?             @db.VarChar(100)
+  telefono                String?             @db.VarChar(20)
+  telefonoContacto        String?             @map("telefono_contacto") @db.VarChar(20)
+  ministerio              String?             @db.VarChar(50)
+  direccion               String?
+  fechaIngreso            DateTime            @default(now()) @map("fecha_ingreso")
+  fechaNacimiento         DateTime?           @map("fecha_nacimiento")
+  estadoCivil             String?             @map("estado_civil") @db.VarChar(30)
+  profesion               String?             @db.VarChar(100)
+  anosCongregarse         Int?                @map("anos_congregarse")
+  fechaAceptacion         DateTime?           @map("fecha_aceptacion")
+  perteneceJuntaDirectiva Boolean             @default(false) @map("pertenece_junta_directiva")
+  puestoJuntaDirectiva    String?             @map("puesto_junta_directiva") @db.VarChar(50)
+  estado                  Int                 @default(1) @db.SmallInt
+  observaciones           String?
+  fechaInactivo           DateTime?           @map("fecha_inactivo")
+  createdAt               DateTime?           @default(now()) @map("created_at")
+  updatedAt               DateTime?           @default(now()) @updatedAt @map("updated_at")
+  asistencias             Asistencia[]
+  reportes                ReporteAsistencia[]
 
   @@map("asociados")
 }

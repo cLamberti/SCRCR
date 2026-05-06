@@ -30,6 +30,11 @@ export interface Congregado {
     segundoMinisterio?: string;   // Opcional
     urlFotoCedula: string;
     estado: EstadoCongregado;      // 1=activo, 0=inactivo (soft delete, esquema DB07)
+    observaciones?: string;
+    fechaNacimiento?: Date;
+    correo?: string;
+    profesion?: string;
+    direccion?: string;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -46,6 +51,11 @@ export class CongregadoModel implements Congregado {
     segundoMinisterio?: string;
     urlFotoCedula: string;
     estado: EstadoCongregado;
+    observaciones?: string;
+    fechaNacimiento?: Date;
+    correo?: string;
+    profesion?: string;
+    direccion?: string;
     createdAt: Date;
     updatedAt: Date;
 
@@ -61,6 +71,11 @@ export class CongregadoModel implements Congregado {
         this.segundoMinisterio = data.segundoMinisterio;
         this.urlFotoCedula = data.urlFotoCedula ?? '';
         this.estado = data.estado ?? EstadoCongregado.ACTIVO;
+        this.observaciones = data.observaciones;
+        this.fechaNacimiento = data.fechaNacimiento;
+        this.correo = data.correo;
+        this.profesion = data.profesion;
+        this.direccion = data.direccion;
         this.createdAt = data.createdAt ?? new Date();
         this.updatedAt = data.updatedAt ?? new Date();
     }
@@ -94,6 +109,11 @@ export class CongregadoModel implements Congregado {
             segundoMinisterio: this.segundoMinisterio,
             urlFotoCedula: this.urlFotoCedula,
             estado: this.estado,
+            observaciones: this.observaciones,
+            fechaNacimiento: this.fechaNacimiento,
+            correo: this.correo,
+            profesion: this.profesion,
+            direccion: this.direccion,
             createdAt: this.createdAt,
             updatedAt: this.updatedAt,
         };

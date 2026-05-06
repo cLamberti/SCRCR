@@ -38,6 +38,11 @@ function mapToCongregado(row: any): Congregado {
     segundoMinisterio: row.segundoMinisterio ?? undefined,
     urlFotoCedula: row.urlFotoCedula,
     estado: row.estado as EstadoCongregado,
+    observaciones: row.observaciones ?? undefined,
+    fechaNacimiento: row.fechaNacimiento ?? undefined,
+    correo: row.correo ?? undefined,
+    profesion: row.profesion ?? undefined,
+    direccion: row.direccion ?? undefined,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
@@ -58,6 +63,11 @@ export class CongregadoDAO {
           segundoMinisterio: data.segundoMinisterio ?? null,
           urlFotoCedula: data.urlFotoCedula,
           estado: data.estado ?? EstadoCongregado.ACTIVO,
+          observaciones: data.observaciones ?? null,
+          fechaNacimiento: data.fechaNacimiento ? new Date(data.fechaNacimiento) : null,
+          correo: data.correo ?? null,
+          profesion: data.profesion ?? null,
+          direccion: data.direccion ?? null,
         },
       });
       return mapToCongregado(row);
@@ -154,6 +164,11 @@ export class CongregadoDAO {
           segundoMinisterio: data.segundoMinisterio === null ? null : (data.segundoMinisterio ?? existente.segundoMinisterio ?? null),
           urlFotoCedula: data.urlFotoCedula ?? existente.urlFotoCedula,
           estado: data.estado ?? existente.estado,
+          observaciones: data.observaciones === null ? null : (data.observaciones ?? existente.observaciones ?? null),
+          fechaNacimiento: data.fechaNacimiento === null ? null : (data.fechaNacimiento ? new Date(data.fechaNacimiento) : (existente.fechaNacimiento ?? null)),
+          correo: data.correo === null ? null : (data.correo ?? existente.correo ?? null),
+          profesion: data.profesion === null ? null : (data.profesion ?? existente.profesion ?? null),
+          direccion: data.direccion === null ? null : (data.direccion ?? existente.direccion ?? null),
         },
       });
       return mapToCongregado(row);
