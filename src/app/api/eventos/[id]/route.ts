@@ -150,10 +150,19 @@ export async function PUT(
     valores.push(id);
 
     const result = await db.query(sql, valores);
+    const eventoActualizado = result.rows[0];
+
+    // Auditoría
+    try {
+      const { AuditoriaDAO } = require("@/dao/auditoria.dao");
+      const desc = data.activo === false ? `Evento desactivado: ${eventoActualizado.nombre}` : `Evento actualizado: ${eventoActualizado.nombre}`;
+      await AuditoriaDAO.registrar('eventos', id, data.activo === false ? 'eliminacion' : 'edicion', desc);
+    } catch (e) { console.error("Error auditando evento", e); }
+
     return NextResponse.json({
       success: true,
       message: "Evento actualizado exitosamente",
-      data: result.rows[0],
+      data: eventoActualizado,
     });
   } catch (error: any) {
     const msg = error?.message || "";
@@ -210,10 +219,18 @@ export async function DELETE(
       [id]
     );
 
+    const eventoEliminado = result.rows[0];
+
+    // Auditoría
+    try {
+      const { AuditoriaDAO } = require("@/dao/auditoria.dao");
+      await AuditoriaDAO.registrar('eventos', id, 'eliminacion', `Evento eliminado (Inactivo): ${eventoEliminado.nombre}`);
+    } catch (e) { console.error("Error auditando evento", e); }
+
     return NextResponse.json({
       success: true,
       message: "Evento eliminado exitosamente",
-      data: result.rows[0],
+      data: eventoEliminado,
     });
   } catch (error) {
     console.error("Error al eliminar evento:", error);

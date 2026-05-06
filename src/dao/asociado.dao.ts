@@ -1,10 +1,11 @@
-import { prisma } from '@/lib/prisma';
+import { neon } from '@neondatabase/serverless';
 import {
   CrearAsociadoRequest,
   ActualizarAsociadoRequest,
   FiltrosAsociadoRequest,
 } from '@/dto/asociado.dto';
 import { Asociado, AsociadoModel } from '@/models/Asociado';
+import { AuditoriaDAO } from './auditoria.dao';
 
 export interface PaginacionResultado<T> {
   data: T[];
@@ -25,39 +26,53 @@ export class AsociadoDAOError extends Error {
   }
 }
 
-function mapToAsociado(row: any): Asociado {
-  return new AsociadoModel({
-    id: row.id,
-    nombreCompleto: row.nombreCompleto,
-    cedula: row.cedula,
-    correo: row.correo ?? undefined,
-    telefono: row.telefono ?? undefined,
-    ministerio: row.ministerio ?? undefined,
-    direccion: row.direccion ?? undefined,
-    fechaIngreso: row.fechaIngreso,
-    estado: row.estado,
-  });
-}
-
 export class AsociadoDAO {
+  private sql: ReturnType<typeof neon>;
+
+  constructor(connectionString?: string) {
+    const url = connectionString || process.env.POSTGRES_URL || '';
+    this.sql = neon(url);
+  }
+
+  private mapRowToAsociado(row: any): Asociado {
+    return new AsociadoModel({
+      id:             row.id,
+      nombreCompleto: row.nombre_completo,
+      cedula:         row.cedula,
+      correo:         row.correo,
+      telefono:       row.telefono,
+      ministerio:     row.ministerio,
+      direccion:      row.direccion,
+      fechaIngreso:   row.fecha_ingreso,
+      estado:         row.estado,
+    });
+  }
+
   async crear(data: CrearAsociadoRequest): Promise<Asociado> {
     try {
-      const row = await prisma.asociado.create({
-        data: {
-          nombreCompleto: data.nombreCompleto,
-          cedula: data.cedula,
-          correo: data.correo ?? null,
-          telefono: data.telefono ?? null,
-          ministerio: data.ministerio ?? null,
-          direccion: data.direccion ?? null,
-          fechaIngreso: data.fechaIngreso ? new Date(data.fechaIngreso) : new Date(),
-          estado: data.estado ?? 1,
-        },
-      });
-      return mapToAsociado(row);
+      const result = await this.sql`
+        INSERT INTO asociados (
+          nombre_completo, cedula, correo, telefono,
+          ministerio, direccion, fecha_ingreso, estado
+        ) VALUES (
+          ${data.nombreCompleto},
+          ${data.cedula},
+          ${data.correo      || null},
+          ${data.telefono    || null},
+          ${data.ministerio  || null},
+          ${data.direccion   || null},
+          ${data.fechaIngreso ? new Date(data.fechaIngreso) : new Date()},
+          ${data.estado ?? 1}
+        )
+        RETURNING *
+      ` as any[];
+
+      const asociado = this.mapRowToAsociado(result[0]);
+      await AuditoriaDAO.registrar('asociados', asociado.id, 'creacion', 'Registro inicial del asociado');
+      return asociado;
     } catch (error: any) {
       if (error instanceof AsociadoDAOError) throw error;
-      if (error.code === 'P2002') {
+      if (error.code === '23505') {
         throw new AsociadoDAOError('Ya existe un asociado con esta cédula', 'DUPLICATE_KEY', error);
       }
       throw new AsociadoDAOError('Error al crear el asociado en la base de datos', 'DATABASE_ERROR', error);
@@ -66,8 +81,9 @@ export class AsociadoDAO {
 
   async obtenerPorId(id: number): Promise<Asociado | null> {
     try {
-      const row = await prisma.asociado.findUnique({ where: { id } });
-      return row ? mapToAsociado(row) : null;
+      // this.sql es la instancia correcta; sin this. falla en runtime
+      const result = await this.sql`SELECT * FROM asociados WHERE id = ${id}` as any[];
+      return result.length ? this.mapRowToAsociado(result[0]) : null;
     } catch (error) {
       throw new AsociadoDAOError('Error al obtener el asociado por ID', 'DATABASE_ERROR', error);
     }
@@ -75,8 +91,10 @@ export class AsociadoDAO {
 
   async obtenerPorCedula(cedula: string): Promise<Asociado | null> {
     try {
-      const row = await prisma.asociado.findUnique({ where: { cedula } });
-      return row ? mapToAsociado(row) : null;
+      const result = await this.sql`
+        SELECT * FROM asociados WHERE cedula = ${cedula}
+      ` as any[];
+      return result.length ? this.mapRowToAsociado(result[0]) : null;
     } catch (error) {
       throw new AsociadoDAOError('Error al obtener el asociado por cédula', 'DATABASE_ERROR', error);
     }
@@ -91,33 +109,54 @@ export class AsociadoDAO {
     try {
       const offset = (page - 1) * limit;
 
-      const where: any = {};
-      if (estado !== undefined) where.estado = estado;
-      if (filtros?.nombreCompleto) where.nombreCompleto = { contains: filtros.nombreCompleto, mode: 'insensitive' };
-      if (filtros?.cedula) where.cedula = { contains: filtros.cedula, mode: 'insensitive' };
-      if (filtros?.ministerio) where.ministerio = { contains: filtros.ministerio, mode: 'insensitive' };
-      if (filtros?.fechaIngresoDesde || filtros?.fechaIngresoHasta) {
-        where.fechaIngreso = {};
-        if (filtros.fechaIngresoDesde) where.fechaIngreso.gte = new Date(filtros.fechaIngresoDesde);
-        if (filtros.fechaIngresoHasta) where.fechaIngreso.lte = new Date(filtros.fechaIngresoHasta);
+      const conditions: string[] = [];
+      const values: any[]        = [];
+
+      if (estado !== undefined) {
+        values.push(estado);
+        conditions.push(`estado = $${values.length}`);
+      }
+      if (filtros?.nombreCompleto) {
+        values.push(`%${filtros.nombreCompleto}%`);
+        conditions.push(`nombre_completo ILIKE $${values.length}`);
+      }
+      if (filtros?.cedula) {
+        values.push(`%${filtros.cedula}%`);
+        conditions.push(`cedula ILIKE $${values.length}`);
+      }
+      if (filtros?.ministerio) {
+        values.push(`%${filtros.ministerio}%`);
+        conditions.push(`ministerio ILIKE $${values.length}`);
+      }
+      if (filtros?.fechaIngresoDesde) {
+        values.push(new Date(filtros.fechaIngresoDesde));
+        conditions.push(`fecha_ingreso >= $${values.length}`);
+      }
+      if (filtros?.fechaIngresoHasta) {
+        values.push(new Date(filtros.fechaIngresoHasta));
+        conditions.push(`fecha_ingreso <= $${values.length}`);
       }
 
-      const [total, rows] = await Promise.all([
-        prisma.asociado.count({ where }),
-        prisma.asociado.findMany({
-          where,
-          orderBy: { id: 'desc' },
-          skip: offset,
-          take: limit,
-        }),
-      ]);
+      const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+            const dataResult = await this.sql.query(
+        `SELECT * FROM asociados ${where} ORDER BY id DESC LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
+        [...values, limit, offset]
+      ) as { rows: any[] };
+
+      const countResult = await this.sql.query(
+        `SELECT COUNT(*) as count FROM asociados ${where}`,
+        values
+      ) as { rows: any[] };
+      const total      = parseInt(countResult.rows[0].count);
+      const totalPages = Math.max(1, Math.ceil(total / limit));
 
       return {
-        data: rows.map(mapToAsociado),
+        data: dataResult.rows.map((row: any) => this.mapRowToAsociado(row)),
         total,
         page,
         limit,
-        totalPages: Math.max(1, Math.ceil(total / limit)),
+        totalPages,
       };
     } catch (error) {
       throw new AsociadoDAOError('Error al obtener la lista de asociados', 'DATABASE_ERROR', error);
@@ -127,25 +166,32 @@ export class AsociadoDAO {
   async actualizar(id: number, data: ActualizarAsociadoRequest): Promise<Asociado> {
     try {
       const existente = await this.obtenerPorId(id);
-      if (!existente) throw new AsociadoDAOError('Asociado no encontrado', 'NOT_FOUND');
+      if (!existente) {
+        throw new AsociadoDAOError('Asociado no encontrado', 'NOT_FOUND');
+      }
 
-      const row = await prisma.asociado.update({
-        where: { id },
-        data: {
-          nombreCompleto: data.nombreCompleto ?? existente.nombreCompleto,
-          cedula: data.cedula ?? existente.cedula,
-          correo: data.correo ?? existente.correo ?? null,
-          telefono: data.telefono ?? existente.telefono ?? null,
-          ministerio: data.ministerio ?? existente.ministerio ?? null,
-          direccion: data.direccion ?? existente.direccion ?? null,
-          fechaIngreso: data.fechaIngreso ? new Date(data.fechaIngreso) : existente.fechaIngreso,
-          estado: data.estado ?? existente.estado,
-        },
-      });
-      return mapToAsociado(row);
+      const result = await this.sql`
+        UPDATE asociados SET
+          nombre_completo = ${data.nombreCompleto ?? existente.nombreCompleto},
+          cedula          = ${data.cedula         ?? existente.cedula},
+          correo          = ${data.correo         ?? existente.correo},
+          telefono        = ${data.telefono        ?? existente.telefono},
+          ministerio      = ${data.ministerio      ?? existente.ministerio},
+          direccion       = ${data.direccion       ?? existente.direccion},
+          fecha_ingreso   = ${data.fechaIngreso
+                              ? new Date(data.fechaIngreso)
+                              : existente.fechaIngreso},
+          estado          = ${data.estado ?? existente.estado}
+        WHERE id = ${id}
+        RETURNING *
+      ` as any[];
+
+      const asociado = this.mapRowToAsociado(result[0]);
+      await AuditoriaDAO.registrar('asociados', asociado.id, 'edicion', 'Actualización de información del asociado');
+      return asociado;
     } catch (error: any) {
       if (error instanceof AsociadoDAOError) throw error;
-      if (error.code === 'P2002') {
+      if (error.code === '23505') {
         throw new AsociadoDAOError('Ya existe un asociado con esta cédula', 'DUPLICATE_KEY', error);
       }
       throw new AsociadoDAOError('Error al actualizar el asociado', 'DATABASE_ERROR', error);
@@ -154,11 +200,14 @@ export class AsociadoDAO {
 
   async eliminar(id: number): Promise<boolean> {
     try {
-      const result = await prisma.asociado.updateMany({
-        where: { id },
-        data: { estado: 0 },
-      });
-      return result.count > 0;
+      const result = await this.sql`
+        UPDATE asociados SET estado = 0 WHERE id = ${id} RETURNING id
+      ` as any[];
+      if (result.length > 0) {
+        await AuditoriaDAO.registrar('asociados', id, 'eliminacion', 'Desactivación del asociado (Inactivo)');
+        return true;
+      }
+      return false;
     } catch (error) {
       throw new AsociadoDAOError('Error al eliminar el asociado', 'DATABASE_ERROR', error);
     }
@@ -166,18 +215,21 @@ export class AsociadoDAO {
 
   async eliminarPermanente(id: number): Promise<boolean> {
     try {
-      await prisma.asociado.delete({ where: { id } });
-      return true;
-    } catch (error: any) {
-      if (error.code === 'P2025') return false;
+      const result = await this.sql`
+        DELETE FROM asociados WHERE id = ${id} RETURNING id
+      ` as any[];
+      return result.length > 0;
+    } catch (error) {
       throw new AsociadoDAOError('Error al eliminar permanentemente el asociado', 'DATABASE_ERROR', error);
     }
   }
 
   async listarTodos(): Promise<Asociado[]> {
     try {
-      const rows = await prisma.asociado.findMany({ orderBy: { nombreCompleto: 'asc' } });
-      return rows.map(mapToAsociado);
+      const result = await this.sql`
+        SELECT * FROM asociados ORDER BY nombre_completo
+      ` as any[];
+      return result.map((row: any) => this.mapRowToAsociado(row));
     } catch (error) {
       throw new AsociadoDAOError('Error al listar todos los asociados', 'DATABASE_ERROR', error);
     }
@@ -185,15 +237,13 @@ export class AsociadoDAO {
 
   async buscarPorNombre(nombre: string, limit: number = 10): Promise<Asociado[]> {
     try {
-      const rows = await prisma.asociado.findMany({
-        where: {
-          nombreCompleto: { contains: nombre, mode: 'insensitive' },
-          estado: 1,
-        },
-        orderBy: { nombreCompleto: 'asc' },
-        take: limit,
-      });
-      return rows.map(mapToAsociado);
+      const result = await this.sql`
+        SELECT * FROM asociados
+        WHERE nombre_completo ILIKE ${'%' + nombre + '%'} AND estado = 1
+        ORDER BY nombre_completo
+        LIMIT ${limit}
+      ` as any[];
+      return result.map((row: any) => this.mapRowToAsociado(row));
     } catch (error) {
       throw new AsociadoDAOError('Error al buscar asociados por nombre', 'DATABASE_ERROR', error);
     }
@@ -201,11 +251,18 @@ export class AsociadoDAO {
 
   async obtenerEstadisticas(): Promise<{ total: number; activos: number; inactivos: number }> {
     try {
-      const [total, activos] = await Promise.all([
-        prisma.asociado.count(),
-        prisma.asociado.count({ where: { estado: 1 } }),
-      ]);
-      return { total, activos, inactivos: total - activos };
+      const result = await this.sql`
+        SELECT
+          COUNT(*) as total,
+          COUNT(*) FILTER (WHERE estado = 1) as activos,
+          COUNT(*) FILTER (WHERE estado = 0) as inactivos
+        FROM asociados
+      ` as any[];
+      return {
+        total:     parseInt(result[0].total),
+        activos:   parseInt(result[0].activos),
+        inactivos: parseInt(result[0].inactivos),
+      };
     } catch (error) {
       throw new AsociadoDAOError('Error al obtener estadísticas', 'DATABASE_ERROR', error);
     }

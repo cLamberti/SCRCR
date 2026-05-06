@@ -140,6 +140,12 @@ export async function POST(request: NextRequest) {
     const result = await db.query(insertSQL, values);
     const evento: EventoResponse = result.rows[0];
 
+    // Auditoría
+    try {
+      const { AuditoriaDAO } = require("@/dao/auditoria.dao");
+      await AuditoriaDAO.registrar('eventos', evento.id, 'creacion', `Evento creado: ${evento.nombre}`);
+    } catch (e) { console.error("Error auditando evento", e); }
+
     return NextResponse.json(
       { success: true, message: "Evento creado exitosamente", data: evento },
       { status: 201 }
