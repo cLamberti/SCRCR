@@ -5,6 +5,7 @@ import {
   FiltrosAsociadoRequest,
 } from '@/dto/asociado.dto';
 import { Asociado, AsociadoModel } from '@/models/Asociado';
+import { AuditoriaDAO } from './auditoria.dao';
 
 export interface PaginacionResultado<T> {
   data: T[];
@@ -74,7 +75,9 @@ export class AsociadoDAO {
           fechaInactivo: data.fechaInactivo ? new Date(data.fechaInactivo) : null,
         },
       });
-      return mapToAsociado(row);
+      const asociado = mapToAsociado(row);
+      await AuditoriaDAO.registrar('asociados', asociado.id, 'creacion', 'Registro inicial del asociado');
+      return asociado;
     } catch (error: any) {
       if (error instanceof AsociadoDAOError) throw error;
       if (error.code === 'P2002') {
@@ -174,7 +177,9 @@ export class AsociadoDAO {
             : (existente.fechaInactivo ?? null),
         },
       });
-      return mapToAsociado(row);
+      const actualizado = mapToAsociado(row);
+      await AuditoriaDAO.registrar('asociados', id, 'edicion', 'Actualización de información del asociado');
+      return actualizado;
     } catch (error: any) {
       if (error instanceof AsociadoDAOError) throw error;
       if (error.code === 'P2002') {
@@ -190,6 +195,9 @@ export class AsociadoDAO {
         where: { id },
         data: { estado: 0 },
       });
+      if (result.count > 0) {
+        await AuditoriaDAO.registrar('asociados', id, 'eliminacion', 'Desactivación del asociado (Inactivo)');
+      }
       return result.count > 0;
     } catch (error) {
       throw new AsociadoDAOError('Error al eliminar el asociado', 'DATABASE_ERROR', error);

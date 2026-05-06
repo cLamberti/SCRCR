@@ -5,6 +5,7 @@ import {
   FiltrosCongregadoRequest,
 } from '@/dto/congregado.dto';
 import { Congregado, CongregadoModel, EstadoCongregado, EstadoCivil } from '@/models/Congregado';
+import { AuditoriaDAO } from './auditoria.dao';
 
 export interface PaginacionResultado<T> {
   data: T[];
@@ -70,7 +71,9 @@ export class CongregadoDAO {
           direccion: data.direccion ?? null,
         },
       });
-      return mapToCongregado(row);
+      const congregado = mapToCongregado(row);
+      await AuditoriaDAO.registrar('congregados', congregado.id, 'creacion', 'Registro inicial del congregado');
+      return congregado;
     } catch (error: any) {
       if (error instanceof CongregadoDAOError) throw error;
       if (error.code === 'P2002') {
@@ -171,7 +174,9 @@ export class CongregadoDAO {
           direccion: data.direccion === null ? null : (data.direccion ?? existente.direccion ?? null),
         },
       });
-      return mapToCongregado(row);
+      const actualizado = mapToCongregado(row);
+      await AuditoriaDAO.registrar('congregados', id, 'edicion', 'Actualización de información del congregado');
+      return actualizado;
     } catch (error: any) {
       if (error instanceof CongregadoDAOError) throw error;
       if (error.code === 'P2002') {
@@ -187,6 +192,9 @@ export class CongregadoDAO {
         where: { id },
         data: { estado: EstadoCongregado.INACTIVO },
       });
+      if (result.count > 0) {
+        await AuditoriaDAO.registrar('congregados', id, 'eliminacion', 'Desactivación del congregado (Inactivo)');
+      }
       return result.count > 0;
     } catch (error) {
       throw new CongregadoDAOError('Error al eliminar el congregado', 'DATABASE_ERROR', error);

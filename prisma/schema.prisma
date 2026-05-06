@@ -6,12 +6,6 @@ datasource db {
   provider = "postgresql"
 }
 
-enum EstadoAsistencia {
-  presente
-  ausente
-  justificado
-}
-
 model Usuario {
   id               Int       @id @default(autoincrement())
   username         String    @unique @db.VarChar(50)
@@ -31,24 +25,24 @@ model Usuario {
 }
 
 model Congregado {
-  id                Int      @id @default(autoincrement())
-  nombre            String   @db.VarChar(100)
-  cedula            String   @unique @db.VarChar(20)
-  fechaIngreso      DateTime @default(now()) @map("fecha_ingreso")
-  telefono          String   @db.VarChar(20)
-  segundoTelefono   String?  @map("segundo_telefono") @db.VarChar(20)
-  estadoCivil       String   @map("estado_civil") @db.VarChar(20)
-  ministerio        String   @db.VarChar(50)
-  segundoMinisterio String?  @map("segundo_ministerio") @db.VarChar(50)
-  urlFotoCedula     String   @map("url_foto_cedula")
-  estado            Int      @default(1) @db.SmallInt
-  observaciones     String?
-  fechaNacimiento   DateTime? @map("fecha_nacimiento")
-  correo            String?   @db.VarChar(100)
-  profesion         String?   @db.VarChar(100)
+  id                Int                 @id @default(autoincrement())
+  nombre            String              @db.VarChar(100)
+  cedula            String              @unique @db.VarChar(20)
+  fechaIngreso      DateTime            @default(now()) @map("fecha_ingreso")
+  telefono          String              @db.VarChar(20)
+  segundoTelefono   String?             @map("segundo_telefono") @db.VarChar(20)
+  estadoCivil       String              @map("estado_civil") @db.VarChar(20)
+  ministerio        String              @db.VarChar(50)
+  segundoMinisterio String?             @map("segundo_ministerio") @db.VarChar(50)
+  urlFotoCedula     String              @map("url_foto_cedula")
+  estado            Int                 @default(1) @db.SmallInt
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @default(now()) @updatedAt @map("updated_at")
+  correo            String?             @db.VarChar(100)
   direccion         String?
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
+  fechaNacimiento   DateTime?           @map("fecha_nacimiento")
+  observaciones     String?
+  profesion         String?             @db.VarChar(100)
   reportes          ReporteAsistencia[]
 
   @@map("congregados")
@@ -72,10 +66,10 @@ model Asociado {
   perteneceJuntaDirectiva Boolean             @default(false) @map("pertenece_junta_directiva")
   puestoJuntaDirectiva    String?             @map("puesto_junta_directiva") @db.VarChar(50)
   estado                  Int                 @default(1) @db.SmallInt
-  observaciones           String?
-  fechaInactivo           DateTime?           @map("fecha_inactivo")
   createdAt               DateTime?           @default(now()) @map("created_at")
   updatedAt               DateTime?           @default(now()) @updatedAt @map("updated_at")
+  fechaInactivo           DateTime?           @map("fecha_inactivo")
+  observaciones           String?
   asistencias             Asistencia[]
   reportes                ReporteAsistencia[]
   asistenciasActaAsociacion AsistenciaActaAsociacion[]
@@ -141,47 +135,47 @@ model AsistenciaActaJD {
 }
 
 model Empleado {
-  id              Int              @id @default(autoincrement())
-  nombre          String           @db.VarChar(100)
-  cedula          String           @unique @db.VarChar(20)
-  puesto          String           @db.VarChar(100)
-  salarioBase     Decimal          @map("salario_base") @db.Decimal(12, 2)
-  cuentaBancaria  String?          @map("cuenta_bancaria") @db.VarChar(50)
-  estado          Int              @default(1) @db.SmallInt
-  createdAt       DateTime         @default(now()) @map("created_at")
-  updatedAt       DateTime         @default(now()) @updatedAt @map("updated_at")
-  lineasPlanilla  LineaPlanilla[]
+  id             Int             @id @default(autoincrement())
+  nombre         String          @db.VarChar(100)
+  cedula         String          @unique @db.VarChar(20)
+  puesto         String          @db.VarChar(100)
+  salarioBase    Decimal         @map("salario_base") @db.Decimal(12, 2)
+  cuentaBancaria String?         @map("cuenta_bancaria") @db.VarChar(50)
+  estado         Int             @default(1) @db.SmallInt
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @default(now()) @updatedAt @map("updated_at")
+  lineasPlanilla LineaPlanilla[]
 
   @@map("empleados")
 }
 
 model PeriodoPlanilla {
-  id               Int              @id @default(autoincrement())
-  mes              Int
-  anio             Int
-  estado           String           @default("borrador") @db.VarChar(20)
-  fechaGeneracion  DateTime         @default(now()) @map("fecha_generacion")
-  createdAt        DateTime         @default(now()) @map("created_at")
-  updatedAt        DateTime         @default(now()) @updatedAt @map("updated_at")
-  lineas           LineaPlanilla[]
+  id              Int             @id @default(autoincrement())
+  mes             Int
+  anio            Int
+  estado          String          @default("borrador") @db.VarChar(20)
+  fechaGeneracion DateTime        @default(now()) @map("fecha_generacion")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @default(now()) @updatedAt @map("updated_at")
+  lineas          LineaPlanilla[]
 
   @@unique([mes, anio])
   @@map("periodos_planilla")
 }
 
 model LineaPlanilla {
-  id               Int             @id @default(autoincrement())
-  empleadoId       Int             @map("empleado_id")
-  periodoPlanillaId Int            @map("periodo_planilla_id")
-  diasTrabajados   Int             @map("dias_trabajados")
-  diasAusentes     Int             @default(0) @map("dias_ausentes")
-  diasVacaciones   Int             @default(0) @map("dias_vacaciones")
-  diasIncapacidad  Int             @default(0) @map("dias_incapacidad")
-  montoAPagar      Decimal         @map("monto_a_pagar") @db.Decimal(12, 2)
-  createdAt        DateTime        @default(now()) @map("created_at")
-  updatedAt        DateTime        @default(now()) @updatedAt @map("updated_at")
-  empleado         Empleado        @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  periodo          PeriodoPlanilla @relation(fields: [periodoPlanillaId], references: [id], onDelete: Cascade)
+  id                Int             @id @default(autoincrement())
+  empleadoId        Int             @map("empleado_id")
+  periodoPlanillaId Int             @map("periodo_planilla_id")
+  diasTrabajados    Int             @map("dias_trabajados")
+  diasAusentes      Int             @default(0) @map("dias_ausentes")
+  diasVacaciones    Int             @default(0) @map("dias_vacaciones")
+  diasIncapacidad   Int             @default(0) @map("dias_incapacidad")
+  montoAPagar       Decimal         @map("monto_a_pagar") @db.Decimal(12, 2)
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @default(now()) @updatedAt @map("updated_at")
+  empleado          Empleado        @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  periodo           PeriodoPlanilla @relation(fields: [periodoPlanillaId], references: [id], onDelete: Cascade)
 
   @@unique([empleadoId, periodoPlanillaId])
   @@map("lineas_planilla")
@@ -192,7 +186,7 @@ model Evento {
   nombre      String              @db.VarChar(255)
   descripcion String?
   fecha       DateTime            @db.Date
-  hora        DateTime            @db.Time()
+  hora        DateTime            @db.Time(6)
   activo      Boolean             @default(true)
   createdAt   DateTime            @default(now()) @map("created_at")
   updatedAt   DateTime            @default(now()) @updatedAt @map("updated_at")
@@ -209,7 +203,7 @@ model Asistencia {
   fechaRegistro DateTime         @default(now()) @map("fecha_registro")
   observaciones String?
   estado        EstadoAsistencia @default(ausente)
-  horaRegistro  DateTime         @default(now()) @map("hora_registro") @db.Time()
+  horaRegistro  DateTime         @default(now()) @map("hora_registro") @db.Time(6)
   justificacion String?
   createdAt     DateTime         @default(now()) @map("created_at")
   updatedAt     DateTime         @default(now()) @updatedAt @map("updated_at")
@@ -223,15 +217,15 @@ model Asistencia {
 model ReporteAsistencia {
   id            Int              @id @default(autoincrement())
   asociadoId    Int?             @map("asociado_id")
-  congregadoId  Int?             @map("congregado_id")
   eventoId      Int              @map("evento_id")
   fecha         DateTime         @db.Date
   estado        EstadoAsistencia
-  horaRegistro  DateTime?        @map("hora_registro") @db.Time()
+  horaRegistro  DateTime?        @map("hora_registro") @db.Time(6)
   observaciones String?
   justificacion String?
-  createdAt     DateTime?        @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt     DateTime?        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  createdAt     DateTime?        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime?        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  congregadoId  Int?             @map("congregado_id")
   asociado      Asociado?        @relation(fields: [asociadoId], references: [id], onDelete: Cascade)
   congregado    Congregado?      @relation(fields: [congregadoId], references: [id], onDelete: Cascade)
   evento        Evento           @relation(fields: [eventoId], references: [id], onDelete: Cascade)
@@ -242,17 +236,35 @@ model ReporteAsistencia {
 }
 
 model Permiso {
-  id                     Int       @id @default(autoincrement())
-  usuarioId              Int       @map("usuario_id")
-  fechaInicio            DateTime  @map("fecha_inicio") @db.Date
-  fechaFin               DateTime  @map("fecha_fin") @db.Date
-  motivo                 String
-  documentoUrl           String?   @map("documento_url")
-  estado                 String    @default("PENDIENTE") @db.VarChar(20)
+  id                      Int      @id @default(autoincrement())
+  usuarioId               Int      @map("usuario_id")
+  fechaInicio             DateTime @map("fecha_inicio") @db.Date
+  fechaFin                DateTime @map("fecha_fin") @db.Date
+  motivo                  String
+  documentoUrl            String?  @map("documento_url")
+  estado                  String   @default("PENDIENTE") @db.VarChar(20)
   observacionesResolucion String?  @map("observaciones_resolucion")
-  createdAt              DateTime  @default(now()) @map("created_at")
-  updatedAt              DateTime  @default(now()) @updatedAt @map("updated_at")
-  usuario                Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @default(now()) @updatedAt @map("updated_at")
+  usuario                 Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
   @@map("permisos")
+}
+
+enum EstadoAsistencia {
+  presente
+  ausente
+  justificado
+}
+
+model Auditoria {
+  id         Int      @id @default(autoincrement())
+  tabla      String   @db.VarChar(50)
+  registroId Int      @map("registro_id")
+  accion     String   @db.VarChar(20)
+  detalles   String?
+  fecha      DateTime @default(now())
+  usuarioId  Int?     @map("usuario_id")
+
+  @@map("auditoria")
 }

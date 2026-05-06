@@ -77,6 +77,13 @@ const NAV_ITEMS: Omit<NavItem, 'onClick'>[] = [
     roles: ['admin', 'tesorero', 'pastorGeneral'],
   },
   {
+    id: 'historial',
+    href: '/historial',
+    icon: FaClipboardList,
+    label: 'Historial',
+    roles: ['admin', 'tesorero', 'pastorGeneral'],
+  },
+  {
     id: 'permisos',
     href: '/permisos',
     icon: FaClipboardList,
