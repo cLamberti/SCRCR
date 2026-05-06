@@ -122,12 +122,12 @@ export default function Sidebar({ activeItem, pageTitle = 'SCRCR' }: SidebarProp
     ...itemsFiltrados,
     ...(usuario && !loading
       ? [{
-          id: 'cerrar',
-          onClick: logout,
-          icon: FaSignOutAlt,
-          label: 'Cerrar Sesión',
-          roles: ['admin', 'pastorGeneral', 'juntaDirectiva', 'asistenteAdministrativo'] as Role[],
-        }]
+        id: 'cerrar',
+        onClick: logout,
+        icon: FaSignOutAlt,
+        label: 'Cerrar Sesión',
+        roles: ['admin', 'pastorGeneral', 'juntaDirectiva', 'asistenteAdministrativo'] as Role[],
+      }]
       : []),
   ];
 
@@ -229,8 +229,22 @@ export default function Sidebar({ activeItem, pageTitle = 'SCRCR' }: SidebarProp
         })}
       </nav>
 
-      <div className="px-4 py-4 border-t border-white/10">
+      <div className="px-4 py-4 border-t border-white/10 space-y-2">
         <p className="text-[10px] text-white/25 text-center">v1.0 · 2025</p>
+        <div className="text-center">
+          <p className="text-[9px] text-white/20 uppercase tracking-widest mb-1">Desarrollado por</p>
+          <p className="text-[9px] text-white/25 leading-tight">Estudiantes de la Universidad Nacional</p>
+          <div className="mt-1 flex flex-col gap-0.5">
+            {[
+              'Christopher Lamberti Chavarria',
+              'Luciana Chacon Castillo',
+              'Isaac Aburto Torres',
+              'Isaiah Raust Dussin',
+            ].map(nombre => (
+              <p key={nombre} className="text-[9px] text-white/20 leading-tight">{nombre}</p>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
