@@ -197,11 +197,65 @@ export default function ConsultarAsociadosPage() {
     setModalEditOpen(true); setMensaje(''); setErroresLista([]); setEsError(false);
   };
 
+  const validarFormularioAsociado = (): string[] => {
+    const errores: string[] = [];
+    const f = formulario;
+
+    if (!f.nombreCompleto.trim()) {
+      errores.push('El nombre completo es requerido.');
+    } else if (f.nombreCompleto.trim().split(/\s+/).length < 2) {
+      errores.push('El nombre completo debe incluir al menos nombre y apellido.');
+    } else if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]+$/.test(f.nombreCompleto)) {
+      errores.push('El nombre completo solo puede contener letras y espacios.');
+    }
+
+    if (!f.cedula.trim()) {
+      errores.push('La cédula es requerida.');
+    } else if (!/^[0-9-]+$/.test(f.cedula)) {
+      errores.push('La cédula solo puede contener números y guiones.');
+    } else if (f.cedula.trim().length < 9) {
+      errores.push('La cédula debe tener al menos 9 caracteres.');
+    }
+
+    if (!f.telefono.trim()) {
+      errores.push('El celular es requerido.');
+    } else if (!/^[\d\s\-+()]+$/.test(f.telefono)) {
+      errores.push('El celular contiene caracteres no válidos.');
+    } else if (f.telefono.replace(/[\s\-+()]/g, '').length < 8) {
+      errores.push('El celular debe tener al menos 8 dígitos.');
+    }
+
+    if (f.correo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.correo)) {
+      errores.push('El formato del correo electrónico no es válido.');
+    }
+
+    if (f.telefonoContacto && f.telefonoContacto.replace(/[\s\-+()]/g, '').length < 8) {
+      errores.push('El teléfono de contacto debe tener al menos 8 dígitos.');
+    }
+
+    if (f.perteneceJuntaDirectiva && !f.puestoJuntaDirectiva) {
+      errores.push('El puesto en la Junta Directiva es requerido.');
+    }
+
+    if (f.anosCongregarse !== '' && (Number(f.anosCongregarse) < 0 || !Number.isInteger(Number(f.anosCongregarse)))) {
+      errores.push('Los años de congregarse deben ser un número entero positivo.');
+    }
+
+    return errores;
+  };
+
   const guardarCambios = async () => {
+    const erroresValidacion = validarFormularioAsociado();
+    if (erroresValidacion.length > 0) {
+      setErroresLista(erroresValidacion);
+      setEsError(true);
+      return;
+    }
+
     try {
       setGuardando(true); setMensaje(''); setErroresLista([]); setEsError(false);
-      
-      const url = asociadoEditando 
+
+      const url = asociadoEditando
         ? `/api/asociados/update?id=${asociadoEditando.id}`
         : '/api/asociados';
       const method = asociadoEditando ? 'PUT' : 'POST';

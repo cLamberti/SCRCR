@@ -75,8 +75,23 @@ export default function GestionUsuariosPage() {
   useEffect(() => { cargarUsuarios(); }, []);
   useEffect(() => { cargarUsuarios(currentPage, itemsPerPage); }, [currentPage, itemsPerPage]);
 
+  const validarFormulario = (): string | null => {
+    const { nombreCompleto, username, email } = formState;
+    if (nombreCompleto.trim().length < 3) return "El nombre completo debe tener al menos 3 caracteres.";
+    if (username.trim().length < 3) return "El nombre de usuario debe tener al menos 3 caracteres.";
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) return "El nombre de usuario solo puede contener letras, números y guiones bajos (_).";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "El formato del correo electrónico no es válido.";
+    return null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const errorValidacion = validarFormulario();
+    if (errorValidacion) {
+      setMensaje(errorValidacion);
+      setMensajeOk(false);
+      return;
+    }
     setEnviando(true);
     setMensaje("");
     try {

@@ -13,7 +13,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const secret = process.env.JWT_SECRET || "uwrT0PdHQ7gkJeoaD3iKqMGk";
+    const secret = process.env.JWT_SECRET;
+    if (!secret) throw new Error('JWT_SECRET no configurado');
     const decoded = jwt.verify(token, secret) as { id: number };
 
     const usuario = await prisma.usuario.findUnique({
@@ -55,17 +56,37 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const secret = process.env.JWT_SECRET || "uwrT0PdHQ7gkJeoaD3iKqMGk";
+    const secret = process.env.JWT_SECRET;
+    if (!secret) throw new Error('JWT_SECRET no configurado');
     const decoded = jwt.verify(token, secret) as { id: number };
 
     const { nombreCompleto, email, password } = await request.json();
 
     const dataToUpdate: any = {};
-    if (nombreCompleto) dataToUpdate.nombreCompleto = nombreCompleto;
-    if (email) dataToUpdate.email = email;
+
+    if (nombreCompleto) {
+      if (typeof nombreCompleto !== 'string' || nombreCompleto.trim().length < 3) {
+        return NextResponse.json(
+          { success: false, message: "El nombre completo debe tener al menos 3 caracteres" },
+          { status: 400 }
+        );
+      }
+      dataToUpdate.nombreCompleto = nombreCompleto.trim();
+    }
+
+    if (email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return NextResponse.json(
+          { success: false, message: "El formato del correo electrónico no es válido" },
+          { status: 400 }
+        );
+      }
+      dataToUpdate.email = email.trim().toLowerCase();
+    }
+
     if (password) {
-      const saltRounds = 10;
-      dataToUpdate.passwordHash = await bcrypt.hash(password, saltRounds);
+      dataToUpdate.passwordHash = await bcrypt.hash(password, 10);
     }
 
     if (Object.keys(dataToUpdate).length === 0) {
@@ -92,7 +113,13 @@ export async function PUT(request: NextRequest) {
       message: "Perfil actualizado exitosamente",
       data: updatedUser,
     });
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.code === 'P2002') {
+      return NextResponse.json(
+        { success: false, message: "El correo electrónico ya está en uso por otro usuario" },
+        { status: 409 }
+      );
+    }
     console.error("Error al actualizar perfil:", error);
     return NextResponse.json(
       { success: false, message: "Error interno del servidor" },
