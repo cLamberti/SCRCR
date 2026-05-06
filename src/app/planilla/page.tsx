@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { FaFileExcel, FaPlus, FaLock, FaTrash, FaEye, FaUserTie } from 'react-icons/fa';
+import { FaFileExcel, FaPlus, FaLock, FaTrash, FaEye, FaUserTie, FaSpinner } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 import Sidebar from '@/components/SideBar';
 
@@ -45,6 +45,8 @@ export default function PlanillaPage() {
 
   // Planillas
   const [planillas, setPlanillas] = useState<PlanillaResumen[]>([]);
+  const [loadingPlanillas, setLoadingPlanillas] = useState(true);
+  const [loadingEmpleados, setLoadingEmpleados] = useState(true);
   const [detalle, setDetalle] = useState<PlanillaDetalle | null>(null);
   const [modalDetalle, setModalDetalle] = useState(false);
 
@@ -57,15 +59,21 @@ export default function PlanillaPage() {
   const [mensajePlan, setMensajePlan] = useState('');
 
   const cargarEmpleados = useCallback(async () => {
-    const res = await fetch('/api/empleados');
-    const json = await res.json();
-    if (json.success) setEmpleados(json.data);
+    setLoadingEmpleados(true);
+    try {
+      const res = await fetch('/api/empleados');
+      const json = await res.json();
+      if (json.success) setEmpleados(json.data);
+    } finally { setLoadingEmpleados(false); }
   }, []);
 
   const cargarPlanillas = useCallback(async () => {
-    const res = await fetch('/api/planilla');
-    const json = await res.json();
-    if (json.success) setPlanillas(json.data);
+    setLoadingPlanillas(true);
+    try {
+      const res = await fetch('/api/planilla');
+      const json = await res.json();
+      if (json.success) setPlanillas(json.data);
+    } finally { setLoadingPlanillas(false); }
   }, []);
 
   useEffect(() => { cargarEmpleados(); cargarPlanillas(); }, [cargarEmpleados, cargarPlanillas]);
@@ -198,7 +206,22 @@ export default function PlanillaPage() {
           {/* ── TAB HISTORIAL ── */}
           {tab === 'historial' && (
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-              {planillas.length === 0 ? (
+              {loadingPlanillas ? (
+                <div className="divide-y divide-gray-50">
+                  {[...Array(4)].map((_, i) => (
+                    <div key={i} className="px-6 py-4 flex gap-6 items-center" style={{ opacity: 1 - i * 0.2 }}>
+                      <div className="h-4 w-32 rounded bg-gray-200 animate-pulse" />
+                      <div className="h-5 w-16 rounded-full bg-gray-100 animate-pulse" />
+                      <div className="h-3 w-24 rounded bg-gray-100 animate-pulse" />
+                      <div className="h-4 w-28 rounded bg-gray-200 animate-pulse ml-auto" />
+                      <div className="flex gap-2">
+                        <div className="h-8 w-8 rounded-lg bg-gray-100 animate-pulse" />
+                        <div className="h-8 w-8 rounded-lg bg-gray-100 animate-pulse" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : planillas.length === 0 ? (
                 <div className="p-12 text-center">
                   <FaFileExcel className="mx-auto text-gray-300 text-3xl mb-3" />
                   <p className="text-gray-500 text-sm">No hay planillas generadas aún.</p>
@@ -318,7 +341,19 @@ export default function PlanillaPage() {
               )}
 
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                {empleados.length === 0 ? (
+                {loadingEmpleados ? (
+                  <div className="divide-y divide-gray-50">
+                    {[...Array(3)].map((_, i) => (
+                      <div key={i} className="px-6 py-4 flex gap-6 items-center" style={{ opacity: 1 - i * 0.25 }}>
+                        <div className="h-4 w-40 rounded bg-gray-200 animate-pulse" />
+                        <div className="h-3 w-24 rounded bg-gray-100 animate-pulse" />
+                        <div className="h-3 w-28 rounded bg-gray-100 animate-pulse" />
+                        <div className="h-4 w-24 rounded bg-gray-200 animate-pulse ml-auto" />
+                        <div className="h-8 w-8 rounded-lg bg-gray-100 animate-pulse" />
+                      </div>
+                    ))}
+                  </div>
+                ) : empleados.length === 0 ? (
                   <div className="p-12 text-center">
                     <FaUserTie className="mx-auto text-gray-300 text-3xl mb-3" />
                     <p className="text-gray-500 text-sm">No hay empleados registrados.</p>

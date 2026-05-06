@@ -6,7 +6,8 @@
       "Bash(mkdir -p \"C:/Users/User/OneDrive/Escritorio/Trabajos/ing+/scrcr/src/app/api/planilla/[id]/exportar\")",
       "Bash(npx prisma *)",
       "Bash(npm run *)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(node -e \"const {PrismaClient} = require\\('@prisma/client'\\); const p = new \\(require\\('@prisma/adapter-neon'\\).PrismaNeon\\)\\({connectionString: process.env.POSTGRES_URL}\\); console.log\\(typeof new PrismaClient\\({adapter: p}\\).empleado\\)\")"
     ]
   }
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useDebounce } from "@/hooks/useDebounce";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -53,6 +54,7 @@ export default function EventosPage() {
   const router = useRouter();
 
   const [nombre, setNombre] = useState("");
+  const nombreDebounced = useDebounce(nombre, 400);
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
   const [activo, setActivo] = useState("");
@@ -91,7 +93,7 @@ export default function EventosPage() {
     setErrLoad(null);
     try {
       const params = new URLSearchParams();
-      if (nombre.trim()) params.set("nombre", nombre.trim());
+      if (nombreDebounced.trim()) params.set("nombre", nombreDebounced.trim());
       if (fechaDesde) params.set("fechaDesde", fechaDesde);
       if (fechaHasta) params.set("fechaHasta", fechaHasta);
       if (activo !== "") params.set("activo", activo);
@@ -113,7 +115,7 @@ export default function EventosPage() {
     }
   }
 
-  useEffect(() => { fetchEventos(); }, [nombre, fechaDesde, fechaHasta, activo, page, limit]);
+  useEffect(() => { fetchEventos(); }, [nombreDebounced, fechaDesde, fechaHasta, activo, page, limit]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
