@@ -78,8 +78,66 @@ model Asociado {
   updatedAt               DateTime?           @default(now()) @updatedAt @map("updated_at")
   asistencias             Asistencia[]
   reportes                ReporteAsistencia[]
+  asistenciasActaAsociacion AsistenciaActaAsociacion[]
+  asistenciasActaJD       AsistenciaActaJD[]
 
   @@map("asociados")
+}
+
+model ActaAsociacion {
+  id            Int                        @id @default(autoincrement())
+  fecha         DateTime                   @db.Date
+  tipoSesion    String                     @map("tipo_sesion") @db.VarChar(20)
+  urlActa       String?                    @map("url_acta")
+  nombreArchivo String?                    @map("nombre_archivo") @db.VarChar(255)
+  createdAt     DateTime                   @default(now()) @map("created_at")
+  updatedAt     DateTime                   @default(now()) @updatedAt @map("updated_at")
+  asistencias   AsistenciaActaAsociacion[]
+
+  @@map("actas_asociacion")
+}
+
+model AsistenciaActaAsociacion {
+  id            Int              @id @default(autoincrement())
+  actaId        Int              @map("acta_id")
+  asociadoId    Int              @map("asociado_id")
+  estado        EstadoAsistencia @default(ausente)
+  justificacion String?
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @default(now()) @updatedAt @map("updated_at")
+  acta          ActaAsociacion   @relation(fields: [actaId], references: [id], onDelete: Cascade)
+  asociado      Asociado         @relation(fields: [asociadoId], references: [id], onDelete: Cascade)
+
+  @@unique([actaId, asociadoId])
+  @@map("asistencias_acta_asociacion")
+}
+
+model ActaJuntaDirectiva {
+  id            Int                @id @default(autoincrement())
+  fecha         DateTime           @db.Date
+  tipoSesion    String             @map("tipo_sesion") @db.VarChar(20)
+  urlActa       String?            @map("url_acta")
+  nombreArchivo String?            @map("nombre_archivo") @db.VarChar(255)
+  createdAt     DateTime           @default(now()) @map("created_at")
+  updatedAt     DateTime           @default(now()) @updatedAt @map("updated_at")
+  asistencias   AsistenciaActaJD[]
+
+  @@map("actas_junta_directiva")
+}
+
+model AsistenciaActaJD {
+  id            Int                @id @default(autoincrement())
+  actaId        Int                @map("acta_id")
+  asociadoId    Int                @map("asociado_id")
+  estado        EstadoAsistencia   @default(ausente)
+  justificacion String?
+  createdAt     DateTime           @default(now()) @map("created_at")
+  updatedAt     DateTime           @default(now()) @updatedAt @map("updated_at")
+  acta          ActaJuntaDirectiva @relation(fields: [actaId], references: [id], onDelete: Cascade)
+  asociado      Asociado           @relation(fields: [asociadoId], references: [id], onDelete: Cascade)
+
+  @@unique([actaId, asociadoId])
+  @@map("asistencias_acta_jd")
 }
 
 model Empleado {
