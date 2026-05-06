@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ActualizarEventoRequest, EventoResponse } from "@/dto/evento.dto";
 import { EventoValidator } from "@/validators/evento.validator";
 import { prisma } from "@/lib/db";
+import { AuditoriaDAO } from "@/dao/auditoria.dao";
 
 function mapEventoToResponse(evento: any): EventoResponse {
   return {
@@ -134,6 +135,8 @@ export async function PUT(
       data: updateData
     });
 
+    await AuditoriaDAO.registrar('eventos', id, 'edicion', `Modificación del evento: ${result.nombre}`);
+
     return NextResponse.json({
       success: true,
       message: "Evento actualizado exitosamente",
@@ -191,6 +194,8 @@ export async function DELETE(
         activo: false
       }
     });
+
+    await AuditoriaDAO.registrar('eventos', id, 'eliminacion', `Desactivación del evento: ${result.nombre}`);
 
     return NextResponse.json({
       success: true,

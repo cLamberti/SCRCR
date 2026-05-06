@@ -7,6 +7,7 @@ import {
 import { EventoValidator } from "@/validators/evento.validator";
 import { prisma } from "@/lib/db";
 import { Prisma } from "@prisma/client";
+import { AuditoriaDAO } from "@/dao/auditoria.dao";
 
 function mapEventoToResponse(evento: any): EventoResponse {
   return {
@@ -133,6 +134,8 @@ export async function POST(request: NextRequest) {
         activo: activoValue,
       }
     });
+
+    await AuditoriaDAO.registrar('eventos', evento.id, 'creacion', `Evento creado: ${evento.nombre}`);
 
     return NextResponse.json(
       { success: true, message: "Evento creado exitosamente", data: mapEventoToResponse(evento) },
