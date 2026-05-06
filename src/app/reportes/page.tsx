@@ -90,9 +90,10 @@ export default function ReportesPage() {
   const personas = tipo === "asociado" ? asociados : congregados;
 
   useEffect(() => {
-    cargarAsociados();
-    cargarCongregados();
-    cargarEventos();
+    setCargandoPersonas(true);
+    Promise.all([cargarAsociados(), cargarCongregados(), cargarEventos()]).finally(() =>
+      setCargandoPersonas(false)
+    );
   }, []);
 
   useEffect(() => {
@@ -127,7 +128,6 @@ export default function ReportesPage() {
 
   const cargarCongregados = async () => {
     try {
-      setCargandoPersonas(true);
       const res = await fetch("/api/congregados?all=true");
       const data = await res.json();
       if (data.success && Array.isArray(data.data)) {
@@ -143,8 +143,6 @@ export default function ReportesPage() {
     } catch {
       toast.error("Error al cargar congregados");
       setCongregados([]);
-    } finally {
-      setCargandoPersonas(false);
     }
   };
 
