@@ -22,7 +22,8 @@ function mapToReporte(row: any): ReporteAsistencia {
 
   return {
     id: Number(row.id),
-    asociado_id: Number(row.asociadoId),
+    asociado_id: row.asociadoId != null ? Number(row.asociadoId) : null,
+    congregado_id: row.congregadoId != null ? Number(row.congregadoId) : null,
     evento_id: Number(row.eventoId),
     fecha: row.fecha instanceof Date
       ? row.fecha.toISOString().split('T')[0]
@@ -42,33 +43,65 @@ function mapToReporte(row: any): ReporteAsistencia {
 export class ReporteAsistenciaDAO {
   async crear(data: CrearReporteAsistenciaRequest): Promise<ReporteAsistencia> {
     try {
-      const row = await prisma.reporteAsistencia.upsert({
-        where: {
-          asociadoId_eventoId_fecha: {
+      const fechaDate = new Date(data.fecha);
+
+      if (data.asociado_id != null) {
+        const row = await prisma.reporteAsistencia.upsert({
+          where: {
+            asociadoId_eventoId_fecha: {
+              asociadoId: data.asociado_id,
+              eventoId: data.evento_id,
+              fecha: fechaDate,
+            },
+          },
+          update: {
+            estado: data.estado as any,
+            justificacion: data.justificacion ?? null,
+            horaRegistro: new Date(),
+          },
+          create: {
             asociadoId: data.asociado_id,
             eventoId: data.evento_id,
-            fecha: new Date(data.fecha),
+            fecha: fechaDate,
+            estado: data.estado as any,
+            justificacion: data.justificacion ?? null,
+            horaRegistro: new Date(),
           },
-        },
-        update: {
-          estado: data.estado as any,
-          justificacion: data.justificacion ?? null,
-          horaRegistro: new Date(),
-        },
-        create: {
-          asociadoId: data.asociado_id,
-          eventoId: data.evento_id,
-          fecha: new Date(data.fecha),
-          estado: data.estado as any,
-          justificacion: data.justificacion ?? null,
-          horaRegistro: new Date(),
-        },
-      });
-      return mapToReporte(row);
+        });
+        return mapToReporte(row);
+      }
+
+      if (data.congregado_id != null) {
+        const row = await prisma.reporteAsistencia.upsert({
+          where: {
+            congregadoId_eventoId_fecha: {
+              congregadoId: data.congregado_id,
+              eventoId: data.evento_id,
+              fecha: fechaDate,
+            },
+          },
+          update: {
+            estado: data.estado as any,
+            justificacion: data.justificacion ?? null,
+            horaRegistro: new Date(),
+          },
+          create: {
+            congregadoId: data.congregado_id,
+            eventoId: data.evento_id,
+            fecha: fechaDate,
+            estado: data.estado as any,
+            justificacion: data.justificacion ?? null,
+            horaRegistro: new Date(),
+          },
+        });
+        return mapToReporte(row);
+      }
+
+      throw new ReporteAsistenciaDAOError('Debe indicar asociadoId o congregadoId', 'VALIDATION_ERROR');
     } catch (error: any) {
       if (error instanceof ReporteAsistenciaDAOError) throw error;
       if (error.code === 'P2003') {
-        throw new ReporteAsistenciaDAOError('El asociado o evento no existe', 'FOREIGN_KEY_VIOLATION', error);
+        throw new ReporteAsistenciaDAOError('El asociado, congregado o evento no existe', 'FOREIGN_KEY_VIOLATION', error);
       }
       throw new ReporteAsistenciaDAOError(`Error al crear el registro: ${error.message}`, 'DATABASE_ERROR', error);
     }

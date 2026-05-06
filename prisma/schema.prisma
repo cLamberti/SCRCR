@@ -42,28 +42,91 @@ model Congregado {
   segundoMinisterio String?  @map("segundo_ministerio") @db.VarChar(50)
   urlFotoCedula     String   @map("url_foto_cedula")
   estado            Int      @default(1) @db.SmallInt
+  observaciones     String?
+  fechaNacimiento   DateTime? @map("fecha_nacimiento")
+  correo            String?   @db.VarChar(100)
+  profesion         String?   @db.VarChar(100)
+  direccion         String?
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
+  reportes          ReporteAsistencia[]
 
   @@map("congregados")
 }
 
 model Asociado {
-  id             Int                 @id @default(autoincrement())
-  nombreCompleto String              @map("nombre_completo") @db.VarChar(100)
-  cedula         String              @unique @db.VarChar(20)
-  correo         String?             @db.VarChar(100)
-  telefono       String?             @db.VarChar(20)
-  ministerio     String?             @db.VarChar(50)
-  direccion      String?
-  fechaIngreso   DateTime            @default(now()) @map("fecha_ingreso")
-  estado         Int                 @default(1) @db.SmallInt
-  createdAt      DateTime?           @default(now()) @map("created_at")
-  updatedAt      DateTime?           @default(now()) @updatedAt @map("updated_at")
-  asistencias    Asistencia[]
-  reportes       ReporteAsistencia[]
+  id                      Int                 @id @default(autoincrement())
+  nombreCompleto          String              @map("nombre_completo") @db.VarChar(100)
+  cedula                  String              @unique @db.VarChar(20)
+  correo                  String?             @db.VarChar(100)
+  telefono                String?             @db.VarChar(20)
+  telefonoContacto        String?             @map("telefono_contacto") @db.VarChar(20)
+  ministerio              String?             @db.VarChar(50)
+  direccion               String?
+  fechaIngreso            DateTime            @default(now()) @map("fecha_ingreso")
+  fechaNacimiento         DateTime?           @map("fecha_nacimiento")
+  estadoCivil             String?             @map("estado_civil") @db.VarChar(30)
+  profesion               String?             @db.VarChar(100)
+  anosCongregarse         Int?                @map("anos_congregarse")
+  fechaAceptacion         DateTime?           @map("fecha_aceptacion")
+  perteneceJuntaDirectiva Boolean             @default(false) @map("pertenece_junta_directiva")
+  puestoJuntaDirectiva    String?             @map("puesto_junta_directiva") @db.VarChar(50)
+  estado                  Int                 @default(1) @db.SmallInt
+  observaciones           String?
+  fechaInactivo           DateTime?           @map("fecha_inactivo")
+  createdAt               DateTime?           @default(now()) @map("created_at")
+  updatedAt               DateTime?           @default(now()) @updatedAt @map("updated_at")
+  asistencias             Asistencia[]
+  reportes                ReporteAsistencia[]
 
   @@map("asociados")
+}
+
+model Empleado {
+  id              Int              @id @default(autoincrement())
+  nombre          String           @db.VarChar(100)
+  cedula          String           @unique @db.VarChar(20)
+  puesto          String           @db.VarChar(100)
+  salarioBase     Decimal          @map("salario_base") @db.Decimal(12, 2)
+  cuentaBancaria  String?          @map("cuenta_bancaria") @db.VarChar(50)
+  estado          Int              @default(1) @db.SmallInt
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @default(now()) @updatedAt @map("updated_at")
+  lineasPlanilla  LineaPlanilla[]
+
+  @@map("empleados")
+}
+
+model PeriodoPlanilla {
+  id               Int              @id @default(autoincrement())
+  mes              Int
+  anio             Int
+  estado           String           @default("borrador") @db.VarChar(20)
+  fechaGeneracion  DateTime         @default(now()) @map("fecha_generacion")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @default(now()) @updatedAt @map("updated_at")
+  lineas           LineaPlanilla[]
+
+  @@unique([mes, anio])
+  @@map("periodos_planilla")
+}
+
+model LineaPlanilla {
+  id               Int             @id @default(autoincrement())
+  empleadoId       Int             @map("empleado_id")
+  periodoPlanillaId Int            @map("periodo_planilla_id")
+  diasTrabajados   Int             @map("dias_trabajados")
+  diasAusentes     Int             @default(0) @map("dias_ausentes")
+  diasVacaciones   Int             @default(0) @map("dias_vacaciones")
+  diasIncapacidad  Int             @default(0) @map("dias_incapacidad")
+  montoAPagar      Decimal         @map("monto_a_pagar") @db.Decimal(12, 2)
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @default(now()) @updatedAt @map("updated_at")
+  empleado         Empleado        @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  periodo          PeriodoPlanilla @relation(fields: [periodoPlanillaId], references: [id], onDelete: Cascade)
+
+  @@unique([empleadoId, periodoPlanillaId])
+  @@map("lineas_planilla")
 }
 
 model Evento {
@@ -101,7 +164,8 @@ model Asistencia {
 
 model ReporteAsistencia {
   id            Int              @id @default(autoincrement())
-  asociadoId    Int              @map("asociado_id")
+  asociadoId    Int?             @map("asociado_id")
+  congregadoId  Int?             @map("congregado_id")
   eventoId      Int              @map("evento_id")
   fecha         DateTime         @db.Date
   estado        EstadoAsistencia
@@ -110,10 +174,12 @@ model ReporteAsistencia {
   justificacion String?
   createdAt     DateTime?        @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt     DateTime?        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
-  asociado      Asociado         @relation(fields: [asociadoId], references: [id], onDelete: Cascade)
+  asociado      Asociado?        @relation(fields: [asociadoId], references: [id], onDelete: Cascade)
+  congregado    Congregado?      @relation(fields: [congregadoId], references: [id], onDelete: Cascade)
   evento        Evento           @relation(fields: [eventoId], references: [id], onDelete: Cascade)
 
   @@unique([asociadoId, eventoId, fecha])
+  @@unique([congregadoId, eventoId, fecha])
   @@map("reportes_asistencia")
 }
 

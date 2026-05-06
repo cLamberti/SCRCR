@@ -5,10 +5,20 @@ export interface Asociado {
   cedula: string;
   correo?: string;
   telefono?: string;
+  telefonoContacto?: string;
   ministerio?: string;
   direccion?: string;
   fechaIngreso: Date;
+  fechaNacimiento?: Date;
+  estadoCivil?: string;
+  profesion?: string;
+  anosCongregarse?: number;
+  fechaAceptacion?: Date;
+  perteneceJuntaDirectiva: boolean;
+  puestoJuntaDirectiva?: string;
   estado: number;
+  observaciones?: string;
+  fechaInactivo?: Date;
 }
 
 export class AsociadoModel implements Asociado {
@@ -17,10 +27,20 @@ export class AsociadoModel implements Asociado {
   cedula: string;
   correo?: string;
   telefono?: string;
+  telefonoContacto?: string;
   ministerio?: string;
   direccion?: string;
   fechaIngreso: Date;
+  fechaNacimiento?: Date;
+  estadoCivil?: string;
+  profesion?: string;
+  anosCongregarse?: number;
+  fechaAceptacion?: Date;
+  perteneceJuntaDirectiva: boolean;
+  puestoJuntaDirectiva?: string;
   estado: number;
+  observaciones?: string;
+  fechaInactivo?: Date;
 
   constructor(data: Partial<Asociado>) {
     this.id = data.id || 0;
@@ -28,18 +48,26 @@ export class AsociadoModel implements Asociado {
     this.cedula = data.cedula || '';
     this.correo = data.correo;
     this.telefono = data.telefono;
+    this.telefonoContacto = data.telefonoContacto;
     this.ministerio = data.ministerio;
     this.direccion = data.direccion;
     this.fechaIngreso = data.fechaIngreso || new Date();
+    this.fechaNacimiento = data.fechaNacimiento;
+    this.estadoCivil = data.estadoCivil;
+    this.profesion = data.profesion;
+    this.anosCongregarse = data.anosCongregarse;
+    this.fechaAceptacion = data.fechaAceptacion;
+    this.perteneceJuntaDirectiva = data.perteneceJuntaDirectiva ?? false;
+    this.puestoJuntaDirectiva = data.puestoJuntaDirectiva;
     this.estado = data.estado ?? 0;
+    this.observaciones = data.observaciones;
+    this.fechaInactivo = data.fechaInactivo;
   }
 
-  // Método para validar si el asociado está activo
   isActivo(): boolean {
     return this.estado === 1;
   }
 
-  // Método para obtener el objeto como JSON
   toJSON(): Asociado {
     return {
       id: this.id,
@@ -47,21 +75,27 @@ export class AsociadoModel implements Asociado {
       cedula: this.cedula,
       correo: this.correo,
       telefono: this.telefono,
+      telefonoContacto: this.telefonoContacto,
       ministerio: this.ministerio,
       direccion: this.direccion,
       fechaIngreso: this.fechaIngreso,
-      estado: this.estado
+      fechaNacimiento: this.fechaNacimiento,
+      estadoCivil: this.estadoCivil,
+      profesion: this.profesion,
+      anosCongregarse: this.anosCongregarse,
+      fechaAceptacion: this.fechaAceptacion,
+      perteneceJuntaDirectiva: this.perteneceJuntaDirectiva,
+      puestoJuntaDirectiva: this.puestoJuntaDirectiva,
+      estado: this.estado,
+      observaciones: this.observaciones,
+      fechaInactivo: this.fechaInactivo,
     };
   }
 }
 
-// Tipo para crear un nuevo asociado (sin id)
 export type NuevoAsociado = Omit<Asociado, 'id'>;
-
-// Tipo para actualizar un asociado (todos los campos opcionales excepto id)
 export type ActualizarAsociado = Partial<Omit<Asociado, 'id'>> & { id: number };
 
-// Enum para los estados del asociado
 export enum EstadoAsociado {
   INACTIVO = 0,
   ACTIVO = 1

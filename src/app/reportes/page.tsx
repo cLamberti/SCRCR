@@ -6,8 +6,7 @@ import Swal from "sweetalert2";
 import {
   FaCalendarAlt, FaCheckCircle, FaTimesCircle,
   FaExclamationCircle, FaSpinner, FaUsers, FaSearch,
-  FaRedo,
-  FaDownload,
+  FaRedo, FaDownload,
 } from "react-icons/fa";
 import Sidebar from "@/components/SideBar";
 
@@ -17,9 +16,11 @@ enum EstadoAsistencia {
   Justificado = "justificado",
 }
 
-interface Asociado {
+type TipoPersona = "asociado" | "congregado";
+
+interface Persona {
   id: number;
-  nombreCompleto: string;
+  nombre: string;
   cedula: string;
   ministerio?: string;
 }
@@ -32,11 +33,12 @@ interface Evento {
 
 interface RegistroAsistencia {
   id: number;
-  asociadoId: number;
+  asociadoId: number | null;
+  congregadoId: number | null;
   eventoId: number;
   estado: EstadoAsistencia;
   fecha: string;
-  justificacion?: string;
+  justificacion?: string | null;
   horaRegistro: string;
   createdAt: string;
   updatedAt: string;
@@ -73,18 +75,23 @@ function escaparCSV(valor: unknown): string {
 }
 
 export default function ReportesPage() {
-  const [asociados, setAsociados] = useState<Asociado[]>([]);
+  const [tipo, setTipo] = useState<TipoPersona>("asociado");
+  const [asociados, setAsociados] = useState<Persona[]>([]);
+  const [congregados, setCongregados] = useState<Persona[]>([]);
   const [eventos, setEventos] = useState<Evento[]>([]);
   const [registros, setRegistros] = useState<RegistroAsistencia[]>([]);
   const [eventoId, setEventoId] = useState<number>(0);
-  const [cargandoAsociados, setCargandoAsociados] = useState(true);
+  const [cargandoPersonas, setCargandoPersonas] = useState(true);
   const [cargandoEventos, setCargandoEventos] = useState(true);
   const [cargandoRegistros, setCargandoRegistros] = useState(false);
   const [procesando, setProcesando] = useState<Set<number>>(new Set());
   const [busqueda, setBusqueda] = useState("");
 
+  const personas = tipo === "asociado" ? asociados : congregados;
+
   useEffect(() => {
     cargarAsociados();
+    cargarCongregados();
     cargarEventos();
   }, []);
 
@@ -93,21 +100,51 @@ export default function ReportesPage() {
     else setRegistros([]);
   }, [eventoId]);
 
+  // Limpiar búsqueda al cambiar tipo
+  useEffect(() => {
+    setBusqueda("");
+  }, [tipo]);
+
   const cargarAsociados = async () => {
     try {
-      setCargandoAsociados(true);
       const res = await fetch("/api/asociados/consulta?all=true");
       const data = await res.json();
-      if (data.success && Array.isArray(data.data)) setAsociados(data.data);
-      else {
-        toast.error("No se pudieron cargar los asociados");
-        setAsociados([]);
-      }
+      if (data.success && Array.isArray(data.data)) {
+        setAsociados(
+          data.data.map((a: any) => ({
+            id: a.id,
+            nombre: a.nombreCompleto,
+            cedula: a.cedula,
+            ministerio: a.ministerio,
+          }))
+        );
+      } else setAsociados([]);
     } catch {
-      toast.error("Error de conexión al cargar asociados");
+      toast.error("Error al cargar asociados");
       setAsociados([]);
+    }
+  };
+
+  const cargarCongregados = async () => {
+    try {
+      setCargandoPersonas(true);
+      const res = await fetch("/api/congregados?all=true");
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        setCongregados(
+          data.data.map((c: any) => ({
+            id: c.id,
+            nombre: c.nombre,
+            cedula: c.cedula,
+            ministerio: c.ministerio,
+          }))
+        );
+      } else setCongregados([]);
+    } catch {
+      toast.error("Error al cargar congregados");
+      setCongregados([]);
     } finally {
-      setCargandoAsociados(false);
+      setCargandoPersonas(false);
     }
   };
 
@@ -140,15 +177,16 @@ export default function ReportesPage() {
         setRegistros(
           data.data.map((r: any) => ({
             id: r.id,
-            asociadoId: r.asociado_id || r.asociadoId,
-            eventoId: r.evento_id || r.eventoId,
+            asociadoId: r.asociadoId ?? null,
+            congregadoId: r.congregadoId ?? null,
+            eventoId: r.eventoId,
             estado: r.estado as EstadoAsistencia,
             fecha: r.fecha,
             justificacion: r.justificacion,
-            horaRegistro: r.hora_registro || r.horaRegistro,
-            createdAt: r.created_at || r.createdAt,
-            updatedAt: r.updated_at || r.updatedAt,
-          })),
+            horaRegistro: r.horaRegistro,
+            createdAt: r.createdAt,
+            updatedAt: r.updatedAt,
+          }))
         );
       } else setRegistros([]);
     } catch {
@@ -159,51 +197,54 @@ export default function ReportesPage() {
     }
   };
 
+  const obtenerRegistro = (personaId: number): RegistroAsistencia | undefined => {
+    if (tipo === "asociado") return registros.find(r => r.asociadoId === personaId);
+    return registros.find(r => r.congregadoId === personaId);
+  };
+
+  const obtenerEstado = (personaId: number) => obtenerRegistro(personaId)?.estado;
+
   const registrarAsistencia = async (
-    asociadoId: number,
+    personaId: number,
     estado: EstadoAsistencia,
-    justificacion?: string,
+    justificacion?: string
   ) => {
-    setProcesando((prev) => new Set(prev).add(asociadoId));
+    setProcesando(prev => new Set(prev).add(personaId));
     const toastId = toast.loading("Registrando...");
     try {
+      const body: Record<string, unknown> = {
+        eventoId,
+        estado,
+        fecha: new Date().toISOString().split("T")[0],
+        ...(justificacion ? { justificacion } : {}),
+      };
+      if (tipo === "asociado") body.asociadoId = personaId;
+      else body.congregadoId = personaId;
+
       const res = await fetch("/api/reporte-asistencia", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          eventoId,
-          asociadoId,
-          estado,
-          fecha: new Date().toISOString().split("T")[0],
-          ...(justificacion ? { justificacion } : {}),
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (data.success) {
         await cargarRegistros();
-        toast.success(ESTADO_CONFIG[estado].label, {
-          id: toastId,
-          duration: 1500,
-        });
+        toast.success(ESTADO_CONFIG[estado].label, { id: toastId, duration: 1500 });
       } else toast.error(data.message || "Error al registrar", { id: toastId });
     } catch {
       toast.error("Error de conexión", { id: toastId });
     } finally {
-      setProcesando((prev) => {
-        const n = new Set(prev);
-        n.delete(asociadoId);
-        return n;
-      });
+      setProcesando(prev => { const n = new Set(prev); n.delete(personaId); return n; });
     }
   };
 
   const actualizarAsistencia = async (
     registroId: number,
-    asociadoId: number,
+    personaId: number,
     nuevoEstado: EstadoAsistencia,
-    justificacion?: string,
+    justificacion?: string
   ) => {
-    setProcesando((prev) => new Set(prev).add(asociadoId));
+    setProcesando(prev => new Set(prev).add(personaId));
     const toastId = toast.loading("Actualizando...");
     try {
       const res = await fetch(`/api/reporte-asistencia?id=${registroId}`, {
@@ -214,28 +255,17 @@ export default function ReportesPage() {
       const data = await res.json();
       if (data.success) {
         await cargarRegistros();
-        toast.success(`Actualizado a ${ESTADO_CONFIG[nuevoEstado].label}`, {
-          id: toastId,
-          duration: 1500,
-        });
-      } else
-        toast.error(data.message || "Error al actualizar", { id: toastId });
+        toast.success(`Actualizado a ${ESTADO_CONFIG[nuevoEstado].label}`, { id: toastId, duration: 1500 });
+      } else toast.error(data.message || "Error al actualizar", { id: toastId });
     } catch {
       toast.error("Error de conexión", { id: toastId });
     } finally {
-      setProcesando((prev) => {
-        const n = new Set(prev);
-        n.delete(asociadoId);
-        return n;
-      });
+      setProcesando(prev => { const n = new Set(prev); n.delete(personaId); return n; });
     }
   };
 
-  const manejarCambioEstado = async (
-    asociadoId: number,
-    nuevoEstado: EstadoAsistencia,
-  ) => {
-    const existente = registros.find((r) => r.asociadoId === asociadoId);
+  const manejarCambioEstado = async (personaId: number, nuevoEstado: EstadoAsistencia) => {
+    const existente = obtenerRegistro(personaId);
 
     if (!existente) {
       if (nuevoEstado === EstadoAsistencia.Justificado) {
@@ -246,11 +276,10 @@ export default function ReportesPage() {
           showCancelButton: true,
           confirmButtonText: "Registrar",
           cancelButtonText: "Cancelar",
-          inputValidator: (v) =>
-            !v?.trim() ? "La justificación es obligatoria" : null,
+          inputValidator: v => (!v?.trim() ? "La justificación es obligatoria" : null),
         });
-        if (value) await registrarAsistencia(asociadoId, nuevoEstado, value);
-      } else await registrarAsistencia(asociadoId, nuevoEstado);
+        if (value) await registrarAsistencia(personaId, nuevoEstado, value);
+      } else await registrarAsistencia(personaId, nuevoEstado);
       return;
     }
 
@@ -267,7 +296,6 @@ export default function ReportesPage() {
       confirmButtonText: "Sí, cambiar",
       cancelButtonText: "Cancelar",
     });
-
     if (!isConfirmed) return;
 
     if (nuevoEstado === EstadoAsistencia.Justificado) {
@@ -276,27 +304,18 @@ export default function ReportesPage() {
         input: "textarea",
         showCancelButton: true,
         confirmButtonText: "Actualizar",
-        inputValidator: (v) =>
-          !v?.trim() ? "La justificación es obligatoria" : null,
+        inputValidator: v => (!v?.trim() ? "La justificación es obligatoria" : null),
       });
-      if (value) {
-        await actualizarAsistencia(
-          existente.id,
-          asociadoId,
-          nuevoEstado,
-          value,
-        );
-      }
+      if (value) await actualizarAsistencia(existente.id, personaId, nuevoEstado, value);
     } else {
-      await actualizarAsistencia(existente.id, asociadoId, nuevoEstado);
+      await actualizarAsistencia(existente.id, personaId, nuevoEstado);
     }
   };
 
   const resetearAsistencia = async () => {
-    const { presentes, ausentes, justificados } = estadisticas;
     const { isConfirmed } = await Swal.fire({
       title: "¿Resetear asistencias?",
-      html: `<p class="text-sm text-gray-600 mb-3">Se eliminarán <strong>${registros.length} registros</strong> del evento seleccionado.</p><div class="text-xs text-gray-500">Presentes: ${presentes} · Ausentes: ${ausentes} · Justificados: ${justificados}</div>`,
+      html: `<p class="text-sm text-gray-600 mb-3">Se eliminarán <strong>todos los registros</strong> del evento (asociados y congregados).</p>`,
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#dc2626",
@@ -307,9 +326,7 @@ export default function ReportesPage() {
 
     const toastId = toast.loading("Reseteando...");
     try {
-      const res = await fetch(`/api/reporte-asistencia?eventoId=${eventoId}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(`/api/reporte-asistencia?eventoId=${eventoId}`, { method: "DELETE" });
       const data = await res.json();
       if (data.success) {
         setRegistros([]);
@@ -320,88 +337,54 @@ export default function ReportesPage() {
     }
   };
 
-  const obtenerRegistro = (asociadoId: number) =>
-    registros.find(r => r.asociadoId === asociadoId);
-
-  const obtenerEstado = (asociadoId: number) =>
-    obtenerRegistro(asociadoId)?.estado;
+  // Registros relevantes al tipo activo
+  const registrosActivos = registros.filter(r =>
+    tipo === "asociado" ? r.asociadoId != null : r.congregadoId != null
+  );
 
   const estadisticas = {
-    presentes: registros.filter((r) => r.estado === EstadoAsistencia.Presente)
-      .length,
-    ausentes: registros.filter((r) => r.estado === EstadoAsistencia.Ausente)
-      .length,
-    justificados: registros.filter(
-      (r) => r.estado === EstadoAsistencia.Justificado,
-    ).length,
-    sinRegistro: asociados.length - registros.length,
+    presentes: registrosActivos.filter(r => r.estado === EstadoAsistencia.Presente).length,
+    ausentes: registrosActivos.filter(r => r.estado === EstadoAsistencia.Ausente).length,
+    justificados: registrosActivos.filter(r => r.estado === EstadoAsistencia.Justificado).length,
+    sinRegistro: personas.length - registrosActivos.length,
   };
 
-  const porcentajeAsistencia =
-    asociados.length > 0
-      ? Math.round((estadisticas.presentes / asociados.length) * 100)
-      : 0;
+  const porcentajeAsistencia = personas.length > 0
+    ? Math.round((estadisticas.presentes / personas.length) * 100)
+    : 0;
 
-  const filtrados = asociados.filter((a) => {
+  const filtrados = personas.filter(p => {
     const q = busqueda.toLowerCase();
-    return (
-      !q ||
-      a.nombreCompleto.toLowerCase().includes(q) ||
-      a.cedula.includes(q) ||
-      (a.ministerio || "").toLowerCase().includes(q)
-    );
+    return !q || p.nombre.toLowerCase().includes(q) || p.cedula.includes(q) || (p.ministerio || "").toLowerCase().includes(q);
   });
 
-  const eventoSeleccionado = eventos.find((ev) => ev.id === eventoId);
+  const eventoSeleccionado = eventos.find(ev => ev.id === eventoId);
 
   const exportarReporteCSV = () => {
-    if (!eventoId) {
-      toast.error("Seleccione un evento antes de exportar.");
-      return;
-    }
+    if (!eventoId) { toast.error("Seleccione un evento antes de exportar."); return; }
+    if (personas.length === 0) { toast.error("No hay personas para exportar."); return; }
 
-    if (asociados.length === 0) {
-      toast.error("No hay asociados para exportar.");
-      return;
-    }
-
-    const filas = asociados.map((a) => {
-      const estado = obtenerEstado(a.id);
-      return [
-        a.nombreCompleto,
-        a.cedula,
-        a.ministerio || "",
-        estado ? ESTADO_CONFIG[estado].label : "Sin registro",
-      ];
+    const tipoLabel = tipo === "asociado" ? "Asociado" : "Congregado";
+    const filas = personas.map(p => {
+      const estado = obtenerEstado(p.id);
+      return [p.nombre, p.cedula, p.ministerio || "", estado ? ESTADO_CONFIG[estado].label : "Sin registro", tipoLabel];
     });
 
-    const encabezados = ["Nombre", "Cédula", "Ministerio", "Estado"];
+    const encabezados = ["Nombre", "Cédula", "Ministerio", "Estado", "Tipo"];
+    const csv = [encabezados, ...filas].map(fila => fila.map(escaparCSV).join(",")).join("\n");
 
-    const csv = [encabezados, ...filas]
-      .map((fila) => fila.map(escaparCSV).join(","))
-      .join("\n");
+    const nombreEvento = (eventoSeleccionado?.nombre || "evento").replace(/[^\w\s-]/g, "").replace(/\s+/g, "_");
+    const fechaEvento = eventoSeleccionado?.fecha ? eventoSeleccionado.fecha.slice(0, 10) : new Date().toISOString().split("T")[0];
 
-    const nombreEvento = (eventoSeleccionado?.nombre || "evento")
-      .replace(/[^\w\s-]/g, "")
-      .replace(/\s+/g, "_");
-
-    const fechaEvento = eventoSeleccionado?.fecha
-      ? eventoSeleccionado.fecha.slice(0, 10)
-      : new Date().toISOString().split("T")[0];
-
-    const blob = new Blob(["\uFEFF" + csv], {
-      type: "text/csv;charset=utf-8;",
-    });
-
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const enlace = document.createElement("a");
     enlace.href = url;
-    enlace.download = `reporte_asistencia_${nombreEvento}_${fechaEvento}.csv`;
+    enlace.download = `reporte_asistencia_${tipo}_${nombreEvento}_${fechaEvento}.csv`;
     document.body.appendChild(enlace);
     enlace.click();
     document.body.removeChild(enlace);
     URL.revokeObjectURL(url);
-
     toast.success("Reporte exportado correctamente.");
   };
 
@@ -416,18 +399,14 @@ export default function ReportesPage() {
               <FaCalendarAlt className="text-white text-sm" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-gray-900">
-                Reportes de Asistencia
-              </h1>
-              <p className="text-xs text-gray-400">
-                Registra la asistencia por evento
-              </p>
+              <h1 className="text-lg font-bold text-gray-900">Reportes de Asistencia</h1>
+              <p className="text-xs text-gray-400">Registra la asistencia por evento</p>
             </div>
           </div>
         </header>
 
         <main className="flex-1 px-4 md:px-8 py-6 space-y-5">
-          {/* Selector de evento */}
+          {/* Selector de evento + resetear */}
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
             <div className="flex flex-col sm:flex-row sm:items-end gap-4">
               <div className="flex-1">
@@ -436,13 +415,13 @@ export default function ReportesPage() {
                 </label>
                 <select
                   value={eventoId}
-                  onChange={(e) => setEventoId(Number(e.target.value))}
+                  onChange={e => setEventoId(Number(e.target.value))}
                   className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#17609c]"
                 >
                   {cargandoEventos ? (
                     <option>Cargando eventos...</option>
                   ) : eventos.length > 0 ? (
-                    eventos.map((ev) => (
+                    eventos.map(ev => (
                       <option key={ev.id} value={ev.id}>
                         {ev.nombre} — {ev.fecha?.slice(0, 10)}
                       </option>
@@ -452,8 +431,6 @@ export default function ReportesPage() {
                   )}
                 </select>
               </div>
-
-              {/* CAMBIO: aquí ya NO va el botón exportar */}
               <button
                 onClick={resetearAsistencia}
                 disabled={registros.length === 0 || cargandoRegistros}
@@ -465,69 +442,55 @@ export default function ReportesPage() {
             </div>
           </div>
 
+          {/* Toggle Asociados / Congregados */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-1 flex gap-1 w-fit">
+            {(["asociado", "congregado"] as TipoPersona[]).map(t => (
+              <button
+                key={t}
+                onClick={() => setTipo(t)}
+                className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-150 ${
+                  tipo === t
+                    ? "bg-[#003366] text-white shadow-sm"
+                    : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"
+                }`}
+              >
+                <FaUsers className="text-xs" />
+                {t === "asociado" ? "Asociados" : "Congregados"}
+              </button>
+            ))}
+          </div>
+
           {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             {[
-              {
-                label: "Total",
-                value: asociados.length,
-                color: "border-[#003366] text-[#003366]",
-                bg: "bg-blue-50",
-              },
-              {
-                label: "Presentes",
-                value: estadisticas.presentes,
-                color: "border-green-500 text-green-700",
-                bg: "bg-green-50",
-              },
-              {
-                label: "Ausentes",
-                value: estadisticas.ausentes,
-                color: "border-red-500 text-red-700",
-                bg: "bg-red-50",
-              },
-              {
-                label: "Justificados",
-                value: estadisticas.justificados,
-                color: "border-amber-500 text-amber-700",
-                bg: "bg-amber-50",
-              },
-              {
-                label: "Sin registro",
-                value: estadisticas.sinRegistro,
-                color: "border-gray-400 text-gray-600",
-                bg: "bg-gray-50",
-              },
-            ].map((s) => (
-              <div
-                key={s.label}
-                className={`${s.bg} rounded-xl border ${s.color} border-l-4 p-4`}
-              >
+              { label: "Total", value: personas.length, color: "border-[#003366] text-[#003366]", bg: "bg-blue-50" },
+              { label: "Presentes", value: estadisticas.presentes, color: "border-green-500 text-green-700", bg: "bg-green-50" },
+              { label: "Ausentes", value: estadisticas.ausentes, color: "border-red-500 text-red-700", bg: "bg-red-50" },
+              { label: "Justificados", value: estadisticas.justificados, color: "border-amber-500 text-amber-700", bg: "bg-amber-50" },
+              { label: "Sin registro", value: estadisticas.sinRegistro, color: "border-gray-400 text-gray-600", bg: "bg-gray-50" },
+            ].map(s => (
+              <div key={s.label} className={`${s.bg} rounded-xl border ${s.color} border-l-4 p-4`}>
                 <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-                <p className="text-xs text-gray-500 font-medium mt-0.5">
-                  {s.label}
-                </p>
+                <p className="text-xs text-gray-500 font-medium mt-0.5">{s.label}</p>
               </div>
             ))}
           </div>
 
           {/* Barra de progreso */}
-          {asociados.length > 0 && (
+          {personas.length > 0 && (
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                   Asistencia registrada
                 </span>
                 <span className="text-sm font-bold text-[#003366]">
-                  {registros.length} / {asociados.length}
+                  {registrosActivos.length} / {personas.length}
                 </span>
               </div>
               <div className="w-full bg-gray-100 rounded-full h-2">
                 <div
                   className="bg-[#003366] h-2 rounded-full transition-all duration-500"
-                  style={{
-                    width: `${(registros.length / asociados.length) * 100}%`,
-                  }}
+                  style={{ width: `${(registrosActivos.length / personas.length) * 100}%` }}
                 />
               </div>
               {estadisticas.presentes > 0 && (
@@ -544,8 +507,8 @@ export default function ReportesPage() {
             <input
               type="text"
               value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              placeholder="Buscar asociado por nombre, cédula o ministerio…"
+              onChange={e => setBusqueda(e.target.value)}
+              placeholder={`Buscar ${tipo === "asociado" ? "asociado" : "congregado"} por nombre, cédula o ministerio…`}
               className="w-full pl-10 pr-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#17609c] shadow-sm"
             />
           </div>
@@ -554,9 +517,9 @@ export default function ReportesPage() {
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
               <span className="text-sm font-semibold text-gray-700">
-                {cargandoAsociados
+                {cargandoPersonas
                   ? "Cargando..."
-                  : `${filtrados.length} asociado${filtrados.length !== 1 ? "s" : ""}`}
+                  : `${filtrados.length} ${tipo === "asociado" ? "asociado" : "congregado"}${filtrados.length !== 1 ? "s" : ""}`}
               </span>
               {cargandoRegistros && (
                 <span className="flex items-center gap-1.5 text-xs text-gray-400">
@@ -565,16 +528,16 @@ export default function ReportesPage() {
               )}
             </div>
 
-            {cargandoAsociados ? (
+            {cargandoPersonas ? (
               <div className="p-12 text-center text-gray-400 text-sm flex flex-col items-center gap-3">
                 <FaSpinner className="animate-spin text-2xl text-[#003366]" />
-                Cargando asociados...
+                Cargando...
               </div>
             ) : filtrados.length === 0 ? (
               <div className="p-12 text-center">
                 <FaUsers className="mx-auto text-gray-300 text-3xl mb-3" />
                 <p className="text-gray-500 text-sm">
-                  No hay asociados para mostrar.
+                  No hay {tipo === "asociado" ? "asociados" : "congregados"} para mostrar.
                 </p>
               </div>
             ) : (
@@ -590,30 +553,19 @@ export default function ReportesPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {filtrados.map((a) => {
-                        const estado = obtenerEstado(a.id);
-                        const registro = obtenerRegistro(a.id);
-                        const isProcesando = procesando.has(a.id);
+                      {filtrados.map(p => {
+                        const estado = obtenerEstado(p.id);
+                        const registro = obtenerRegistro(p.id);
+                        const isProcesando = procesando.has(p.id);
 
                         return (
-                          <tr
-                            key={a.id}
-                            className="hover:bg-gray-50 transition"
-                          >
-                            <td className="px-6 py-4 font-medium text-gray-900">
-                              {a.nombreCompleto}
-                            </td>
-                            <td className="px-6 py-4 text-gray-500 text-xs font-mono">
-                              {a.cedula}
-                            </td>
-                            <td className="px-6 py-4 text-gray-500">
-                              {a.ministerio || "—"}
-                            </td>
+                          <tr key={p.id} className="hover:bg-gray-50 transition">
+                            <td className="px-6 py-4 font-medium text-gray-900">{p.nombre}</td>
+                            <td className="px-6 py-4 text-gray-500 text-xs font-mono">{p.cedula}</td>
+                            <td className="px-6 py-4 text-gray-500">{p.ministerio || "—"}</td>
                             <td className="px-6 py-4">
                               {estado ? (
-                                <span
-                                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${ESTADO_CONFIG[estado].badge}`}
-                                >
+                                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${ESTADO_CONFIG[estado].badge}`}>
                                   {ESTADO_CONFIG[estado].label}
                                 </span>
                               ) : (
@@ -622,7 +574,6 @@ export default function ReportesPage() {
                                 </span>
                               )}
                             </td>
-                            {/* columna justificacion */}
                             <td className="px-6 py-4 max-w-[200px]">
                               {estado === EstadoAsistencia.Justificado && registro?.justificacion ? (
                                 <span
@@ -637,7 +588,7 @@ export default function ReportesPage() {
                             </td>
                             <td className="px-6 py-4">
                               <div className="flex gap-1.5">
-                                {Object.values(EstadoAsistencia).map((e) => {
+                                {Object.values(EstadoAsistencia).map(e => {
                                   const cfg = ESTADO_CONFIG[e];
                                   const isActive = estado === e;
                                   const Icon = cfg.icon;
@@ -645,23 +596,15 @@ export default function ReportesPage() {
                                   return (
                                     <button
                                       key={e}
-                                      onClick={() =>
-                                        manejarCambioEstado(a.id, e)
-                                      }
+                                      onClick={() => manejarCambioEstado(p.id, e)}
                                       disabled={isProcesando || isActive}
                                       title={cfg.label}
                                       className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg transition ${
                                         isActive ? cfg.btnActive : cfg.btn
                                       } disabled:cursor-not-allowed`}
                                     >
-                                      {isProcesando ? (
-                                        <FaSpinner className="animate-spin" />
-                                      ) : (
-                                        <Icon />
-                                      )}
-                                      <span className="hidden lg:inline">
-                                        {cfg.label}
-                                      </span>
+                                      {isProcesando ? <FaSpinner className="animate-spin" /> : <Icon />}
+                                      <span className="hidden lg:inline">{cfg.label}</span>
                                     </button>
                                   );
                                 })}
@@ -676,23 +619,21 @@ export default function ReportesPage() {
 
                 {/* Mobile cards */}
                 <div className="md:hidden divide-y divide-gray-100">
-                  {filtrados.map((a) => {
-                    const estado = obtenerEstado(a.id);
-                    const registro = obtenerRegistro(a.id);
-                    const isProcesando = procesando.has(a.id);
+                  {filtrados.map(p => {
+                    const estado = obtenerEstado(p.id);
+                    const registro = obtenerRegistro(p.id);
+                    const isProcesando = procesando.has(p.id);
 
                     return (
-                      <div key={a.id} className="p-4">
+                      <div key={p.id} className="p-4">
                         <div className="flex items-start justify-between mb-2">
                           <div>
-                            <p className="font-semibold text-gray-900 text-sm">
-                              {a.nombreCompleto}
-                            </p>
+                            <p className="font-semibold text-gray-900 text-sm">{p.nombre}</p>
                             <p className="text-xs text-gray-500 mt-0.5">
-                              {a.cedula} {a.ministerio && `· ${a.ministerio}`}
+                              {p.cedula} {p.ministerio && `· ${p.ministerio}`}
                             </p>
                           </div>
-                          <div className="flex flex-col items-end gap-1">
+                          <div>
                             {estado ? (
                               <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${ESTADO_CONFIG[estado].badge}`}>
                                 {ESTADO_CONFIG[estado].label}
@@ -704,14 +645,13 @@ export default function ReportesPage() {
                             )}
                           </div>
                         </div>
-                        {/* justificacion en mobile */}
                         {estado === EstadoAsistencia.Justificado && registro?.justificacion && (
                           <div className="mb-3 px-2.5 py-1.5 bg-amber-50 border border-amber-200 rounded-lg">
                             <p className="text-xs text-amber-700 italic">{registro.justificacion}</p>
                           </div>
                         )}
                         <div className="grid grid-cols-3 gap-2">
-                          {Object.values(EstadoAsistencia).map((e) => {
+                          {Object.values(EstadoAsistencia).map(e => {
                             const cfg = ESTADO_CONFIG[e];
                             const isActive = estado === e;
                             const Icon = cfg.icon;
@@ -719,17 +659,13 @@ export default function ReportesPage() {
                             return (
                               <button
                                 key={e}
-                                onClick={() => manejarCambioEstado(a.id, e)}
+                                onClick={() => manejarCambioEstado(p.id, e)}
                                 disabled={isProcesando || isActive}
                                 className={`flex items-center justify-center gap-1 py-2 text-xs font-semibold rounded-lg transition ${
                                   isActive ? cfg.btnActive : cfg.btn
                                 } disabled:cursor-not-allowed`}
                               >
-                                {isProcesando ? (
-                                  <FaSpinner className="animate-spin" />
-                                ) : (
-                                  <Icon />
-                                )}
+                                {isProcesando ? <FaSpinner className="animate-spin" /> : <Icon />}
                                 {cfg.label}
                               </button>
                             );
@@ -742,13 +678,12 @@ export default function ReportesPage() {
               </>
             )}
           </div>
-          {/* Exportacion de CSV */}
+
+          {/* Exportar CSV */}
           <div className="flex justify-end">
             <button
               onClick={exportarReporteCSV}
-              disabled={
-                cargandoAsociados || cargandoRegistros || asociados.length === 0
-              }
+              disabled={cargandoPersonas || cargandoRegistros || personas.length === 0}
               className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-[#003366] bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition"
             >
               <FaDownload className="text-xs" />

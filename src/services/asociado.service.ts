@@ -32,17 +32,29 @@ export class AsociadoService {
   /* Convierte un modelo Asociado al DTO de respuesta */
   private toResponse(asociado: Asociado): AsociadoResponse {
     return {
-      id:             asociado.id,
-      nombreCompleto: asociado.nombreCompleto,
-      cedula:         asociado.cedula,
-      correo:         asociado.correo,
-      telefono:       asociado.telefono,
-      ministerio:     asociado.ministerio,
-      direccion:      asociado.direccion,
-      fechaIngreso:   asociado.fechaIngreso instanceof Date
-                        ? asociado.fechaIngreso.toISOString()
-                        : asociado.fechaIngreso,
-      estado:         asociado.estado,
+      id:                      asociado.id,
+      nombreCompleto:          asociado.nombreCompleto,
+      cedula:                  asociado.cedula,
+      correo:                  asociado.correo,
+      telefono:                asociado.telefono,
+      telefonoContacto:        asociado.telefonoContacto,
+      ministerio:              asociado.ministerio,
+      direccion:               asociado.direccion,
+      fechaIngreso:            asociado.fechaIngreso instanceof Date
+                                 ? asociado.fechaIngreso.toISOString()
+                                 : asociado.fechaIngreso,
+      fechaNacimiento:         asociado.fechaNacimiento instanceof Date
+                                 ? asociado.fechaNacimiento.toISOString()
+                                 : asociado.fechaNacimiento,
+      estadoCivil:             asociado.estadoCivil,
+      profesion:               asociado.profesion,
+      anosCongregarse:         asociado.anosCongregarse,
+      fechaAceptacion:         asociado.fechaAceptacion instanceof Date
+                                 ? asociado.fechaAceptacion.toISOString()
+                                 : asociado.fechaAceptacion,
+      perteneceJuntaDirectiva: asociado.perteneceJuntaDirectiva,
+      puestoJuntaDirectiva:    asociado.puestoJuntaDirectiva,
+      estado:                  asociado.estado,
     };
   }
 

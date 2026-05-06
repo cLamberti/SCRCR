@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   FaUsers, FaUserPlus, FaChevronLeft, FaChevronRight,
-  FaEye, FaEyeSlash, FaSearch, FaFilter,
+  FaEye, FaEyeSlash, FaSearch, FaFilter, FaTrash
 } from "react-icons/fa";
 import Sidebar from "@/components/SideBar";
+import Swal from "sweetalert2";
 
 type UsuarioRow = {
   id: number;
@@ -74,8 +75,23 @@ export default function GestionUsuariosPage() {
   useEffect(() => { cargarUsuarios(); }, []);
   useEffect(() => { cargarUsuarios(currentPage, itemsPerPage); }, [currentPage, itemsPerPage]);
 
+  const validarFormulario = (): string | null => {
+    const { nombreCompleto, username, email } = formState;
+    if (nombreCompleto.trim().length < 3) return "El nombre completo debe tener al menos 3 caracteres.";
+    if (username.trim().length < 3) return "El nombre de usuario debe tener al menos 3 caracteres.";
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) return "El nombre de usuario solo puede contener letras, números y guiones bajos (_).";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "El formato del correo electrónico no es válido.";
+    return null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const errorValidacion = validarFormulario();
+    if (errorValidacion) {
+      setMensaje(errorValidacion);
+      setMensajeOk(false);
+      return;
+    }
     setEnviando(true);
     setMensaje("");
     try {
@@ -96,6 +112,40 @@ export default function GestionUsuariosPage() {
       await cargarUsuarios(1, itemsPerPage);
     } catch { setMensaje("Error de conexión."); setMensajeOk(false); }
     finally { setEnviando(false); }
+  };
+
+  const handleEliminar = (id: number, nombre: string) => {
+    Swal.fire({
+      title: 'Eliminar Usuario',
+      text: `¿Qué deseas hacer con el usuario ${nombre}?`,
+      icon: 'warning',
+      showCancelButton: true,
+      showDenyButton: true,
+      confirmButtonColor: '#d33',
+      denyButtonColor: '#f59e0b',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Eliminar Permanentemente',
+      denyButtonText: 'Desactivar (Soft Delete)',
+      cancelButtonText: 'Cancelar'
+    }).then(async (result) => {
+      if (result.isConfirmed || result.isDenied) {
+        const isHardDelete = result.isConfirmed;
+        try {
+          const res = await fetch(`/api/usuarios/${id}?hardDelete=${isHardDelete}`, {
+            method: "DELETE"
+          });
+          const json = await res.json();
+          if (res.ok && json.success) {
+            Swal.fire('¡Listo!', json.message, 'success');
+            cargarUsuarios(currentPage, itemsPerPage);
+          } else {
+            Swal.fire('Error', json.message || 'Error al eliminar el usuario', 'error');
+          }
+        } catch (error) {
+          Swal.fire('Error', 'No se pudo conectar con el servidor', 'error');
+        }
+      }
+    });
   };
 
   const filtrados = usuarios.filter(u => {
@@ -256,7 +306,7 @@ export default function GestionUsuariosPage() {
                   <table className="min-w-full text-sm">
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-100">
-                        {["ID", "Nombre completo", "Usuario", "Correo", "Rol", "Estado"].map(h => (
+                        {["ID", "Nombre completo", "Usuario", "Correo", "Rol", "Estado", "Acciones"].map(h => (
                           <th key={h} className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
                         ))}
                       </tr>
@@ -279,6 +329,15 @@ export default function GestionUsuariosPage() {
                               {u.estado === 1 ? "Activo" : "Inactivo"}
                             </span>
                           </td>
+                          <td className="px-6 py-4">
+                            <button 
+                              onClick={() => handleEliminar(u.id, u.nombreCompleto)} 
+                              className="inline-flex items-center justify-center w-8 h-8 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white border border-red-200 hover:border-red-600 rounded-lg transition-colors shadow-sm" 
+                              title="Eliminar usuario"
+                            >
+                              <FaTrash className="text-sm" />
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -294,9 +353,18 @@ export default function GestionUsuariosPage() {
                           <p className="font-semibold text-gray-900 text-sm">{u.nombreCompleto}</p>
                           <p className="text-xs text-gray-500 font-mono mt-0.5">@{u.username}</p>
                         </div>
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${u.estado === 1 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
-                          {u.estado === 1 ? "Activo" : "Inactivo"}
-                        </span>
+                        <div className="flex flex-col items-end gap-2">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${u.estado === 1 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
+                            {u.estado === 1 ? "Activo" : "Inactivo"}
+                          </span>
+                          <button 
+                            onClick={() => handleEliminar(u.id, u.nombreCompleto)} 
+                            className="inline-flex items-center justify-center w-8 h-8 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white border border-red-200 hover:border-red-600 rounded-lg transition-colors shadow-sm"
+                            title="Eliminar usuario"
+                          >
+                            <FaTrash className="text-sm" />
+                          </button>
+                        </div>
                       </div>
                       <p className="text-xs text-gray-500 mb-2">{u.email}</p>
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${ROL_COLORS[u.rol] || "bg-gray-100 text-gray-600"}`}>

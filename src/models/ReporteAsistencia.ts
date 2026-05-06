@@ -6,12 +6,13 @@ export enum EstadoAsistencia {
 }
 export interface ReporteAsistencia {
   id: number;
-  asociado_id: number;
+  asociado_id?: number | null;
+  congregado_id?: number | null;
   evento_id: number;
-  fecha: string; // Formato YYYY-MM-DD
+  fecha: string;
   estado: EstadoAsistencia;
-  hora_registro: string; // Formato HH:MM:SS
+  hora_registro: string | null;
   justificacion?: string | null;
-  created_at: string; // ISO timestamp
-  updated_at: string; // ISO timestamp
+  created_at: string;
+  updated_at: string;
 }
