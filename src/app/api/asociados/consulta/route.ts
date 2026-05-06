@@ -12,10 +12,19 @@ const mapAsociadosToResponse = (asociados: Asociado[]): AsociadoResponse[] => {
     cedula: a.cedula,
     correo: a.correo,
     telefono: a.telefono,
+    telefonoContacto: a.telefonoContacto,
     direccion: a.direccion,
     ministerio: a.ministerio,
     fechaIngreso: a.fechaIngreso ? a.fechaIngreso.toISOString() : '',
+    fechaNacimiento: a.fechaNacimiento ? a.fechaNacimiento.toISOString() : undefined,
+    estadoCivil: a.estadoCivil,
+    profesion: a.profesion,
+    anosCongregarse: a.anosCongregarse,
+    fechaAceptacion: a.fechaAceptacion ? a.fechaAceptacion.toISOString() : undefined,
+    perteneceJuntaDirectiva: a.perteneceJuntaDirectiva ?? false,
+    puestoJuntaDirectiva: a.puestoJuntaDirectiva,
     estado: a.estado,
+    observaciones: a.observaciones,
   }));
 };
 
