@@ -44,7 +44,7 @@ export class UsuarioDAO {
     username: string;
     email: string;
     passwordHash: string;
-    rol: 'admin' | 'tesorero' | 'pastorGeneral';
+    rol: 'admin' | 'pastorGeneral' | 'juntaDirectiva' | 'asistenteAdministrativo';
     estado: number;
   }): Promise<Usuario> {
     const row = await prisma.usuario.create({

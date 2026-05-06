@@ -18,7 +18,7 @@ export const CreateUsuarioSchema = z.object({
   email: z.string().email('Email inválido'),
   password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
   nombreCompleto: z.string().min(3, 'El nombre completo debe tener al menos 3 caracteres'),
-  rol: z.enum(['admin', 'tesorero', 'pastorGeneral']),
+  rol: z.enum(['admin', 'pastorGeneral', 'juntaDirectiva', 'asistenteAdministrativo']),
 });
 
 export type CreateUsuarioDTO = z.infer<typeof CreateUsuarioSchema>;

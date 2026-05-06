@@ -160,18 +160,18 @@ export default function PermisosPage() {
               </button>
             </div>
 
-            <div className="overflow-x-auto rounded-xl border border-gray-200 mb-4">
+            {/* Desktop table */}
+            <div className="hidden md:block overflow-x-auto rounded-xl border border-gray-200 mb-4">
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="bg-[#003366] text-white">
-                    <th className="px-4 py-3 font-semibold text-left">ID</th>
-                    <th className="px-4 py-3 font-semibold text-left">Usuario</th>
-                    <th className="px-4 py-3 font-semibold text-left">F. Inicio</th>
-                    <th className="px-4 py-3 font-semibold text-left">F. Fin</th>
+                    <th className="px-4 py-3 font-semibold text-left whitespace-nowrap">ID</th>
+                    <th className="px-4 py-3 font-semibold text-left whitespace-nowrap">Usuario</th>
+                    <th className="px-4 py-3 font-semibold text-left whitespace-nowrap">F. Inicio</th>
+                    <th className="px-4 py-3 font-semibold text-left whitespace-nowrap">F. Fin</th>
                     <th className="px-4 py-3 font-semibold text-left">Motivo</th>
-
-                    <th className="px-4 py-3 font-semibold text-left">Estado</th>
-                    {isAdminRoles && <th className="px-4 py-3 font-semibold text-center">Acciones</th>}
+                    <th className="px-4 py-3 font-semibold text-left whitespace-nowrap">Estado</th>
+                    {isAdminRoles && <th className="px-4 py-3 font-semibold text-center whitespace-nowrap">Acciones</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -181,28 +181,21 @@ export default function PermisosPage() {
                     filtrados.map(r => (
                       <tr key={r.id} className="border-t hover:bg-blue-50/30">
                         <td className="px-4 py-3 text-gray-600">{r.id}</td>
-                        <td className="px-4 py-3 font-medium text-gray-800">{r.nombreCompleto}</td>
-                        <td className="px-4 py-3 text-gray-600">{formatFecha(r.fechaInicio)}</td>
-                        <td className="px-4 py-3 text-gray-600">{formatFecha(r.fechaFin)}</td>
+                        <td className="px-4 py-3 font-medium text-gray-800 whitespace-nowrap">{r.nombreCompleto}</td>
+                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{formatFecha(r.fechaInicio)}</td>
+                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{formatFecha(r.fechaFin)}</td>
                         <td className="px-4 py-3 text-gray-600 max-w-[200px] truncate" title={r.motivo}>{r.motivo}</td>
-
                         <td className="px-4 py-3"><BadgeEstado estado={r.estado} /></td>
                         {isAdminRoles && (
                           <td className="px-4 py-3 text-center">
                             {r.estado === 'PENDIENTE' && (
                               <div className="flex gap-2 justify-center">
-                                <button
-                                  onClick={() => abrirModalEstado(r, 'APROBADO')}
-                                  className="w-7 h-7 rounded bg-green-100 text-green-700 hover:bg-green-200 flex items-center justify-center transition-colors"
-                                  title="Aprobar"
-                                >
+                                <button onClick={() => abrirModalEstado(r, 'APROBADO')}
+                                  className="w-7 h-7 rounded bg-green-100 text-green-700 hover:bg-green-200 flex items-center justify-center transition-colors" title="Aprobar">
                                   <FaCheck className="text-xs" />
                                 </button>
-                                <button
-                                  onClick={() => abrirModalEstado(r, 'RECHAZADO')}
-                                  className="w-7 h-7 rounded bg-red-100 text-red-700 hover:bg-red-200 flex items-center justify-center transition-colors"
-                                  title="Rechazar"
-                                >
+                                <button onClick={() => abrirModalEstado(r, 'RECHAZADO')}
+                                  className="w-7 h-7 rounded bg-red-100 text-red-700 hover:bg-red-200 flex items-center justify-center transition-colors" title="Rechazar">
                                   <FaTimes className="text-xs" />
                                 </button>
                               </div>
@@ -221,6 +214,53 @@ export default function PermisosPage() {
                   )}
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile cards */}
+            <div className="md:hidden mb-4">
+              {loading ? (
+                <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">
+                  Cargando datos...
+                </div>
+              ) : filtrados.length === 0 ? (
+                <div className="bg-white rounded-xl border border-gray-200 p-10 text-center text-gray-400">
+                  <FaClipboardList className="mx-auto mb-2 text-2xl opacity-30" />
+                  <p className="text-sm">No hay permisos registrados</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filtrados.map(r => (
+                    <div key={r.id} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="min-w-0 flex-1 pr-3">
+                          <p className="font-semibold text-gray-900 text-sm truncate">{r.nombreCompleto}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">#{r.id}</p>
+                        </div>
+                        <BadgeEstado estado={r.estado} />
+                      </div>
+                      <p className="text-xs text-gray-600 mb-1">
+                        <span className="font-semibold">Período:</span>{' '}
+                        {formatFecha(r.fechaInicio)} – {formatFecha(r.fechaFin)}
+                      </p>
+                      <p className="text-xs text-gray-600 line-clamp-2">
+                        <span className="font-semibold">Motivo:</span> {r.motivo}
+                      </p>
+                      {isAdminRoles && r.estado === 'PENDIENTE' && (
+                        <div className="flex gap-2 mt-3">
+                          <button onClick={() => abrirModalEstado(r, 'APROBADO')}
+                            className="flex-1 py-2 text-xs font-semibold text-green-700 border border-green-200 bg-green-50 rounded-lg flex items-center justify-center gap-1.5 hover:bg-green-600 hover:text-white transition">
+                            <FaCheck /> Aprobar
+                          </button>
+                          <button onClick={() => abrirModalEstado(r, 'RECHAZADO')}
+                            className="flex-1 py-2 text-xs font-semibold text-red-700 border border-red-200 bg-red-50 rounded-lg flex items-center justify-center gap-1.5 hover:bg-red-600 hover:text-white transition">
+                            <FaTimes /> Rechazar
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
           </div>

@@ -14,7 +14,7 @@ async function main() {
   // ── Usuarios ──────────────────────────────────────────────────────────────
   const hash = (p: string) => bcrypt.hash(p, 10);
 
-  const [adminUser, tesoreroUser, pastorUser] = await Promise.all([
+  const [adminUser, jdUser, pastorUser, asistenteUser] = await Promise.all([
     prisma.usuario.upsert({
       where: { username: 'admin' },
       update: {},
@@ -28,14 +28,14 @@ async function main() {
       },
     }),
     prisma.usuario.upsert({
-      where: { username: 'tesorero' },
+      where: { username: 'juntadirectiva' },
       update: {},
       create: {
-        username: 'tesorero',
-        email: 'tesorero@iglesiaemanuel.cr',
-        passwordHash: await hash('Tesorero123'),
+        username: 'juntadirectiva',
+        email: 'jd@iglesiaemanuel.cr',
+        passwordHash: await hash('JuntaDir123'),
         nombreCompleto: 'María Fernanda Rodríguez Solís',
-        rol: 'tesorero',
+        rol: 'juntaDirectiva',
         estado: 1,
       },
     }),
@@ -51,6 +51,18 @@ async function main() {
         estado: 1,
       },
     }),
+    prisma.usuario.upsert({
+      where: { username: 'asistente' },
+      update: {},
+      create: {
+        username: 'asistente',
+        email: 'asistente@iglesiaemanuel.cr',
+        passwordHash: await hash('Asistente123'),
+        nombreCompleto: 'Carlos Andrés Mora Vargas',
+        rol: 'asistenteAdministrativo',
+        estado: 1,
+      },
+    }),
   ]);
   console.log('✅ Usuarios creados');
 
@@ -59,7 +71,7 @@ async function main() {
     skipDuplicates: true,
     data: [
       {
-        usuarioId: tesoreroUser.id,
+        usuarioId: jdUser.id,
         fechaInicio: new Date('2026-05-10'),
         fechaFin: new Date('2026-05-12'),
         motivo: 'Consulta médica y recuperación',
@@ -74,7 +86,7 @@ async function main() {
         estado: 'PENDIENTE',
       },
       {
-        usuarioId: adminUser.id,
+        usuarioId: asistenteUser.id,
         fechaInicio: new Date('2026-07-14'),
         fechaFin: new Date('2026-07-18'),
         motivo: 'Vacaciones anuales',
@@ -225,8 +237,9 @@ async function main() {
 
   console.log('\n🎉 Seed completado exitosamente.');
   console.log('   👤 admin / Admin123');
-  console.log('   👤 tesorero / Tesorero123');
+  console.log('   👤 juntadirectiva / JuntaDir123');
   console.log('   👤 pastor / Pastor123');
+  console.log('   👤 asistente / Asistente123');
 }
 
 main()

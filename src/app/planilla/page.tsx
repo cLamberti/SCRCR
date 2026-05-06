@@ -231,49 +231,90 @@ export default function PlanillaPage() {
                   </button>
                 </div>
               ) : (
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-100">
-                      {['Período', 'Estado', 'Fecha Generación', 'Total a Pagar', 'Acciones'].map(h => (
-                        <th key={h} className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
+                <>
+                  {/* Desktop table */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-100">
+                          {['Período', 'Estado', 'Fecha Generación', 'Total a Pagar', 'Acciones'].map(h => (
+                            <th key={h} className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {planillas.map(p => (
+                          <tr key={p.id} className="hover:bg-gray-50 transition">
+                            <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{MESES[p.mes - 1]} {p.anio}</td>
+                            <td className="px-6 py-4">
+                              <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold ${p.estado === 'cerrado' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                                {p.estado === 'cerrado' ? 'Cerrada' : 'Borrador'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-gray-600 text-xs whitespace-nowrap">{new Date(p.fechaGeneracion).toLocaleDateString('es-CR')}</td>
+                            <td className="px-6 py-4 font-semibold text-gray-900 whitespace-nowrap">
+                              ₡{p.totalAPagar?.toLocaleString('es-CR', { minimumFractionDigits: 2 }) ?? '—'}
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex gap-2">
+                                <button onClick={() => verDetalle(p.id)} title="Ver detalle"
+                                  className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white border border-blue-200 transition">
+                                  <FaEye className="text-xs" />
+                                </button>
+                                <button onClick={() => exportar(p.id)} title="Exportar Excel"
+                                  className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-600 hover:text-white border border-green-200 transition">
+                                  <FaFileExcel className="text-xs" />
+                                </button>
+                                {p.estado !== 'cerrado' && (
+                                  <button onClick={() => cerrarPlanilla(p.id)} title="Cerrar planilla"
+                                    className="p-2 rounded-lg bg-gray-50 text-gray-600 hover:bg-gray-600 hover:text-white border border-gray-200 transition">
+                                    <FaLock className="text-xs" />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile cards */}
+                  <div className="md:hidden divide-y divide-gray-100">
                     {planillas.map(p => (
-                      <tr key={p.id} className="hover:bg-gray-50 transition">
-                        <td className="px-6 py-4 font-medium text-gray-900">{MESES[p.mes - 1]} {p.anio}</td>
-                        <td className="px-6 py-4">
+                      <div key={p.id} className="p-4">
+                        <div className="flex items-start justify-between mb-2">
+                          <div>
+                            <p className="font-semibold text-gray-900 text-sm">{MESES[p.mes - 1]} {p.anio}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">{new Date(p.fechaGeneracion).toLocaleDateString('es-CR')}</p>
+                          </div>
                           <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold ${p.estado === 'cerrado' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
                             {p.estado === 'cerrado' ? 'Cerrada' : 'Borrador'}
                           </span>
-                        </td>
-                        <td className="px-6 py-4 text-gray-600 text-xs">{new Date(p.fechaGeneracion).toLocaleDateString('es-CR')}</td>
-                        <td className="px-6 py-4 font-semibold text-gray-900">
+                        </div>
+                        <p className="text-sm font-bold text-gray-900 mb-3">
                           ₡{p.totalAPagar?.toLocaleString('es-CR', { minimumFractionDigits: 2 }) ?? '—'}
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex gap-2">
-                            <button onClick={() => verDetalle(p.id)} title="Ver detalle"
-                              className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white border border-blue-200 transition">
-                              <FaEye className="text-xs" />
+                        </p>
+                        <div className="flex gap-2">
+                          <button onClick={() => verDetalle(p.id)}
+                            className="flex-1 py-2 text-xs font-semibold text-blue-600 border border-blue-200 bg-blue-50 rounded-lg flex items-center justify-center gap-1.5 hover:bg-blue-600 hover:text-white transition">
+                            <FaEye /> Ver detalle
+                          </button>
+                          <button onClick={() => exportar(p.id)}
+                            className="flex-1 py-2 text-xs font-semibold text-green-600 border border-green-200 bg-green-50 rounded-lg flex items-center justify-center gap-1.5 hover:bg-green-600 hover:text-white transition">
+                            <FaFileExcel /> Exportar
+                          </button>
+                          {p.estado !== 'cerrado' && (
+                            <button onClick={() => cerrarPlanilla(p.id)}
+                              className="py-2 px-3 text-xs font-semibold text-gray-600 border border-gray-200 bg-gray-50 rounded-lg flex items-center justify-center gap-1.5 hover:bg-gray-600 hover:text-white transition">
+                              <FaLock />
                             </button>
-                            <button onClick={() => exportar(p.id)} title="Exportar Excel"
-                              className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-600 hover:text-white border border-green-200 transition">
-                              <FaFileExcel className="text-xs" />
-                            </button>
-                            {p.estado !== 'cerrado' && (
-                              <button onClick={() => cerrarPlanilla(p.id)} title="Cerrar planilla"
-                                className="p-2 rounded-lg bg-gray-50 text-gray-600 hover:bg-gray-600 hover:text-white border border-gray-200 transition">
-                                <FaLock className="text-xs" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
+                          )}
+                        </div>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
+                  </div>
+                </>
               )}
             </div>
           )}
@@ -359,45 +400,83 @@ export default function PlanillaPage() {
                     <p className="text-gray-500 text-sm">No hay empleados registrados.</p>
                   </div>
                 ) : (
-                  <table className="min-w-full text-sm">
-                    <thead>
-                      <tr className="bg-gray-50 border-b border-gray-100">
-                        {['Nombre', 'Cédula', 'Puesto', 'Salario Base', 'Cuenta Bancaria', 'Estado', 'Acciones'].map(h => (
-                          <th key={h} className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
+                  <>
+                    {/* Desktop table */}
+                    <div className="hidden md:block overflow-x-auto">
+                      <table className="min-w-full text-sm">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-100">
+                            {['Nombre', 'Cédula', 'Puesto', 'Salario Base', 'Cuenta Bancaria', 'Estado', 'Acciones'].map(h => (
+                              <th key={h} className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {empleados.map(e => (
+                            <tr key={e.id} className="hover:bg-gray-50 transition">
+                              <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{e.nombre}</td>
+                              <td className="px-6 py-4 text-gray-600 font-mono text-xs whitespace-nowrap">{e.cedula}</td>
+                              <td className="px-6 py-4 text-gray-600 whitespace-nowrap">{e.puesto}</td>
+                              <td className="px-6 py-4 font-semibold text-gray-900 whitespace-nowrap">₡{e.salarioBase.toLocaleString('es-CR', { minimumFractionDigits: 2 })}</td>
+                              <td className="px-6 py-4 text-gray-500 text-xs">{e.cuentaBancaria || '-'}</td>
+                              <td className="px-6 py-4">
+                                <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold ${e.estado === 1 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                  {e.estado === 1 ? 'Activo' : 'Inactivo'}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex gap-2">
+                                  <button onClick={() => abrirFormEmp(e)} title="Editar"
+                                    className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white border border-blue-200 transition">
+                                    <FaEye className="text-xs" />
+                                  </button>
+                                  {e.estado === 1 && (
+                                    <button onClick={() => eliminarEmpleado(e)} title="Desactivar"
+                                      className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-600 hover:text-white border border-red-200 transition">
+                                      <FaTrash className="text-xs" />
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Mobile cards */}
+                    <div className="md:hidden divide-y divide-gray-100">
                       {empleados.map(e => (
-                        <tr key={e.id} className="hover:bg-gray-50 transition">
-                          <td className="px-6 py-4 font-medium text-gray-900">{e.nombre}</td>
-                          <td className="px-6 py-4 text-gray-600 font-mono text-xs">{e.cedula}</td>
-                          <td className="px-6 py-4 text-gray-600">{e.puesto}</td>
-                          <td className="px-6 py-4 font-semibold text-gray-900">₡{e.salarioBase.toLocaleString('es-CR', { minimumFractionDigits: 2 })}</td>
-                          <td className="px-6 py-4 text-gray-500 text-xs">{e.cuentaBancaria || '-'}</td>
-                          <td className="px-6 py-4">
-                            <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold ${e.estado === 1 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                        <div key={e.id} className="p-4">
+                          <div className="flex items-start justify-between mb-1">
+                            <div className="min-w-0 flex-1 pr-3">
+                              <p className="font-semibold text-gray-900 text-sm truncate">{e.nombre}</p>
+                              <p className="text-xs text-gray-500 mt-0.5">{e.cedula} · {e.puesto}</p>
+                            </div>
+                            <span className={`flex-shrink-0 inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold ${e.estado === 1 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                               {e.estado === 1 ? 'Activo' : 'Inactivo'}
                             </span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex gap-2">
-                              <button onClick={() => abrirFormEmp(e)} title="Editar"
-                                className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white border border-blue-200 transition">
-                                <FaEye className="text-xs" />
+                          </div>
+                          <p className="text-sm font-bold text-gray-900 mt-2">₡{e.salarioBase.toLocaleString('es-CR', { minimumFractionDigits: 2 })}</p>
+                          {e.cuentaBancaria && (
+                            <p className="text-xs text-gray-400 font-mono mt-0.5 truncate">{e.cuentaBancaria}</p>
+                          )}
+                          <div className="flex gap-2 mt-3">
+                            <button onClick={() => abrirFormEmp(e)}
+                              className="flex-1 py-2 text-xs font-semibold text-blue-600 border border-blue-200 bg-blue-50 rounded-lg hover:bg-blue-600 hover:text-white transition">
+                              Editar
+                            </button>
+                            {e.estado === 1 && (
+                              <button onClick={() => eliminarEmpleado(e)}
+                                className="flex-1 py-2 text-xs font-semibold text-red-600 border border-red-200 bg-red-50 rounded-lg hover:bg-red-600 hover:text-white transition">
+                                Desactivar
                               </button>
-                              {e.estado === 1 && (
-                                <button onClick={() => eliminarEmpleado(e)} title="Desactivar"
-                                  className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-600 hover:text-white border border-red-200 transition">
-                                  <FaTrash className="text-xs" />
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
+                            )}
+                          </div>
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
+                    </div>
+                  </>
                 )}
               </div>
             </div>

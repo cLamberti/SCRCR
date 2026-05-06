@@ -1,110 +1,91 @@
-
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { jwtVerify } from 'jose';
 
-// Definir permisos por ruta y rol
+// ── Permisos por ruta ────────────────────────────────────────────────────────
+
 const routePermissions: Record<string, string[]> = {
-  '/consulta-asociados': ['admin', 'tesorero', 'pastorGeneral'],
-  '/eliminar-asociados': ['admin', 'pastorGeneral'],
-  '/gestion-usuarios': ['admin', 'pastorGeneral'],
-  '/reportes': ['admin', 'tesorero', 'pastorGeneral'],
-  '/configuracion': ['admin', 'tesorero', 'pastorGeneral', 'asistenteAdministrativo'],
-  '/dashboard': ['admin', 'tesorero', 'pastorGeneral', 'asistenteAdministrativo'],
-  '/congregados': ['admin', 'tesorero', 'pastorGeneral', 'asistenteAdministrativo'],
-  '/permisos': ['admin', 'tesorero', 'pastorGeneral', 'asistenteAdministrativo'],
+  '/consulta-asociados': ['admin', 'juntaDirectiva'],
+  '/congregados':        ['admin', 'pastorGeneral', 'asistenteAdministrativo'],
+  '/eventos':            ['admin', 'pastorGeneral', 'asistenteAdministrativo'],
+  '/gestion-usuarios':   ['admin', 'asistenteAdministrativo'],
+  '/planilla':           ['admin', 'juntaDirectiva'],
+  '/reportes':           ['admin', 'pastorGeneral', 'juntaDirectiva', 'asistenteAdministrativo'],
+  '/permisos':           ['admin', 'pastorGeneral', 'asistenteAdministrativo'],
+  '/actas':              ['admin', 'juntaDirectiva'],
+  '/configuracion':      ['admin', 'pastorGeneral', 'juntaDirectiva', 'asistenteAdministrativo'],
 };
 
-// Rutas que solo pueden acceder usuarios no autenticados
+// Rutas solo para no autenticados
 const authRoutes = ['/login'];
 
-// Rutas públicas que no requieren autenticación
+// Rutas públicas sin restricción
 const publicRoutes = ['/', '/recuperar-password'];
+
+// ── Helper: verificar JWT en Edge ────────────────────────────────────────────
+
+async function getTokenPayload(token: string): Promise<{ rol: string } | null> {
+  try {
+    const secret = new TextEncoder().encode(process.env.JWT_SECRET ?? '');
+    const { payload } = await jwtVerify(token, secret);
+    return payload as { rol: string };
+  } catch {
+    return null;
+  }
+}
+
+// ── Middleware ────────────────────────────────────────────────────────────────
 
 export async function middleware(request: NextRequest) {
   const token = request.cookies.get('auth-token')?.value;
   const { pathname } = request.nextUrl;
 
-  console.log(' MIDDLEWARE ');
-  console.log('Path:', pathname);
-  console.log('Token presente:', !!token);
-
-  // Permitir rutas públicas
+  // Rutas públicas — siempre permitir
   if (publicRoutes.includes(pathname)) {
-    console.log('Ruta pública, permitiendo acceso');
     return NextResponse.next();
   }
 
-  // Si está intentando acceder a una ruta de autenticación y ya tiene token
+  // Rutas de autenticación (/login)
   if (authRoutes.some(route => pathname.startsWith(route))) {
     if (token) {
-      console.log('Usuario con token intentando acceder a login, redirigiendo a home');
-      return NextResponse.redirect(new URL('/', request.url));
+      // Solo redirigir si el token es realmente válido
+      const payload = await getTokenPayload(token);
+      if (payload) {
+        return NextResponse.redirect(new URL('/', request.url));
+      }
     }
     return NextResponse.next();
   }
 
-  // Verificar si la ruta requiere autenticación
-  const protectedRoute = Object.keys(routePermissions).find(route => 
-    pathname.startsWith(route)
+  // Rutas protegidas
+  const protectedRoute = Object.keys(routePermissions).find(route =>
+    pathname.startsWith(route),
   );
 
   if (protectedRoute) {
-    // Si no hay token, redirigir a login
     if (!token) {
-      console.log('No hay token, redirigiendo a login');
       const loginUrl = new URL('/login', request.url);
       loginUrl.searchParams.set('redirect', pathname);
       return NextResponse.redirect(loginUrl);
     }
 
-    // Verificar el rol del usuario
-    try {
-      console.log('Verificando permisos para:', protectedRoute);
-      
-      // Hacer una petición interna para verificar el usuario y su rol
-      const verifyUrl = new URL('/api/auth/verify-role', request.url);
-      const verifyResponse = await fetch(verifyUrl, {
-        headers: {
-          'Cookie': `auth-token=${token}`,
-        },
-      });
+    // Verificar token y rol directamente (sin fetch interno)
+    const payload = await getTokenPayload(token);
 
-      if (!verifyResponse.ok) {
-        console.log('Token inválido, redirigiendo a login');
-        const loginUrl = new URL('/login', request.url);
-        loginUrl.searchParams.set('redirect', pathname);
-        return NextResponse.redirect(loginUrl);
-      }
-
-      const { rol } = await verifyResponse.json();
-      console.log('Rol del usuario:', rol);
-
-      const allowedRoles = routePermissions[protectedRoute];
-      console.log('Roles permitidos:', allowedRoles);
-
-      if (!allowedRoles.includes(rol)) {
-        console.log('Rol no autorizado, redirigiendo a home');
-        const response = NextResponse.redirect(new URL('/', request.url));
-        
-        // Agregar header para mostrar mensaje de error
-        response.headers.set('X-Unauthorized', 'true');
-        response.headers.set('X-Unauthorized-Message', 'No tienes permisos para acceder a esta página');
-        
-        return response;
-      }
-
-      console.log('Rol autorizado, permitiendo acceso');
-      return NextResponse.next();
-
-    } catch (error) {
-      console.error('Error verificando rol:', error);
-      const loginUrl = new URL('/login', request.url);
-      loginUrl.searchParams.set('redirect', pathname);
-      return NextResponse.redirect(loginUrl);
+    if (!payload) {
+      const response = NextResponse.redirect(new URL('/login', request.url));
+      response.cookies.delete('auth-token');
+      return response;
     }
+
+    const allowedRoles = routePermissions[protectedRoute];
+    if (!allowedRoles.includes(payload.rol)) {
+      return NextResponse.redirect(new URL('/', request.url));
+    }
+
+    return NextResponse.next();
   }
 
-  // Rutas no protegidas
   return NextResponse.next();
 }
 

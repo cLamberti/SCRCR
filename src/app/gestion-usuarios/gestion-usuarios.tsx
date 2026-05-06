@@ -23,19 +23,21 @@ type FormState = {
   username: string;
   email: string;
   password: string;
-  rol: "admin" | "tesorero" | "pastorGeneral";
+  rol: "admin" | "pastorGeneral" | "juntaDirectiva" | "asistenteAdministrativo";
 };
 
 const ROL_LABELS: Record<string, string> = {
   admin: "Administrador",
-  tesorero: "Tesorero",
   pastorGeneral: "Pastor General",
+  juntaDirectiva: "Junta Directiva",
+  asistenteAdministrativo: "Asistente Administrativo",
 };
 
 const ROL_COLORS: Record<string, string> = {
   admin: "bg-purple-100 text-purple-800",
-  tesorero: "bg-blue-100 text-blue-800",
   pastorGeneral: "bg-amber-100 text-amber-800",
+  juntaDirectiva: "bg-blue-100 text-blue-800",
+  asistenteAdministrativo: "bg-emerald-100 text-emerald-800",
 };
 
 export default function GestionUsuariosPage() {
@@ -50,30 +52,26 @@ export default function GestionUsuariosPage() {
   const [rolFiltro, setRolFiltro] = useState("");
 
   const [formState, setFormState] = useState<FormState>({
-    nombreCompleto: "", username: "", email: "", password: "", rol: "tesorero",
+    nombreCompleto: "", username: "", email: "", password: "", rol: "juntaDirectiva",
   });
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
   const [enviando, setEnviando] = useState(false);
 
-  const cargarUsuarios = async (page = currentPage, limit = itemsPerPage) => {
+  const cargarUsuarios = async () => {
     setLoading(true);
     setMensaje("");
     try {
-      const res = await fetch(`/api/usuarios?page=${page}&limit=${limit}`);
+      const res = await fetch('/api/usuarios');
       const json = await res.json();
       if (!res.ok || !json.success) { setMensaje(json.message || "Error al obtener usuarios"); setMensajeOk(false); return; }
       setUsuarios(json.data || []);
-      if (json.pagination) { setCurrentPage(json.pagination.page); setTotalPages(json.pagination.totalPages); setTotalItems(json.pagination.total); }
     } catch { setMensaje("Error de conexión."); setMensajeOk(false); }
     finally { setLoading(false); }
   };
 
   useEffect(() => { cargarUsuarios(); }, []);
-  useEffect(() => { cargarUsuarios(currentPage, itemsPerPage); }, [currentPage, itemsPerPage]);
 
   const validarFormulario = (): string | null => {
     const { nombreCompleto, username, email } = formState;
@@ -102,14 +100,17 @@ export default function GestionUsuariosPage() {
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
-        const errMsg = json.errors ? Object.values(json.errors).flat().join(" ") : json.message || "Error al crear el usuario";
-        setMensaje(String(errMsg)); setMensajeOk(false); return;
+        let errMsg = json.message || "Error al crear el usuario";
+        if (json.errors && Array.isArray(json.errors)) {
+          errMsg = json.errors.map((e: { field: string; message: string }) => e.message).join(" ");
+        }
+        setMensaje(errMsg); setMensajeOk(false); return;
       }
       setMensaje("Usuario creado exitosamente."); setMensajeOk(true);
-      setFormState({ nombreCompleto: "", username: "", email: "", password: "", rol: "tesorero" });
+      setFormState({ nombreCompleto: "", username: "", email: "", password: "", rol: "juntaDirectiva" });
       setShowForm(false);
       setCurrentPage(1);
-      await cargarUsuarios(1, itemsPerPage);
+      await cargarUsuarios();
     } catch { setMensaje("Error de conexión."); setMensajeOk(false); }
     finally { setEnviando(false); }
   };
@@ -137,7 +138,7 @@ export default function GestionUsuariosPage() {
           const json = await res.json();
           if (res.ok && json.success) {
             Swal.fire('¡Listo!', json.message, 'success');
-            cargarUsuarios(currentPage, itemsPerPage);
+            cargarUsuarios();
           } else {
             Swal.fire('Error', json.message || 'Error al eliminar el usuario', 'error');
           }
@@ -154,6 +155,10 @@ export default function GestionUsuariosPage() {
     const matchRol = !rolFiltro || u.rol === rolFiltro;
     return matchQ && matchRol;
   });
+
+  const totalPages = Math.max(1, Math.ceil(filtrados.length / itemsPerPage));
+  const paginaActual = Math.min(currentPage, totalPages);
+  const paginados = filtrados.slice((paginaActual - 1) * itemsPerPage, paginaActual * itemsPerPage);
 
   const inputCls = "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#17609c] focus:border-transparent transition";
   const labelCls = "block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1";
@@ -225,8 +230,8 @@ export default function GestionUsuariosPage() {
                 </div>
                 <div className="sm:col-span-2">
                   <label className={labelCls}>Rol *</label>
-                  <div className="grid grid-cols-3 gap-3">
-                    {(["tesorero", "pastorGeneral", "admin"] as const).map(r => (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {(["juntaDirectiva", "pastorGeneral", "asistenteAdministrativo", "admin"] as const).map(r => (
                       <label key={r} className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 cursor-pointer transition ${formState.rol === r ? "border-[#003366] bg-[#003366]/5" : "border-gray-200 hover:border-gray-300"}`}>
                         <input type="radio" name="rol" value={r} checked={formState.rol === r} onChange={() => setFormState(p => ({ ...p, rol: r }))} className="sr-only" />
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${ROL_COLORS[r]}`}>{ROL_LABELS[r]}</span>
@@ -249,16 +254,17 @@ export default function GestionUsuariosPage() {
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="relative flex-1">
                 <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
-                <input type="text" value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por nombre, usuario o correo…" className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#17609c]" />
+                <input type="text" value={busqueda} onChange={e => { setBusqueda(e.target.value); setCurrentPage(1); }} placeholder="Buscar por nombre, usuario o correo…" className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#17609c]" />
               </div>
-              <select value={rolFiltro} onChange={e => setRolFiltro(e.target.value)} className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#17609c]">
+              <select value={rolFiltro} onChange={e => { setRolFiltro(e.target.value); setCurrentPage(1); }} className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#17609c]">
                 <option value="">Todos los roles</option>
                 <option value="admin">Administrador</option>
-                <option value="tesorero">Tesorero</option>
                 <option value="pastorGeneral">Pastor General</option>
+                <option value="juntaDirectiva">Junta Directiva</option>
+                <option value="asistenteAdministrativo">Asistente Administrativo</option>
               </select>
               <div className="flex items-center gap-2">
-                <select value={itemsPerPage} onChange={e => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }} className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none">
+                <select value={itemsPerPage} onChange={e => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }} aria-label="Filas por página" className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none">
                   {[5, 10, 25, 50].map(n => <option key={n} value={n}>{n}/pág.</option>)}
                 </select>
               </div>
@@ -266,12 +272,13 @@ export default function GestionUsuariosPage() {
           </div>
 
           {/* Estadísticas rápidas */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             {[
-              { label: "Total", value: totalItems, color: "bg-[#003366]" },
+              { label: "Total", value: usuarios.length, color: "bg-[#003366]" },
               { label: "Admins", value: usuarios.filter(u => u.rol === "admin").length, color: "bg-purple-600" },
               { label: "Pastores", value: usuarios.filter(u => u.rol === "pastorGeneral").length, color: "bg-amber-500" },
-              { label: "Tesoreros", value: usuarios.filter(u => u.rol === "tesorero").length, color: "bg-blue-500" },
+              { label: "Junta Directiva", value: usuarios.filter(u => u.rol === "juntaDirectiva").length, color: "bg-blue-500" },
+              { label: "Asistentes", value: usuarios.filter(u => u.rol === "asistenteAdministrativo").length, color: "bg-emerald-500" },
             ].map(stat => (
               <div key={stat.label} className="bg-white rounded-xl border border-gray-200 p-4">
                 <div className={`w-8 h-1 ${stat.color} rounded-full mb-2`} />
@@ -286,6 +293,7 @@ export default function GestionUsuariosPage() {
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <span className="text-sm font-semibold text-gray-700">
                 {loading ? "Cargando..." : `${filtrados.length} usuario${filtrados.length !== 1 ? "s" : ""}`}
+              {!loading && filtrados.length > 0 && <span className="text-xs text-gray-400 font-normal ml-1">(pág. {paginaActual}/{totalPages})</span>}
               </span>
               <button onClick={() => { setShowForm(v => !v); setMensaje(""); }} className="md:hidden inline-flex items-center gap-1.5 bg-[#003366] text-white text-xs font-semibold px-3 py-1.5 rounded-lg">
                 <FaUserPlus /> Nuevo
@@ -312,7 +320,7 @@ export default function GestionUsuariosPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {filtrados.map(u => (
+                      {paginados.map(u => (
                         <tr key={u.id} className="hover:bg-gray-50 transition">
                           <td className="px-6 py-4 text-gray-400 text-xs font-mono">{u.id}</td>
                           <td className="px-6 py-4 font-medium text-gray-900">{u.nombreCompleto}</td>
@@ -346,7 +354,7 @@ export default function GestionUsuariosPage() {
 
                 {/* Mobile cards */}
                 <div className="md:hidden divide-y divide-gray-100">
-                  {filtrados.map(u => (
+                  {paginados.map(u => (
                     <div key={u.id} className="p-4">
                       <div className="flex items-start justify-between mb-2">
                         <div>
@@ -377,17 +385,17 @@ export default function GestionUsuariosPage() {
             )}
 
             {/* Paginación */}
-            {!loading && totalItems > 0 && (
+            {!loading && filtrados.length > 0 && (
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-6 py-4 border-t border-gray-100">
                 <span className="text-xs text-gray-500">
-                  Mostrando {filtrados.length} de {totalItems} usuarios
+                  Mostrando {Math.min((paginaActual - 1) * itemsPerPage + 1, filtrados.length)}–{Math.min(paginaActual * itemsPerPage, filtrados.length)} de {filtrados.length} usuarios
                 </span>
                 <div className="flex items-center gap-1.5">
-                  <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 transition">
+                  <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={paginaActual === 1} className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 transition">
                     <FaChevronLeft className="text-xs" />
                   </button>
-                  <span className="text-xs text-gray-500 px-2">Página {currentPage} de {totalPages}</span>
-                  <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 transition">
+                  <span className="text-xs text-gray-500 px-2">Página {paginaActual} de {totalPages}</span>
+                  <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={paginaActual === totalPages} className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 transition">
                     <FaChevronRight className="text-xs" />
                   </button>
                 </div>
