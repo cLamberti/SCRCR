@@ -18,7 +18,7 @@ model Usuario {
   email            String    @unique @db.VarChar(255)
   passwordHash     String    @map("password_hash") @db.VarChar(255)
   nombreCompleto   String    @map("nombre_completo") @db.VarChar(255)
-  rol              String    @default("tesorero") @db.VarChar(20)
+  rol              String    @default("juntaDirectiva") @db.VarChar(30)
   estado           Int       @default(1)
   ultimoAcceso     DateTime? @map("ultimo_acceso")
   intentosFallidos Int       @default(0) @map("intentos_fallidos")

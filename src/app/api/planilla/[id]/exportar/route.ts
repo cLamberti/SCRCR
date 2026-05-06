@@ -18,7 +18,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     const titulo = `Planilla ${MESES[planilla.mes - 1]} ${planilla.anio}`;
     const filas = [
       [titulo],
-      [`Estado: ${planilla.estado === 'cerrado' ? 'Cerrada' : 'Borrador'}`, '', `Generada: ${new Date(planilla.fechaGeneracion).toLocaleDateString('es-CR')}`],
+      ['', `Estado: ${planilla.estado === 'cerrado' ? 'Cerrada' : 'Borrador'}`, '', '', '', '', '', '', '', `Generada: ${new Date(planilla.fechaGeneracion).toLocaleDateString('es-CR')}`],
       [],
       ['#', 'Nombre', 'Cédula', 'Puesto', 'Cuenta Bancaria', 'Salario Base', 'Días Trabajados', 'Días Ausentes', 'Días Vacaciones', 'Días Incapacidad', 'Monto a Pagar'],
       ...planilla.lineas.map((l, i) => [

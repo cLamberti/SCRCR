@@ -365,8 +365,8 @@ export default function CongregadosPage() {
               )}
             </div>
 
-            {/* Tabla */}
-            <div className="overflow-x-auto rounded-xl border border-gray-200 mb-4">
+            {/* Tabla (desktop) */}
+            <div className="hidden md:block overflow-x-auto rounded-xl border border-gray-200 mb-4">
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="bg-[#003366] text-white">
@@ -418,6 +418,66 @@ export default function CongregadosPage() {
                   )}
                 </tbody>
               </table>
+            </div>
+
+            {/* Tarjetas (mobile) */}
+            <div className="md:hidden mb-4">
+              {loading ? (
+                <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">
+                  Cargando datos...
+                </div>
+              ) : paginados.length === 0 ? (
+                <div className="bg-white rounded-xl border border-gray-200 p-10 text-center text-gray-400">
+                  <FaSearch className="mx-auto mb-2 text-2xl opacity-30" />
+                  <p className="text-sm">No se encontraron resultados</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {paginados.map(r => {
+                    const checked = seleccionados.has(r.id);
+                    return (
+                      <div
+                        key={r.id}
+                        className={`rounded-xl border shadow-sm p-4 transition-colors ${
+                          checked ? "bg-blue-50 border-blue-200" : r.estado === 0 ? "bg-red-50/30 border-gray-200" : "bg-white border-gray-200"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between mb-2 gap-2">
+                          <div className="flex items-start gap-2 min-w-0 flex-1">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleFila(r.id)}
+                              className="w-4 h-4 accent-[#003366] cursor-pointer mt-0.5 flex-shrink-0"
+                            />
+                            <div className="min-w-0">
+                              <p className={`font-semibold text-sm truncate ${r.estado === 0 ? "line-through text-gray-400" : "text-gray-900"}`}>
+                                {r.nombre}
+                              </p>
+                              <p className="text-xs text-gray-400 mt-0.5">#{r.id} · {r.cedula}</p>
+                            </div>
+                          </div>
+                          <Badge activo={r.estado === 1} />
+                        </div>
+                        <div className="text-xs text-gray-600 space-y-1 mb-3 pl-6">
+                          {r.telefono && <p><span className="font-semibold">Tel:</span> {r.telefono}</p>}
+                          {r.ministerio && <p><span className="font-semibold">Ministerio:</span> {r.ministerio}</p>}
+                          {r.estadoCivil && <p><span className="font-semibold">Est. Civil:</span> {ESTADO_CIVIL_LABELS[r.estadoCivil] || r.estadoCivil}</p>}
+                          <p><span className="font-semibold">Ingreso:</span> {formatFecha(r.fechaIngreso)}</p>
+                        </div>
+                        <div className="pl-6">
+                          <button
+                            onClick={() => abrirEditar(r)}
+                            className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition"
+                          >
+                            <FaEdit className="text-xs" /> Editar
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Paginación */}

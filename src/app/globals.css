@@ -1,43 +1,384 @@
 @import "tailwindcss";
 
+/* ── Tema por defecto: Azul Naval ────────────────────────────────────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --primary: #003366;
-  --primary-hover: #004488;
-  --primary-light: #17609c;
+  --p:          #003366;   /* primary */
+  --p-hover:    #004488;
+  --p-light:    #17609c;
+  --p-subtle:   #eef3ff;
+  --sidebar-bg: #003366;
+  --sidebar-text: #ffffff;
+  --sidebar-muted: rgba(255,255,255,0.45);
+  --sidebar-active-bg: #ffffff;
+  --sidebar-active-text: #003366;
+  --sidebar-hover-bg: rgba(255,255,255,0.10);
+
+  --bg:         #f8fafc;
+  --surface:    #ffffff;
+  --border:     #e2e8f0;
+  --text:       #111827;
+  --text-muted: #6b7280;
+  --input-bg:   #ffffff;
+  --input-border: #d1d5db;
+
+  --background: var(--bg);
+  --foreground: var(--text);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* ── Azul Cielo ──────────────────────────────────────────────────────────── */
+[data-theme="sky"] {
+  --p:          #0284c7;
+  --p-hover:    #0369a1;
+  --p-light:    #38bdf8;
+  --p-subtle:   #e0f2fe;
+  --sidebar-bg: #075985;
+  --sidebar-active-text: #075985;
 }
 
+/* ── Verde Esmeralda ─────────────────────────────────────────────────────── */
+[data-theme="green"] {
+  --p:          #15803d;
+  --p-hover:    #166534;
+  --p-light:    #22c55e;
+  --p-subtle:   #dcfce7;
+  --sidebar-bg: #166534;
+  --sidebar-active-text: #166534;
+}
+
+/* ── Violeta ─────────────────────────────────────────────────────────────── */
+[data-theme="violet"] {
+  --p:          #7c3aed;
+  --p-hover:    #6d28d9;
+  --p-light:    #a78bfa;
+  --p-subtle:   #ede9fe;
+  --sidebar-bg: #5b21b6;
+  --sidebar-active-text: #5b21b6;
+}
+
+/* ── Modo Oscuro ─────────────────────────────────────────────────────────── */
+.dark {
+  --bg:         #0f172a;
+  --surface:    #1e293b;
+  --border:     #334155;
+  --text:       #f1f5f9;
+  --text-muted: #94a3b8;
+  --input-bg:   #1e293b;
+  --input-border: #475569;
+  --p-subtle:   rgba(255,255,255,0.08);
+  --sidebar-bg: #0f172a;
+  --sidebar-hover-bg: rgba(255,255,255,0.08);
+  --sidebar-active-bg:   rgba(255,255,255,0.14);
+  --sidebar-active-text: #ffffff;
+  --background: var(--bg);
+  --foreground: var(--text);
+}
+
+/* En modo oscuro con otros temas, el sidebar toma colores más oscuros */
+.dark[data-theme="sky"]    { --sidebar-bg: #0c4a6e; }
+.dark[data-theme="green"]  { --sidebar-bg: #052e16; }
+.dark[data-theme="violet"] { --sidebar-bg: #2e1065; }
+
+/* ── Alto Contraste ──────────────────────────────────────────────────────── */
+[data-contrast="high"] {
+  --border: #000000;
+  --text: #000000;
+  --text-muted: #1a1a1a;
+}
+.dark[data-contrast="high"] {
+  --border: #ffffff;
+  --text: #ffffff;
+  --text-muted: #e5e5e5;
+}
+
+/* ── Fuentes de accesibilidad ────────────────────────────────────────────── */
+[data-font="serif"]  body { font-family: Georgia, 'Times New Roman', serif !important; }
+[data-font="mono"]   body { font-family: 'Courier New', Courier, monospace !important; }
+[data-font="dyslexia"] body { font-family: 'Arial', Helvetica, sans-serif !important; letter-spacing: 0.05em; word-spacing: 0.1em; }
+
+/* ── Movimiento reducido ─────────────────────────────────────────────────── */
+[data-motion="reduced"] *, [data-motion="reduced"] *::before, [data-motion="reduced"] *::after {
+  animation-duration: 0.01ms !important;
+  transition-duration: 0.01ms !important;
+}
+
+/* ── Utilidades globales con variables ───────────────────────────────────── */
 body {
-  background: var(--background);
+  background-color: var(--bg);
+  color: var(--text);
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Scrollbar personalizada para tablas */
-.overflow-x-auto::-webkit-scrollbar {
-  height: 6px;
+/* Scrollbar */
+.overflow-x-auto::-webkit-scrollbar { height: 6px; }
+.overflow-x-auto::-webkit-scrollbar-track { background: var(--border); border-radius: 3px; }
+.overflow-x-auto::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 3px; opacity: 0.4; }
+.overflow-x-auto::-webkit-scrollbar-thumb:hover { opacity: 0.7; }
+
+html, body { overflow-x: hidden; }
+
+/* Transición suave al cambiar tema */
+*, *::before, *::after {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.15s ease;
 }
-.overflow-x-auto::-webkit-scrollbar-track {
-  background: #f1f5f9;
-  border-radius: 3px;
-}
-.overflow-x-auto::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
-}
-.overflow-x-auto::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+[data-motion="reduced"] *, [data-motion="reduced"] *::before, [data-motion="reduced"] *::after {
+  transition: none !important;
 }
 
-/* Evitar overflow horizontal en móvil */
-html, body {
-  overflow-x: hidden;
+/* ══════════════════════════════════════════════════════════════════════════
+   OVERRIDES DE MODO OSCURO — solo en el dashboard (páginas con sidebar)
+   El selector :has([data-dashboard]) excluye la página inicial y el login.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Fondos */
+html:has([data-dashboard]).dark body,
+html:has([data-dashboard]).dark .bg-gray-50,
+html:has([data-dashboard]).dark .bg-slate-50 { background-color: #0f172a !important; }
+
+html:has([data-dashboard]).dark .bg-white { background-color: #1e293b !important; }
+
+html:has([data-dashboard]).dark .bg-gray-100,
+html:has([data-dashboard]).dark .bg-gray-200 { background-color: #273549 !important; }
+
+html:has([data-dashboard]).dark .bg-gray-800 { background-color: #0f172a !important; }
+
+/* Hover sobre filas / elementos */
+html:has([data-dashboard]).dark .hover\:bg-gray-50:hover  { background-color: #273549 !important; }
+html:has([data-dashboard]).dark .hover\:bg-gray-100:hover { background-color: #2d3f55 !important; }
+html:has([data-dashboard]).dark .hover\:bg-white:hover    { background-color: #2d3f55 !important; }
+
+/* Texto */
+html:has([data-dashboard]).dark .text-gray-900,
+html:has([data-dashboard]).dark .text-gray-800 { color: #f1f5f9 !important; }
+
+html:has([data-dashboard]).dark .text-gray-700 { color: #cbd5e1 !important; }
+
+html:has([data-dashboard]).dark .text-gray-600,
+html:has([data-dashboard]).dark .text-gray-500 { color: #94a3b8 !important; }
+
+html:has([data-dashboard]).dark .text-gray-400 { color: #64748b !important; }
+
+/* Bordes */
+html:has([data-dashboard]).dark .border-gray-200,
+html:has([data-dashboard]).dark .border-gray-100,
+html:has([data-dashboard]).dark .border-gray-300 { border-color: #334155 !important; }
+
+/* Inputs y selects */
+html:has([data-dashboard]).dark input,
+html:has([data-dashboard]).dark select,
+html:has([data-dashboard]).dark textarea {
+  background-color: #1e293b !important;
+  border-color: #475569 !important;
+  color: #f1f5f9 !important;
+}
+html:has([data-dashboard]).dark input::placeholder,
+html:has([data-dashboard]).dark textarea::placeholder { color: #64748b !important; }
+
+/* Tablas */
+html:has([data-dashboard]).dark thead tr,
+html:has([data-dashboard]).dark .bg-gray-50 thead { background-color: #161f2e !important; }
+html:has([data-dashboard]).dark tbody tr:hover     { background-color: #273549 !important; }
+html:has([data-dashboard]).dark table              { background-color: #1e293b !important; }
+
+/* Divisores */
+html:has([data-dashboard]).dark .divide-gray-50  > * + * { border-color: #334155 !important; }
+html:has([data-dashboard]).dark .divide-gray-100 > * + * { border-color: #334155 !important; }
+html:has([data-dashboard]).dark .divide-y > * + *        { border-color: #334155 !important; }
+
+/* Badges / Pills */
+html:has([data-dashboard]).dark .bg-green-50   { background-color: rgba(16,185,129,0.15) !important; }
+html:has([data-dashboard]).dark .bg-red-50     { background-color: rgba(239,68,68,0.15)  !important; }
+html:has([data-dashboard]).dark .bg-blue-50    { background-color: rgba(59,130,246,0.15) !important; }
+html:has([data-dashboard]).dark .bg-amber-50   { background-color: rgba(245,158,11,0.15) !important; }
+html:has([data-dashboard]).dark .bg-purple-50  { background-color: rgba(139,92,246,0.15) !important; }
+html:has([data-dashboard]).dark .bg-emerald-50 { background-color: rgba(16,185,129,0.15) !important; }
+
+/* Sombras */
+html:has([data-dashboard]).dark .shadow-sm  { box-shadow: 0 1px 2px rgba(0,0,0,0.4)   !important; }
+html:has([data-dashboard]).dark .shadow-md  { box-shadow: 0 4px 6px rgba(0,0,0,0.5)   !important; }
+html:has([data-dashboard]).dark .shadow-lg  { box-shadow: 0 10px 15px rgba(0,0,0,0.5) !important; }
+html:has([data-dashboard]).dark .shadow-2xl { box-shadow: 0 25px 50px rgba(0,0,0,0.6) !important; }
+
+/* Modales */
+html:has([data-dashboard]).dark .bg-white.rounded-2xl,
+html:has([data-dashboard]).dark .bg-white.rounded-xl { background-color: #1e293b !important; }
+
+/* Header sticky */
+html:has([data-dashboard]).dark header.bg-white {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+/* Scrollbar en oscuro */
+html:has([data-dashboard]).dark .overflow-x-auto::-webkit-scrollbar-track { background: #1e293b; }
+html:has([data-dashboard]).dark .overflow-x-auto::-webkit-scrollbar-thumb { background: #475569; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   TEMA-AWARE — solo en el dashboard
+   Reemplaza colores navy hardcodeados por la variable del tema activo.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Dark mode: texto navy → color claro del tema */
+html:has([data-dashboard]).dark .text-\[\#003366\]  { color: var(--p-light) !important; }
+html:has([data-dashboard]).dark .bg-\[\#f2f2f2\]    { background-color: var(--bg) !important; }
+
+/* ── Sky ─────────────────────────────────────────────────────────────────── */
+html:has([data-dashboard])[data-theme="sky"] .bg-\[\#003366\],
+html:has([data-dashboard])[data-theme="sky"] .bg-\[\#002a52\],
+html:has([data-dashboard])[data-theme="sky"] .bg-\[\#17609c\],
+html:has([data-dashboard])[data-theme="sky"] .bg-\[\#2070ac\],
+html:has([data-dashboard])[data-theme="sky"] .bg-\[\#3080bc\]          { background-color: var(--p) !important; }
+html:has([data-dashboard])[data-theme="sky"] .hover\:bg-\[\#004488\]:hover,
+html:has([data-dashboard])[data-theme="sky"] .hover\:bg-\[\#003366\]:hover { background-color: var(--p-hover) !important; }
+html:has([data-dashboard])[data-theme="sky"] .text-\[\#003366\]         { color: var(--p) !important; }
+html:has([data-dashboard])[data-theme="sky"] .border-\[\#003366\]       { border-color: var(--p) !important; }
+html:has([data-dashboard])[data-theme="sky"] .from-\[\#003366\],
+html:has([data-dashboard])[data-theme="sky"] .from-\[\#17609c\],
+html:has([data-dashboard])[data-theme="sky"] .from-\[\#2070ac\],
+html:has([data-dashboard])[data-theme="sky"] .from-\[\#3080bc\]        { --tw-gradient-from: var(--p); }
+html:has([data-dashboard])[data-theme="sky"] .to-\[\#17609c\],
+html:has([data-dashboard])[data-theme="sky"] .to-\[\#2070ac\],
+html:has([data-dashboard])[data-theme="sky"] .to-\[\#3080bc\]          { --tw-gradient-to: var(--p-light); }
+
+/* ── Green ───────────────────────────────────────────────────────────────── */
+html:has([data-dashboard])[data-theme="green"] .bg-\[\#003366\],
+html:has([data-dashboard])[data-theme="green"] .bg-\[\#002a52\],
+html:has([data-dashboard])[data-theme="green"] .bg-\[\#17609c\],
+html:has([data-dashboard])[data-theme="green"] .bg-\[\#2070ac\],
+html:has([data-dashboard])[data-theme="green"] .bg-\[\#3080bc\]          { background-color: var(--p) !important; }
+html:has([data-dashboard])[data-theme="green"] .hover\:bg-\[\#004488\]:hover,
+html:has([data-dashboard])[data-theme="green"] .hover\:bg-\[\#003366\]:hover { background-color: var(--p-hover) !important; }
+html:has([data-dashboard])[data-theme="green"] .text-\[\#003366\]         { color: var(--p) !important; }
+html:has([data-dashboard])[data-theme="green"] .border-\[\#003366\]       { border-color: var(--p) !important; }
+html:has([data-dashboard])[data-theme="green"] .from-\[\#003366\],
+html:has([data-dashboard])[data-theme="green"] .from-\[\#17609c\],
+html:has([data-dashboard])[data-theme="green"] .from-\[\#2070ac\],
+html:has([data-dashboard])[data-theme="green"] .from-\[\#3080bc\]        { --tw-gradient-from: var(--p); }
+html:has([data-dashboard])[data-theme="green"] .to-\[\#17609c\],
+html:has([data-dashboard])[data-theme="green"] .to-\[\#2070ac\],
+html:has([data-dashboard])[data-theme="green"] .to-\[\#3080bc\]          { --tw-gradient-to: var(--p-light); }
+
+/* ── Violet ──────────────────────────────────────────────────────────────── */
+html:has([data-dashboard])[data-theme="violet"] .bg-\[\#003366\],
+html:has([data-dashboard])[data-theme="violet"] .bg-\[\#002a52\],
+html:has([data-dashboard])[data-theme="violet"] .bg-\[\#17609c\],
+html:has([data-dashboard])[data-theme="violet"] .bg-\[\#2070ac\],
+html:has([data-dashboard])[data-theme="violet"] .bg-\[\#3080bc\]          { background-color: var(--p) !important; }
+html:has([data-dashboard])[data-theme="violet"] .hover\:bg-\[\#004488\]:hover,
+html:has([data-dashboard])[data-theme="violet"] .hover\:bg-\[\#003366\]:hover { background-color: var(--p-hover) !important; }
+html:has([data-dashboard])[data-theme="violet"] .text-\[\#003366\]         { color: var(--p) !important; }
+html:has([data-dashboard])[data-theme="violet"] .border-\[\#003366\]       { border-color: var(--p) !important; }
+html:has([data-dashboard])[data-theme="violet"] .from-\[\#003366\],
+html:has([data-dashboard])[data-theme="violet"] .from-\[\#17609c\],
+html:has([data-dashboard])[data-theme="violet"] .from-\[\#2070ac\],
+html:has([data-dashboard])[data-theme="violet"] .from-\[\#3080bc\]        { --tw-gradient-from: var(--p); }
+html:has([data-dashboard])[data-theme="violet"] .to-\[\#17609c\],
+html:has([data-dashboard])[data-theme="violet"] .to-\[\#2070ac\],
+html:has([data-dashboard])[data-theme="violet"] .to-\[\#3080bc\]          { --tw-gradient-to: var(--p-light); }
+
+/* Dark mode + tema: accent text en color claro del tema */
+html:has([data-dashboard]).dark[data-theme="sky"]    .text-\[\#003366\] { color: #7dd3fc !important; }
+html:has([data-dashboard]).dark[data-theme="green"]  .text-\[\#003366\] { color: #86efac !important; }
+html:has([data-dashboard]).dark[data-theme="violet"] .text-\[\#003366\] { color: #c4b5fd !important; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ALTO CONTRASTE — solo en el dashboard
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Claro + alto contraste */
+html:has([data-dashboard])[data-contrast="high"] .text-gray-900,
+html:has([data-dashboard])[data-contrast="high"] .text-gray-800  { color: #000000 !important; }
+html:has([data-dashboard])[data-contrast="high"] .text-gray-700  { color: #111111 !important; }
+html:has([data-dashboard])[data-contrast="high"] .text-gray-600,
+html:has([data-dashboard])[data-contrast="high"] .text-gray-500  { color: #1a1a1a !important; }
+html:has([data-dashboard])[data-contrast="high"] .text-gray-400  { color: #333333 !important; }
+
+html:has([data-dashboard])[data-contrast="high"] .border-gray-100,
+html:has([data-dashboard])[data-contrast="high"] .border-gray-200,
+html:has([data-dashboard])[data-contrast="high"] .border-gray-300 { border-color: #000000 !important; }
+
+html:has([data-dashboard])[data-contrast="high"] .bg-gray-50,
+html:has([data-dashboard])[data-contrast="high"] .bg-gray-100    { background-color: #e8e8e8 !important; }
+
+html:has([data-dashboard])[data-contrast="high"] .divide-gray-50  > * + *,
+html:has([data-dashboard])[data-contrast="high"] .divide-gray-100 > * + *,
+html:has([data-dashboard])[data-contrast="high"] .divide-y > * + * { border-color: #000000 !important; }
+
+/* Oscuro + alto contraste */
+html:has([data-dashboard]).dark[data-contrast="high"] .text-gray-900,
+html:has([data-dashboard]).dark[data-contrast="high"] .text-gray-800,
+html:has([data-dashboard]).dark[data-contrast="high"] .text-gray-700 { color: #ffffff !important; }
+html:has([data-dashboard]).dark[data-contrast="high"] .text-gray-600,
+html:has([data-dashboard]).dark[data-contrast="high"] .text-gray-500,
+html:has([data-dashboard]).dark[data-contrast="high"] .text-gray-400 { color: #e0e0e0 !important; }
+
+html:has([data-dashboard]).dark[data-contrast="high"] .border-gray-100,
+html:has([data-dashboard]).dark[data-contrast="high"] .border-gray-200,
+html:has([data-dashboard]).dark[data-contrast="high"] .border-gray-300 { border-color: #ffffff !important; }
+
+html:has([data-dashboard]).dark[data-contrast="high"] .divide-gray-50  > * + *,
+html:has([data-dashboard]).dark[data-contrast="high"] .divide-gray-100 > * + *,
+html:has([data-dashboard]).dark[data-contrast="high"] .divide-y > * + * { border-color: #ffffff !important; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ESCALA DE ACCESIBILIDAD — layout adaptativo para fuentes grandes/extragrandes
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Sidebar más ancho para acomodar etiquetas de nav en fuente grande */
+[data-scale="grande"]      [data-dashboard] { width: 252px !important; min-width: 252px !important; }
+[data-scale="extragrande"] [data-dashboard] { width: 272px !important; min-width: 272px !important; }
+
+/* Todas las tablas del dashboard siempre tienen scroll horizontal */
+html:has([data-dashboard]) div:has(> table) { overflow-x: auto; }
+
+/* En fuente extragrande, los textos de tabla no escalan para no romper celdas */
+[data-scale="extragrande"] html:has([data-dashboard]) table td,
+[data-scale="extragrande"] html:has([data-dashboard]) table th { font-size: 0.82rem !important; }
+
+/* Evitar overflow del body a escala grande */
+html:has([data-dashboard])[data-scale] body { overflow-x: hidden; }
+
+/* Stats cards: en móvil con fuente grande siempre 2 columnas */
+@media (max-width: 640px) {
+  [data-scale="grande"]      .grid.grid-cols-5 { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
+  [data-scale="extragrande"] .grid.grid-cols-5 { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
+  [data-scale="grande"]      .sm\:grid-cols-5  { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
+  [data-scale="extragrande"] .sm\:grid-cols-5  { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
+  /* Configuración — grid de 3 col colapsa a 1 col en extragrande */
+  [data-scale="extragrande"] .grid-cols-3      { grid-template-columns: repeat(1, minmax(0,1fr)) !important; }
+  /* Configuración — grid de 4 col colapsa a 2 col en extragrande */
+  [data-scale="extragrande"] .sm\:grid-cols-4  { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
+}
+
+/* Contenedores de contenido: nunca se salen del ancho */
+html:has([data-dashboard]) .flex-1,
+html:has([data-dashboard]) .flex-grow { min-width: 0; }
+
+/* Tarjetas de modal en fuente grande: máximo 95vh */
+[data-scale="grande"]      .fixed.inset-0 .rounded-xl,
+[data-scale="grande"]      .fixed.inset-0 .rounded-2xl,
+[data-scale="extragrande"] .fixed.inset-0 .rounded-xl,
+[data-scale="extragrande"] .fixed.inset-0 .rounded-2xl {
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE GENERAL — mejoras globales
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Inputs y selects: mínimo 38px de altura para accesibilidad táctil */
+html:has([data-dashboard]) input,
+html:has([data-dashboard]) select,
+html:has([data-dashboard]) textarea { min-height: 2.375rem; }
+
+/* Botones de acción: mínimo 36px de altura (excluye toggle switches para no distorsionar su forma) */
+html:has([data-dashboard]) button:not([role="switch"]) { min-height: 2.25rem; }
+
+/* Header de página (desktop): no colapsa en fuentes grandes */
+html:has([data-dashboard]) header.sticky { flex-wrap: wrap; gap: 0.5rem; }
+
+/* Contenido principal: offset correcto para header móvil (solo móvil — en desktop md:pt-0 debe funcionar) */
+@media (max-width: 767px) {
+  html:has([data-dashboard]) .pt-14 { padding-top: 3.75rem !important; }
 }
