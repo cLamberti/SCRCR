@@ -148,6 +148,22 @@ function LoginForm() {
           <p className="text-center text-white/40 text-xs mt-6">
             © {new Date().getFullYear()} Sistema SCRCR — Iglesia Bíblica Emanuel
           </p>
+
+          {/* Desarrollado por */}
+          <div className="mt-4 text-center">
+            <p className="text-white/30 text-[10px] uppercase tracking-widest mb-2">Desarrollado por</p>
+            <p className="text-white/50 text-xs font-medium mb-0.5">Estudiantes de la Universidad Nacional</p>
+            <div className="flex flex-wrap justify-center gap-x-3 gap-y-0.5 mt-1.5">
+              {[
+                'Christopher Lamberti Chavarria',
+                'Luciana Chacon Castillo',
+                'Isaac Aburto Torres',
+                'Isaiah Raust Dussin',
+              ].map(nombre => (
+                <span key={nombre} className="text-white/35 text-[11px]">{nombre}</span>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>
