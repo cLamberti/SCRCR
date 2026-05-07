@@ -176,9 +176,10 @@ export class AsociadoValidator {
       if (data.profesion && data.profesion.length > 100) errors.push('La profesión no puede exceder 100 caracteres');
     }
 
-    if (data.anosCongregarse !== undefined) {
+    if (data.anosCongregarse !== undefined && data.anosCongregarse !== null) {
       checkData(data.anosCongregarse);
-      if (!Number.isInteger(data.anosCongregarse) || data.anosCongregarse < 0) {
+      const anosNum = Number(data.anosCongregarse);
+      if (!Number.isInteger(anosNum) || anosNum < 0) {
         errors.push('Los años de congregarse deben ser un número entero positivo');
       }
     }

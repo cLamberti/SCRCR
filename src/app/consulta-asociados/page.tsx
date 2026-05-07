@@ -6,8 +6,8 @@ import Image from 'next/image';
 import {
   FaHome, FaUserPlus, FaList, FaSignOutAlt,
   FaSearch, FaEdit, FaTrash, FaUsers,
-  FaChevronLeft, FaChevronRight, FaExclamationTriangle, 
-FaCalendarAlt
+  FaChevronLeft, FaChevronRight, FaExclamationTriangle,
+  FaCalendarAlt, FaCheckCircle
 } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 import { AsociadoResponse } from '@/dto/asociado.dto';
@@ -262,10 +262,27 @@ export default function ConsultarAsociadosPage() {
         : '/api/asociados';
       const method = asociadoEditando ? 'PUT' : 'POST';
 
+      // Limpiar campos opcionales vacíos para no romper validación del servidor
+      const payload: Record<string, unknown> = { ...formulario };
+      // anosCongregarse debe ser número o ausente (nunca string vacío)
+      if (payload.anosCongregarse === '' || payload.anosCongregarse === null) {
+        delete payload.anosCongregarse;
+      } else {
+        payload.anosCongregarse = Number(payload.anosCongregarse);
+      }
+      // Al reactivar (estado=1), limpiar fechaInactivo
+      if (formulario.estado === 1) {
+        payload.fechaInactivo = '';
+      }
+      // Campos de fecha opcionales: excluir si están vacíos
+      for (const key of ['fechaNacimiento', 'fechaAceptacion'] as const) {
+        if (!payload[key]) delete payload[key];
+      }
+
       const res  = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formulario),
+        body: JSON.stringify(payload),
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
@@ -284,6 +301,27 @@ export default function ConsultarAsociadosPage() {
       setEsError(true);
       Swal.fire('Error', 'Error de conexión con el servidor', 'error');
     } finally { setGuardando(false); }
+  };
+
+  /* ─── Reactivar ─── */
+  const reactivar = async (id: number) => {
+    try {
+      const res = await fetch(`/api/asociados/update?id=${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado: 1, fechaInactivo: '' }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setMensaje('Asociado reactivado exitosamente.');
+        setEsError(false);
+        await cargar();
+      } else {
+        setMensaje(json.message || 'Error al reactivar'); setEsError(true);
+      }
+    } catch {
+      setMensaje('Error de conexión.'); setEsError(true);
+    }
   };
 
   /* ─── Eliminación masiva ─── */
@@ -559,12 +597,22 @@ export default function ConsultarAsociadosPage() {
                             {formatFecha(r.fechaIngreso)}
                           </td>
                           <td className="px-4 py-3">
-                            <button
-                              onClick={() => abrirModalEdicion(r)}
-                              className="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap"
-                            >
-                              <FaEdit className="text-xs" /> Editar
-                            </button>
+                            <div className="flex items-center gap-1.5">
+                              {r.estado === 0 && (
+                                <button
+                                  onClick={() => reactivar(r.id)}
+                                  className="inline-flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+                                >
+                                  <FaCheckCircle className="text-xs" /> Activar
+                                </button>
+                              )}
+                              <button
+                                onClick={() => abrirModalEdicion(r)}
+                                className="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+                              >
+                                <FaEdit className="text-xs" /> Editar
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -626,7 +674,15 @@ export default function ConsultarAsociadosPage() {
                           {r.ministerio && <p><span className="font-semibold">Ministerio:</span> {r.ministerio}</p>}
                           <p><span className="font-semibold">Ingreso:</span> {formatFecha(r.fechaIngreso)}</p>
                         </div>
-                        <div className="pl-6">
+                        <div className="pl-6 flex items-center gap-2">
+                          {r.estado === 0 && (
+                            <button
+                              onClick={() => reactivar(r.id)}
+                              className="inline-flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                            >
+                              <FaCheckCircle className="text-xs" /> Activar
+                            </button>
+                          )}
                           <button
                             onClick={() => abrirModalEdicion(r)}
                             className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"

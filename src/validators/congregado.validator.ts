@@ -229,14 +229,14 @@ export class CongregadoValidator {
             check(data.segundoMinisterio);
         }
 
-        // URL foto cédula (si se proporciona)
-        if (data.urlFotoCedula !== undefined) {
+        // URL foto cédula (si se proporciona y no es vacía)
+        if (data.urlFotoCedula !== undefined && data.urlFotoCedula.trim().length > 0) {
             check(data.urlFotoCedula);
-            if (data.urlFotoCedula.trim().length === 0) {
-                errors.push('La URL de la foto de cédula no puede estar vacía');
-            } else if (!URL_REGEX.test(data.urlFotoCedula)) {
+            if (!URL_REGEX.test(data.urlFotoCedula)) {
                 errors.push('La URL de la foto de cédula no es válida (debe comenzar con http:// o https://)');
             }
+        } else if (data.urlFotoCedula !== undefined) {
+            check(data.urlFotoCedula);
         }
 
         // Estado (si se proporciona)
