@@ -6,7 +6,7 @@ import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import {
   FaUsers, FaUserPlus, FaSearch, FaEdit, FaTrash,
   FaChevronLeft, FaChevronRight, FaExclamationTriangle,
-  FaTimes, FaSave, FaPlus, FaFilter,
+  FaTimes, FaSave, FaPlus, FaFilter, FaCheckCircle,
 } from "react-icons/fa";
 import Sidebar from "@/components/SideBar";
 import { EstadoCivil } from "@/models/Congregado";
@@ -192,6 +192,10 @@ export default function CongregadosPage() {
         ...form,
         segundoTelefono: form.segundoTelefono || null,
         segundoMinisterio: form.segundoMinisterio || null,
+        // Garantizar URL válida para no romper validación
+        urlFotoCedula: form.urlFotoCedula || "https://placeholder.com/cedula.jpg",
+        // Campos de fecha opcionales: excluir si están vacíos
+        ...(form.fechaNacimiento ? {} : { fechaNacimiento: undefined }),
       };
 
       const url = editando ? `/api/congregados/${editando.id}` : "/api/congregados";
@@ -211,6 +215,27 @@ export default function CongregadosPage() {
       setMensaje("Error de conexión."); setEsError(true);
     } finally {
       setGuardando(false);
+    }
+  };
+
+  // ── Reactivar ─────────────────────────────────────────────────────────────
+  const reactivar = async (id: number) => {
+    try {
+      const res = await fetch(`/api/congregados/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estado: 1 }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setMensaje("Congregado reactivado exitosamente.");
+        setEsError(false);
+        await cargar();
+      } else {
+        setMensaje(json.message || "Error al reactivar"); setEsError(true);
+      }
+    } catch {
+      setMensaje("Error de conexión."); setEsError(true);
     }
   };
 
@@ -402,10 +427,18 @@ export default function CongregadosPage() {
                           <td className="px-4 py-3"><Badge activo={r.estado === 1} /></td>
                           <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{formatFecha(r.fechaIngreso)}</td>
                           <td className="px-4 py-3">
-                            <button onClick={() => abrirEditar(r)}
-                              className="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg transition whitespace-nowrap">
-                              <FaEdit className="text-xs" /> Editar
-                            </button>
+                            <div className="flex items-center gap-1.5">
+                              {r.estado === 0 && (
+                                <button onClick={() => reactivar(r.id)}
+                                  className="inline-flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg transition whitespace-nowrap">
+                                  <FaCheckCircle className="text-xs" /> Activar
+                                </button>
+                              )}
+                              <button onClick={() => abrirEditar(r)}
+                                className="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg transition whitespace-nowrap">
+                                <FaEdit className="text-xs" /> Editar
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -467,7 +500,15 @@ export default function CongregadosPage() {
                           {r.estadoCivil && <p><span className="font-semibold">Est. Civil:</span> {ESTADO_CIVIL_LABELS[r.estadoCivil] || r.estadoCivil}</p>}
                           <p><span className="font-semibold">Ingreso:</span> {formatFecha(r.fechaIngreso)}</p>
                         </div>
-                        <div className="pl-6">
+                        <div className="pl-6 flex items-center gap-2">
+                          {r.estado === 0 && (
+                            <button
+                              onClick={() => reactivar(r.id)}
+                              className="inline-flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition"
+                            >
+                              <FaCheckCircle className="text-xs" /> Activar
+                            </button>
+                          )}
                           <button
                             onClick={() => abrirEditar(r)}
                             className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition"
