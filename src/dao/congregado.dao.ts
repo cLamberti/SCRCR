@@ -167,15 +167,36 @@ export class CongregadoDAO {
           segundoMinisterio: data.segundoMinisterio === null ? null : (data.segundoMinisterio ?? existente.segundoMinisterio ?? null),
           urlFotoCedula: data.urlFotoCedula ?? existente.urlFotoCedula,
           estado: data.estado ?? existente.estado,
-          observaciones: data.observaciones === null ? null : (data.observaciones ?? existente.observaciones ?? null),
-          fechaNacimiento: data.fechaNacimiento === null ? null : (data.fechaNacimiento ? new Date(data.fechaNacimiento) : (existente.fechaNacimiento ?? null)),
-          correo: data.correo === null ? null : (data.correo ?? existente.correo ?? null),
-          profesion: data.profesion === null ? null : (data.profesion ?? existente.profesion ?? null),
-          direccion: data.direccion === null ? null : (data.direccion ?? existente.direccion ?? null),
+          observaciones: data.observaciones === undefined ? (existente.observaciones ?? null) : (data.observaciones || null),
+          fechaNacimiento: data.fechaNacimiento === undefined ? (existente.fechaNacimiento ?? null) : (data.fechaNacimiento ? new Date(data.fechaNacimiento) : null),
+          correo: data.correo === undefined ? (existente.correo ?? null) : (data.correo || null),
+          profesion: data.profesion === undefined ? (existente.profesion ?? null) : (data.profesion || null),
+          direccion: data.direccion === undefined ? (existente.direccion ?? null) : (data.direccion || null),
         },
       });
       const actualizado = mapToCongregado(row);
-      await AuditoriaDAO.registrar('congregados', id, 'edicion', 'Actualización de información del congregado');
+
+      // Construir mensaje de auditoría con los campos que cambiaron
+      const camposCambiados: string[] = [];
+      const LABELS: Record<string, string> = {
+        nombre: 'Nombre', cedula: 'Cédula', fechaIngreso: 'Fecha de ingreso',
+        telefono: 'Teléfono', segundoTelefono: 'Segundo teléfono',
+        estadoCivil: 'Estado civil', ministerio: 'Ministerio',
+        segundoMinisterio: 'Segundo ministerio', urlFotoCedula: 'URL foto cédula',
+        estado: 'Estado', observaciones: 'Observaciones',
+        fechaNacimiento: 'Fecha de nacimiento', correo: 'Correo',
+        profesion: 'Oficio/Profesión', direccion: 'Dirección',
+      };
+      const camposAuditables = Object.keys(LABELS) as (keyof typeof LABELS)[];
+      for (const campo of camposAuditables) {
+        const anterior = String((existente as any)[campo] ?? '');
+        const nuevo = String((actualizado as any)[campo] ?? '');
+        if (anterior !== nuevo) camposCambiados.push(LABELS[campo]);
+      }
+      const mensajeAuditoria = camposCambiados.length > 0
+        ? `Campos actualizados: ${camposCambiados.join(', ')}`
+        : 'Actualización de información del congregado';
+      await AuditoriaDAO.registrar('congregados', id, 'edicion', mensajeAuditoria);
       return actualizado;
     } catch (error: any) {
       if (error instanceof CongregadoDAOError) throw error;
