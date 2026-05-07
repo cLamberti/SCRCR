@@ -7,16 +7,17 @@ import Navbar from '@/components/Navbar';
 import { useEffect, useState } from 'react';
 import {
   FaUserPlus, FaSearch, FaUserMinus, FaUsers,
-  FaChartLine, FaExclamationTriangle, FaCalendarAlt, FaClipboardList
+  FaChartLine, FaExclamationTriangle, FaCalendarAlt, FaClipboardList, FaBook
 } from 'react-icons/fa';
 
 const modulos = [
-  {  titulo: "Congregados",descripcion: "Registra, consulta y gestiona los congregados",icono: <FaUsers className="text-3xl" />,href: "/congregados",roles: ["admin", "tesorero", "pastorGeneral"],color: "from-[#17609c] to-[#2070ac]",},
-  { titulo: 'Consulta de Asociados', descripcion: 'Buscar y consultar información de asociados', icono: <FaSearch className="text-3xl" />, href: '/consulta-asociados', roles: ['admin', 'tesorero', 'pastorGeneral'], color: 'from-[#17609c] to-[#2070ac]' },
-  { titulo: 'Gestión de Usuarios', descripcion: 'Administrar usuarios del sistema', icono: <FaUsers className="text-3xl" />, href: '/gestion-usuarios', roles: ['admin', 'pastorGeneral'], color: 'from-slate-600 to-slate-700' },
-  { titulo: 'Reportes', descripcion: 'Generar reportes y estadísticas', icono: <FaChartLine className="text-3xl" />, href: '/reportes', roles: ['admin', 'tesorero', 'pastorGeneral'], color: 'from-[#2070ac] to-[#3080bc]' },
-  { titulo: 'Eventos', descripcion: 'Crea, edita y elimina eventos', icono: <FaCalendarAlt className="text-3xl" />, href: '/eventos', roles: ['admin', 'tesorero', 'pastorGeneral'], color: 'from-[#3080bc] to-[#17609c]' },
-  { titulo: 'Permisos', descripcion: 'Gestión de permisos de ausencia', icono: <FaClipboardList className="text-3xl" />, href: '/permisos', roles: ['admin', 'tesorero', 'pastorGeneral', 'asistenteAdministrativo'], color: 'from-slate-700 to-slate-800' },
+  { titulo: 'Congregados',          descripcion: 'Registra, consulta y gestiona los congregados',    icono: <FaUsers className="text-3xl" />,       href: '/congregados',        roles: ['admin', 'tesorero', 'pastorGeneral', 'asistenteAdministrativo'], color: 'from-[#17609c] to-[#2070ac]' },
+  { titulo: 'Consulta de Asociados',descripcion: 'Buscar y consultar información de asociados',      icono: <FaSearch className="text-3xl" />,       href: '/consulta-asociados', roles: ['admin', 'tesorero', 'juntaDirectiva'],                         color: 'from-[#17609c] to-[#2070ac]' },
+  { titulo: 'Gestión de Usuarios',  descripcion: 'Administrar usuarios del sistema',                 icono: <FaUsers className="text-3xl" />,        href: '/gestion-usuarios',   roles: ['admin', 'asistenteAdministrativo'],                            color: 'from-slate-600 to-slate-700' },
+  { titulo: 'Reportes',             descripcion: 'Generar reportes y estadísticas',                  icono: <FaChartLine className="text-3xl" />,    href: '/reportes',           roles: ['admin', 'tesorero', 'pastorGeneral', 'juntaDirectiva', 'asistenteAdministrativo'], color: 'from-[#2070ac] to-[#3080bc]' },
+  { titulo: 'Eventos',              descripcion: 'Crea, edita y administra eventos',                 icono: <FaCalendarAlt className="text-3xl" />,  href: '/eventos',            roles: ['admin', 'pastorGeneral', 'asistenteAdministrativo'],           color: 'from-[#3080bc] to-[#17609c]' },
+  { titulo: 'Permisos',             descripcion: 'Gestión de permisos de ausencia',                  icono: <FaClipboardList className="text-3xl" />,href: '/permisos',           roles: ['admin', 'pastorGeneral', 'asistenteAdministrativo'],           color: 'from-slate-700 to-slate-800' },
+  { titulo: 'Actas',                descripcion: 'Registro de sesiones y control de asistencia',     icono: <FaBook className="text-3xl" />,         href: '/actas',              roles: ['admin', 'juntaDirectiva'],                                    color: 'from-[#1e3a5f] to-[#003366]' },
 ];
 
 export default function HomePage() {
@@ -156,11 +157,33 @@ export default function HomePage() {
         )}
       </main>
 
-      <footer className="bg-[#003366] text-white py-5 mt-auto">
-        <div className="container mx-auto px-4 text-center">
-          <p className="text-xs text-white/70">
-            © {new Date().getFullYear()} Sistema SCRCR — Iglesia Bíblica Emanuel. Todos los derechos reservados.
-          </p>
+      <footer className="bg-[#003366] text-white py-8 mt-auto">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col items-center gap-5">
+            {/* Copyright */}
+            <p className="text-xs text-white/60">
+              © {new Date().getFullYear()} Sistema SCRCR — Iglesia Bíblica Emanuel. Todos los derechos reservados.
+            </p>
+
+            {/* Divider */}
+            <div className="w-24 h-px bg-white/15" />
+
+            {/* Desarrollado por */}
+            <div className="text-center">
+              <p className="text-[10px] uppercase tracking-widest text-white/35 mb-1.5">Desarrollado por</p>
+              <p className="text-xs text-white/55 font-medium mb-3">Estudiantes de la Universidad Nacional</p>
+              <div className="flex flex-wrap justify-center gap-x-6 gap-y-1">
+                {[
+                  'Christopher Lamberti Chavarria',
+                  'Luciana Chacon Castillo',
+                  'Isaac Aburto Torres',
+                  'Isaiah Raust Dussin',
+                ].map(nombre => (
+                  <span key={nombre} className="text-[11px] text-white/40">{nombre}</span>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </footer>
     </div>
