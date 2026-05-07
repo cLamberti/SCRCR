@@ -63,9 +63,47 @@ const ESTADO_CIVIL_LABELS: Record<string, string> = {
 
 type PageSize = 10 | 25 | 50;
 
-const inputClass =
+const inputBase =
   "shadow-sm border rounded-lg w-full py-2 px-3 text-gray-700 text-sm leading-tight " +
-  "focus:outline-none focus:ring-2 focus:ring-[#003366]/30 focus:border-[#003366] border-gray-300 transition-colors";
+  "focus:outline-none focus:ring-2 focus:ring-[#003366]/30 focus:border-[#003366] transition-colors";
+const inputClass = inputBase + " border-gray-300";
+const inputClassError = inputBase + " border-red-400 bg-red-50/30";
+
+type CongregadoFormErrors = {
+  nombre?: string; cedula?: string; fechaIngreso?: string;
+  telefono?: string; ministerio?: string; urlFotoCedula?: string; correo?: string;
+};
+type CongregadoFormTouched = Partial<Record<keyof CongregadoFormErrors, boolean>>;
+
+function validarCampoCongregado(campo: keyof CongregadoFormErrors, valor: string): string | undefined {
+  switch (campo) {
+    case 'nombre':
+      if (!valor.trim()) return 'El nombre completo es obligatorio.';
+      if (valor.trim().length < 3) return 'Debe tener al menos 3 caracteres.';
+      return undefined;
+    case 'cedula':
+      if (!valor.trim()) return 'La cédula es obligatoria.';
+      return undefined;
+    case 'fechaIngreso':
+      if (!valor) return 'La fecha de ingreso es obligatoria.';
+      return undefined;
+    case 'telefono':
+      if (!valor.trim()) return 'El teléfono es obligatorio.';
+      return undefined;
+    case 'ministerio':
+      if (!valor.trim()) return 'El ministerio es obligatorio.';
+      return undefined;
+    case 'urlFotoCedula':
+      if (!valor.trim()) return 'La URL de la foto cédula es obligatoria.';
+      return undefined;
+    case 'correo':
+      if (valor && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor))
+        return 'Ingresa un correo válido, por ejemplo: nombre@correo.com';
+      return undefined;
+    default:
+      return undefined;
+  }
+}
 
 const formatFecha = (iso: string) =>
   iso ? new Date(iso).toLocaleDateString("es-CR") : "-";
@@ -98,6 +136,8 @@ export default function CongregadosPage() {
   const [editando, setEditando] = useState<CongregadoRow | null>(null);
   const [form, setForm] = useState<FormState>(FORM_INICIAL);
   const [guardando, setGuardando] = useState(false);
+  const [formErrors, setFormErrors] = useState<CongregadoFormErrors>({});
+  const [formTouched, setFormTouched] = useState<CongregadoFormTouched>({});
 
   // modal eliminar masivo
   const [modalDelete, setModalDelete] = useState(false);
@@ -155,15 +195,29 @@ export default function CongregadosPage() {
   );
 
   // ── Crear / Editar ─────────────────────────────────────────────────────────
+  const handleCampoCong = (campo: keyof CongregadoFormErrors, valor: string) => {
+    setForm(prev => ({ ...prev, [campo]: valor }));
+    setFormTouched(prev => ({ ...prev, [campo]: true }));
+    setFormErrors(prev => ({ ...prev, [campo]: validarCampoCongregado(campo, valor) }));
+  };
+
+  // Solo valida al perder foco — NO reescribe el valor (evita revertir cambios)
+  const handleBlurCong = (campo: keyof CongregadoFormErrors) => {
+    setFormTouched(prev => ({ ...prev, [campo]: true }));
+    setFormErrors(prev => ({ ...prev, [campo]: validarCampoCongregado(campo, String((form as any)[campo] ?? '')) }));
+  };
+
   const abrirCrear = () => {
     setEditando(null);
     setForm(FORM_INICIAL);
+    setFormErrors({}); setFormTouched({});
     setShowForm(true);
     setMensaje(""); setEsError(false);
   };
 
   const abrirEditar = (row: CongregadoRow) => {
     setEditando(row);
+    setFormErrors({}); setFormTouched({});
     setForm({
       nombre: row.nombre || "",
       cedula: row.cedula || "",
@@ -186,6 +240,23 @@ export default function CongregadosPage() {
   };
 
   const guardar = async () => {
+    // Validate all required fields first
+    const camposReq: (keyof CongregadoFormErrors)[] = ['nombre', 'cedula', 'fechaIngreso', 'telefono', 'ministerio', 'urlFotoCedula'];
+    const newErrors: CongregadoFormErrors = {};
+    const newTouched: CongregadoFormTouched = {};
+    for (const campo of camposReq) {
+      newTouched[campo] = true;
+      const err = validarCampoCongregado(campo, String((form as any)[campo] ?? ''));
+      if (err) newErrors[campo] = err;
+    }
+    if (form.correo) {
+      newTouched.correo = true;
+      const errCorreo = validarCampoCongregado('correo', form.correo);
+      if (errCorreo) newErrors.correo = errCorreo;
+    }
+    setFormTouched(prev => ({ ...prev, ...newTouched }));
+    setFormErrors(prev => ({ ...prev, ...newErrors }));
+    if (Object.keys(newErrors).length > 0) return;
     setGuardando(true); setMensaje(""); setEsError(false);
     try {
       const body = {
@@ -576,37 +647,64 @@ export default function CongregadosPage() {
                 {/* Nombre */}
                 <div className="sm:col-span-2">
                   <label htmlFor="nombre" className="block text-gray-700 text-xs font-semibold mb-1.5">Nombre completo *</label>
-                  <input id="nombre" type="text" value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} className={inputClass} placeholder="Ej: María Fernanda Solano Mora" />
+                  <input id="nombre" type="text" value={form.nombre}
+                    onChange={e => handleCampoCong('nombre', e.target.value)}
+                    onBlur={() => handleBlurCong('nombre')}
+                    className={formTouched.nombre && formErrors.nombre ? inputClassError : inputClass}
+                    placeholder="Ej: María Fernanda Solano Mora" />
+                  {formTouched.nombre && formErrors.nombre && (
+                    <p className="mt-1 text-xs text-red-600">{formErrors.nombre}</p>
+                  )}
                 </div>
 
                 {/* Cédula */}
                 <div>
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Cédula *</label>
-                  <input type="text" value={form.cedula} onChange={e => setForm({ ...form, cedula: e.target.value })} className={inputClass} placeholder="5-0291-0483" />
+                  <input type="text" value={form.cedula}
+                    onChange={e => handleCampoCong('cedula', e.target.value)}
+                    onBlur={() => handleBlurCong('cedula')}
+                    className={formTouched.cedula && formErrors.cedula ? inputClassError : inputClass}
+                    placeholder="5-0291-0483" />
+                  {formTouched.cedula && formErrors.cedula && (
+                    <p className="mt-1 text-xs text-red-600">{formErrors.cedula}</p>
+                  )}
                 </div>
 
                 {/* Fecha ingreso */}
                 <div>
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Fecha de ingreso a la congregación *</label>
-                  <input type="date" value={form.fechaIngreso} onChange={e => setForm({ ...form, fechaIngreso: e.target.value })} className={inputClass} />
+                  <input type="date" value={form.fechaIngreso}
+                    onChange={e => handleCampoCong('fechaIngreso', e.target.value)}
+                    onBlur={() => handleBlurCong('fechaIngreso')}
+                    className={formTouched.fechaIngreso && formErrors.fechaIngreso ? inputClassError : inputClass} />
+                  {formTouched.fechaIngreso && formErrors.fechaIngreso && (
+                    <p className="mt-1 text-xs text-red-600">{formErrors.fechaIngreso}</p>
+                  )}
                 </div>
 
                 {/* Teléfono */}
                 <div>
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Teléfono *</label>
-                  <input type="tel" value={form.telefono} onChange={e => setForm({ ...form, telefono: e.target.value })} className={inputClass} placeholder="8888-8888" />
+                  <input type="tel" value={form.telefono}
+                    onChange={e => handleCampoCong('telefono', e.target.value)}
+                    onBlur={() => handleBlurCong('telefono')}
+                    className={formTouched.telefono && formErrors.telefono ? inputClassError : inputClass}
+                    placeholder="8888-8888" />
+                  {formTouched.telefono && formErrors.telefono && (
+                    <p className="mt-1 text-xs text-red-600">{formErrors.telefono}</p>
+                  )}
                 </div>
 
                 {/* Segundo teléfono */}
                 <div>
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Segundo teléfono</label>
-                  <input type="tel" value={form.segundoTelefono} onChange={e => setForm({ ...form, segundoTelefono: e.target.value })} className={inputClass} placeholder="Opcional" />
+                  <input type="tel" value={form.segundoTelefono} onChange={e => setForm(prev => ({ ...prev, segundoTelefono: e.target.value }))} className={inputClass} placeholder="Opcional" />
                 </div>
 
                 {/* Estado civil */}
                 <div>
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Estado civil *</label>
-                  <select value={form.estadoCivil} onChange={e => setForm({ ...form, estadoCivil: e.target.value })} className={inputClass}>
+                  <select value={form.estadoCivil} onChange={e => setForm(prev => ({ ...prev, estadoCivil: e.target.value }))} className={inputClass}>
                     {Object.entries(ESTADO_CIVIL_LABELS).map(([v, l]) => (
                       <option key={v} value={v}>{l}</option>
                     ))}
@@ -616,7 +714,7 @@ export default function CongregadosPage() {
                 {/* Estado */}
                 <div>
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Estado</label>
-                  <select value={form.estado} onChange={e => setForm({ ...form, estado: Number(e.target.value) })} className={inputClass}>
+                  <select value={form.estado} onChange={e => setForm(prev => ({ ...prev, estado: Number(e.target.value) }))} className={inputClass}>
                     <option value={1}>Activo</option>
                     <option value={0}>Inactivo</option>
                   </select>
@@ -625,49 +723,70 @@ export default function CongregadosPage() {
                 {/* Ministerio */}
                 <div>
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Ministerio *</label>
-                  <input type="text" value={form.ministerio} onChange={e => setForm({ ...form, ministerio: e.target.value })} className={inputClass} placeholder="Ej: Alabanza" />
+                  <input type="text" value={form.ministerio}
+                    onChange={e => handleCampoCong('ministerio', e.target.value)}
+                    onBlur={() => handleBlurCong('ministerio')}
+                    className={formTouched.ministerio && formErrors.ministerio ? inputClassError : inputClass}
+                    placeholder="Ej: Alabanza" />
+                  {formTouched.ministerio && formErrors.ministerio && (
+                    <p className="mt-1 text-xs text-red-600">{formErrors.ministerio}</p>
+                  )}
                 </div>
 
                 {/* Segundo ministerio */}
                 <div>
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Segundo ministerio</label>
-                  <input type="text" value={form.segundoMinisterio} onChange={e => setForm({ ...form, segundoMinisterio: e.target.value })} className={inputClass} placeholder="Opcional" />
+                  <input type="text" value={form.segundoMinisterio} onChange={e => setForm(prev => ({ ...prev, segundoMinisterio: e.target.value }))} className={inputClass} placeholder="Opcional" />
                 </div>
 
                 {/* URL foto cédula */}
                 <div className="sm:col-span-2">
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">URL foto cédula *</label>
-                  <input type="url" value={form.urlFotoCedula} onChange={e => setForm({ ...form, urlFotoCedula: e.target.value })} className={inputClass} placeholder="https://..." />
+                  <input type="url" value={form.urlFotoCedula}
+                    onChange={e => handleCampoCong('urlFotoCedula', e.target.value)}
+                    onBlur={() => handleBlurCong('urlFotoCedula')}
+                    className={formTouched.urlFotoCedula && formErrors.urlFotoCedula ? inputClassError : inputClass}
+                    placeholder="https://..." />
+                  {formTouched.urlFotoCedula && formErrors.urlFotoCedula && (
+                    <p className="mt-1 text-xs text-red-600">{formErrors.urlFotoCedula}</p>
+                  )}
                 </div>
 
                 {/* Fecha de nacimiento */}
                 <div>
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Fecha de nacimiento</label>
-                  <input type="date" value={form.fechaNacimiento} onChange={e => setForm({ ...form, fechaNacimiento: e.target.value })} className={inputClass} />
+                  <input type="date" value={form.fechaNacimiento} onChange={e => setForm(prev => ({ ...prev, fechaNacimiento: e.target.value }))} className={inputClass} />
                 </div>
 
                 {/* Correo electrónico */}
                 <div>
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Correo electrónico (opcional)</label>
-                  <input type="email" value={form.correo} onChange={e => setForm({ ...form, correo: e.target.value })} className={inputClass} placeholder="Ej: correo@ejemplo.com" />
+                  <input type="email" value={form.correo}
+                    onChange={e => handleCampoCong('correo', e.target.value)}
+                    onBlur={() => handleBlurCong('correo')}
+                    className={formTouched.correo && formErrors.correo ? inputClassError : inputClass}
+                    placeholder="Ej: correo@ejemplo.com" />
+                  {formTouched.correo && formErrors.correo && (
+                    <p className="mt-1 text-xs text-red-600">{formErrors.correo}</p>
+                  )}
                 </div>
 
                 {/* Oficio o profesión */}
                 <div>
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Oficio o profesión</label>
-                  <input type="text" value={form.profesion} onChange={e => setForm({ ...form, profesion: e.target.value })} className={inputClass} placeholder="Ej: Estudiante, Ingeniero" />
+                  <input type="text" value={form.profesion} onChange={e => setForm(prev => ({ ...prev, profesion: e.target.value }))} className={inputClass} placeholder="Ej: Estudiante, Ingeniero" />
                 </div>
 
                 {/* Dirección */}
                 <div className="sm:col-span-2">
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Dirección</label>
-                  <input type="text" value={form.direccion} onChange={e => setForm({ ...form, direccion: e.target.value })} className={inputClass} placeholder="Dirección completa" />
+                  <input type="text" value={form.direccion} onChange={e => setForm(prev => ({ ...prev, direccion: e.target.value }))} className={inputClass} placeholder="Dirección completa" />
                 </div>
 
                 {/* Observaciones */}
                 <div className="sm:col-span-2">
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Observaciones</label>
-                  <textarea value={form.observaciones} onChange={e => setForm({ ...form, observaciones: e.target.value })} rows={3} className={inputClass + ' resize-none'} placeholder="Notas adicionales..." />
+                  <textarea value={form.observaciones} onChange={e => setForm(prev => ({ ...prev, observaciones: e.target.value }))} rows={3} className={inputClass + ' resize-none'} placeholder="Notas adicionales..." />
                 </div>
               </div>
             </div>

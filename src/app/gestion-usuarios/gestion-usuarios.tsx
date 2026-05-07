@@ -41,6 +41,38 @@ const ROL_COLORS: Record<string, string> = {
   asistenteAdministrativo: "bg-emerald-100 text-emerald-800",
 };
 
+type FormErrors = {
+  nombreCompleto?: string;
+  username?: string;
+  email?: string;
+  password?: string;
+};
+
+function validarCampo(campo: keyof FormErrors, valor: string): string | undefined {
+  switch (campo) {
+    case "nombreCompleto":
+      if (!valor.trim()) return "El nombre completo es obligatorio.";
+      if (valor.trim().length < 3) return "Debe tener al menos 3 caracteres.";
+      if (valor.length > 255) return "No puede superar los 255 caracteres.";
+      return undefined;
+    case "username":
+      if (!valor.trim()) return "El nombre de usuario es obligatorio.";
+      if (valor.trim().length < 3) return "Debe tener al menos 3 caracteres.";
+      if (valor.length > 50) return "No puede superar los 50 caracteres.";
+      if (!/^[a-zA-Z0-9_]+$/.test(valor)) return "Solo se permiten letras, números y guión bajo ( _ ).";
+      return undefined;
+    case "email":
+      if (!valor.trim()) return "El correo electrónico es obligatorio.";
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor)) return "Ingresa un correo válido, por ejemplo: nombre@correo.com";
+      if (valor.length > 255) return "El correo es demasiado largo.";
+      return undefined;
+    case "password":
+      if (!valor) return "La contraseña es obligatoria.";
+      if (valor.length < 6) return "Debe tener al menos 6 caracteres.";
+      return undefined;
+  }
+}
+
 export default function GestionUsuariosPage() {
   const router = useRouter();
   const [usuarios, setUsuarios] = useState<UsuarioRow[]>([]);
@@ -55,6 +87,8 @@ export default function GestionUsuariosPage() {
   const [formState, setFormState] = useState<FormState>({
     nombreCompleto: "", username: "", email: "", password: "", rol: "juntaDirectiva",
   });
+  const [formErrors, setFormErrors] = useState<FormErrors>({});
+  const [touched, setTouched] = useState<Partial<Record<keyof FormErrors, boolean>>>({});
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -66,32 +100,38 @@ export default function GestionUsuariosPage() {
     try {
       const res = await fetch('/api/usuarios');
       const json = await res.json();
-      if (!res.ok || !json.success) { setMensaje(json.message || "Error al obtener usuarios"); setMensajeOk(false); return; }
+      if (!res.ok || !json.success) { setMensaje(json.message || "No se pudo cargar la lista de usuarios."); setMensajeOk(false); return; }
       setUsuarios(json.data || []);
-    } catch { setMensaje("Error de conexión."); setMensajeOk(false); }
+    } catch { setMensaje("No hay conexión con el servidor. Intenta de nuevo."); setMensajeOk(false); }
     finally { setLoading(false); }
   }, []);
 
   useEffect(() => { cargarUsuarios(); }, [cargarUsuarios]);
   useAutoRefresh(cargarUsuarios);
 
-  const validarFormulario = (): string | null => {
-    const { nombreCompleto, username, email } = formState;
-    if (nombreCompleto.trim().length < 3) return "El nombre completo debe tener al menos 3 caracteres.";
-    if (username.trim().length < 3) return "El nombre de usuario debe tener al menos 3 caracteres.";
-    if (!/^[a-zA-Z0-9_]+$/.test(username)) return "El nombre de usuario solo puede contener letras, números y guiones bajos (_).";
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "El formato del correo electrónico no es válido.";
-    return null;
+  // Marca el campo como tocado y valida en cada tecla
+  const handleChange = (campo: keyof FormErrors, valor: string) => {
+    setFormState(p => ({ ...p, [campo]: valor }));
+    setTouched(p => ({ ...p, [campo]: true }));
+    setFormErrors(p => ({ ...p, [campo]: validarCampo(campo, valor) }));
+  };
+
+  // Marca como tocado al salir (captura campos que el usuario dejó vacíos sin escribir)
+  const handleBlur = (campo: keyof FormErrors) => {
+    setTouched(p => ({ ...p, [campo]: true }));
+    setFormErrors(p => ({ ...p, [campo]: validarCampo(campo, formState[campo]) }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const errorValidacion = validarFormulario();
-    if (errorValidacion) {
-      setMensaje(errorValidacion);
-      setMensajeOk(false);
-      return;
-    }
+    // Validar todos los campos y marcarlos como tocados
+    const campos: (keyof FormErrors)[] = ["nombreCompleto", "username", "email", "password"];
+    const errores: FormErrors = {};
+    campos.forEach(c => { errores[c] = validarCampo(c, formState[c]); });
+    setFormErrors(errores);
+    setTouched({ nombreCompleto: true, username: true, email: true, password: true });
+    if (Object.values(errores).some(Boolean)) return;
+
     setEnviando(true);
     setMensaje("");
     try {
@@ -102,18 +142,24 @@ export default function GestionUsuariosPage() {
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
-        let errMsg = json.message || "Error al crear el usuario";
-        if (json.errors && Array.isArray(json.errors)) {
-          errMsg = json.errors.map((e: { field: string; message: string }) => e.message).join(" ");
+        // Mapear errores del servidor a mensajes amigables
+        const serverMsg: string = json.message || "";
+        let msgFriendly = "Ocurrió un problema al crear el usuario. Intenta de nuevo.";
+        if (serverMsg.includes("username") || serverMsg.toLowerCase().includes("usuario")) {
+          msgFriendly = "Ese nombre de usuario ya está en uso. Elige otro.";
+        } else if (serverMsg.includes("email") || serverMsg.toLowerCase().includes("correo")) {
+          msgFriendly = "Ese correo electrónico ya está registrado. Usa otro.";
         }
-        setMensaje(errMsg); setMensajeOk(false); return;
+        setMensaje(msgFriendly); setMensajeOk(false); return;
       }
-      setMensaje("Usuario creado exitosamente."); setMensajeOk(true);
+      setMensaje("¡Usuario creado correctamente!"); setMensajeOk(true);
       setFormState({ nombreCompleto: "", username: "", email: "", password: "", rol: "juntaDirectiva" });
+      setFormErrors({});
+      setTouched({});
       setShowForm(false);
       setCurrentPage(1);
       await cargarUsuarios();
-    } catch { setMensaje("Error de conexión."); setMensajeOk(false); }
+    } catch { setMensaje("No hay conexión con el servidor. Intenta de nuevo."); setMensajeOk(false); }
     finally { setEnviando(false); }
   };
 
@@ -206,29 +252,64 @@ export default function GestionUsuariosPage() {
                   <FaUserPlus className="text-white text-sm" />
                   <h2 className="text-white font-semibold text-sm">Nuevo usuario</h2>
                 </div>
-                <button onClick={() => setShowForm(false)} className="text-white/70 hover:text-white transition text-sm">✕</button>
+                <button onClick={() => { setShowForm(false); setFormErrors({}); setTouched({}); }} className="text-white/70 hover:text-white transition text-sm">✕</button>
               </div>
               <form onSubmit={handleSubmit} className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className={labelCls}>Nombre completo *</label>
-                  <input type="text" value={formState.nombreCompleto} onChange={e => setFormState(p => ({ ...p, nombreCompleto: e.target.value }))} className={inputCls} required maxLength={255} placeholder="Juan Pérez López" />
+                  <input
+                    type="text"
+                    value={formState.nombreCompleto}
+                    onChange={e => handleChange("nombreCompleto", e.target.value)}
+                    onBlur={() => handleBlur("nombreCompleto")}
+                    className={inputCls + (touched.nombreCompleto && formErrors.nombreCompleto ? " border-red-400 focus:ring-red-300 focus:border-red-400" : "")}
+                    maxLength={255}
+                    placeholder="Juan Pérez López"
+                  />
+                  {touched.nombreCompleto && formErrors.nombreCompleto && <p className="mt-1 text-xs text-red-600">{formErrors.nombreCompleto}</p>}
                 </div>
                 <div>
                   <label className={labelCls}>Nombre de usuario *</label>
-                  <input type="text" value={formState.username} onChange={e => setFormState(p => ({ ...p, username: e.target.value }))} className={inputCls} required maxLength={50} placeholder="juan_perez" />
+                  <input
+                    type="text"
+                    value={formState.username}
+                    onChange={e => handleChange("username", e.target.value)}
+                    onBlur={() => handleBlur("username")}
+                    className={inputCls + (touched.username && formErrors.username ? " border-red-400 focus:ring-red-300 focus:border-red-400" : "")}
+                    maxLength={50}
+                    placeholder="juan_perez"
+                  />
+                  {touched.username && formErrors.username && <p className="mt-1 text-xs text-red-600">{formErrors.username}</p>}
                 </div>
                 <div>
                   <label className={labelCls}>Correo electrónico *</label>
-                  <input type="email" value={formState.email} onChange={e => setFormState(p => ({ ...p, email: e.target.value }))} className={inputCls} required maxLength={255} placeholder="juan@ejemplo.com" />
+                  <input
+                    type="email"
+                    value={formState.email}
+                    onChange={e => handleChange("email", e.target.value)}
+                    onBlur={() => handleBlur("email")}
+                    className={inputCls + (touched.email && formErrors.email ? " border-red-400 focus:ring-red-300 focus:border-red-400" : "")}
+                    maxLength={255}
+                    placeholder="juan@ejemplo.com"
+                  />
+                  {touched.email && formErrors.email && <p className="mt-1 text-xs text-red-600">{formErrors.email}</p>}
                 </div>
                 <div>
                   <label className={labelCls}>Contraseña *</label>
                   <div className="relative">
-                    <input type={showPassword ? "text" : "password"} value={formState.password} onChange={e => setFormState(p => ({ ...p, password: e.target.value }))} className={inputCls + " pr-10"} required placeholder="••••••••" />
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={formState.password}
+                      onChange={e => handleChange("password", e.target.value)}
+                      onBlur={() => handleBlur("password")}
+                      className={inputCls + " pr-10" + (touched.password && formErrors.password ? " border-red-400 focus:ring-red-300 focus:border-red-400" : "")}
+                      placeholder="••••••••"
+                    />
                     <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition">
                       {showPassword ? <FaEyeSlash className="text-sm" /> : <FaEye className="text-sm" />}
                     </button>
                   </div>
+                  {touched.password && formErrors.password && <p className="mt-1 text-xs text-red-600">{formErrors.password}</p>}
                 </div>
                 <div className="sm:col-span-2">
                   <label className={labelCls}>Rol *</label>
@@ -242,7 +323,7 @@ export default function GestionUsuariosPage() {
                   </div>
                 </div>
                 <div className="sm:col-span-2 flex justify-end gap-3">
-                  <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition">Cancelar</button>
+                  <button type="button" onClick={() => { setShowForm(false); setFormErrors({}); setTouched({}); }} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition">Cancelar</button>
                   <button type="submit" disabled={enviando} className="px-5 py-2 text-sm font-semibold text-white bg-[#17609c] hover:bg-[#0f4c7a] disabled:opacity-50 rounded-lg transition">
                     {enviando ? "Creando..." : "Crear usuario"}
                   </button>

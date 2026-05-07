@@ -6,9 +6,11 @@ import Sidebar from '@/components/SideBar';
 import { FaArrowLeft, FaSave } from 'react-icons/fa';
 import Link from 'next/link';
 
-const inputClass =
+const inputBase =
   'shadow-sm border rounded-lg w-full py-2.5 px-3 text-gray-700 text-sm leading-tight ' +
-  'focus:outline-none focus:ring-2 focus:ring-[#003366]/30 focus:border-[#003366] border-gray-300 transition-colors';
+  'focus:outline-none focus:ring-2 focus:ring-[#003366]/30 focus:border-[#003366] transition-colors';
+const inputClass = inputBase + ' border-gray-300';
+const inputClassErr = inputBase + ' border-red-400 bg-red-50/30';
 
 export default function RegistroPermisoPage() {
   const router = useRouter();
@@ -21,6 +23,12 @@ export default function RegistroPermisoPage() {
   const [mensaje, setMensaje] = useState({ text: '', isError: false });
   const [traslapeAviso, setTraslapeAviso] = useState('');
   const [validandoTraslape, setValidandoTraslape] = useState(false);
+  const [errFechaInicio, setErrFechaInicio] = useState('');
+  const [errFechaFin, setErrFechaFin] = useState('');
+  const [errMotivo, setErrMotivo] = useState('');
+  const [touchedFechaInicio, setTouchedFechaInicio] = useState(false);
+  const [touchedFechaFin, setTouchedFechaFin] = useState(false);
+  const [touchedMotivo, setTouchedMotivo] = useState(false);
 
   const validarTraslape = async (fechaInicio: string, fechaFin: string) => {
     if (!fechaInicio || !fechaFin) {
@@ -52,20 +60,31 @@ export default function RegistroPermisoPage() {
 
 
 
+  const validateFechaInicio = (val: string, fin: string) => {
+    if (!val) return 'La fecha de inicio es obligatoria.';
+    if (fin && new Date(val) > new Date(fin)) return 'La fecha de inicio no puede ser posterior a la fecha de fin.';
+    return '';
+  };
+  const validateFechaFin = (val: string, inicio: string) => {
+    if (!val) return 'La fecha de fin es obligatoria.';
+    if (inicio && new Date(inicio) > new Date(val)) return 'La fecha de fin no puede ser anterior a la fecha de inicio.';
+    return '';
+  };
+  const validateMotivo = (val: string) => {
+    if (!val.trim()) return 'El motivo es obligatorio.';
+    if (val.trim().length < 10) return 'El motivo debe tener al menos 10 caracteres.';
+    return '';
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const eI = validateFechaInicio(formData.fechaInicio, formData.fechaFin);
+    const eF = validateFechaFin(formData.fechaFin, formData.fechaInicio);
+    const eM = validateMotivo(formData.motivo);
+    setErrFechaInicio(eI); setErrFechaFin(eF); setErrMotivo(eM);
+    setTouchedFechaInicio(true); setTouchedFechaFin(true); setTouchedMotivo(true);
+    if (eI || eF || eM) return;
     setMensaje({ text: '', isError: false });
-
-    // Validación básica
-    if (!formData.fechaInicio || !formData.fechaFin || !formData.motivo) {
-      setMensaje({ text: 'Todos los campos son requeridos', isError: true });
-      return;
-    }
-
-    if (new Date(formData.fechaInicio) > new Date(formData.fechaFin)) {
-      setMensaje({ text: 'La fecha de fin no puede ser menor a la fecha de inicio', isError: true });
-      return;
-    }
 
     setLoading(true);
     try {
@@ -132,11 +151,16 @@ export default function RegistroPermisoPage() {
                       onChange={(e) => {
                         const next = { ...formData, fechaInicio: e.target.value };
                         setFormData(next);
+                        setTouchedFechaInicio(true);
+                        setErrFechaInicio(validateFechaInicio(e.target.value, next.fechaFin));
+                        if (next.fechaFin) setErrFechaFin(validateFechaFin(next.fechaFin, e.target.value));
                         void validarTraslape(next.fechaInicio, next.fechaFin);
                       }}
-                      className={inputClass}
+                      onBlur={() => { setTouchedFechaInicio(true); setErrFechaInicio(validateFechaInicio(formData.fechaInicio, formData.fechaFin)); }}
+                      className={touchedFechaInicio && errFechaInicio ? inputClassErr : inputClass}
                       disabled={loading}
                     />
+                    {touchedFechaInicio && errFechaInicio && <p className="mt-1 text-xs text-red-600">{errFechaInicio}</p>}
                   </div>
                   <div>
                     <label htmlFor="fechaFin" className="block text-gray-700 text-xs font-semibold mb-1.5">Fecha de Fin *</label>
@@ -147,11 +171,16 @@ export default function RegistroPermisoPage() {
                       onChange={(e) => {
                         const next = { ...formData, fechaFin: e.target.value };
                         setFormData(next);
+                        setTouchedFechaFin(true);
+                        setErrFechaFin(validateFechaFin(e.target.value, next.fechaInicio));
+                        if (next.fechaInicio) setErrFechaInicio(validateFechaInicio(next.fechaInicio, e.target.value));
                         void validarTraslape(next.fechaInicio, next.fechaFin);
                       }}
-                      className={inputClass}
+                      onBlur={() => { setTouchedFechaFin(true); setErrFechaFin(validateFechaFin(formData.fechaFin, formData.fechaInicio)); }}
+                      className={touchedFechaFin && errFechaFin ? inputClassErr : inputClass}
                       disabled={loading}
                     />
+                    {touchedFechaFin && errFechaFin && <p className="mt-1 text-xs text-red-600">{errFechaFin}</p>}
                   </div>
                 </div>
                 {validandoTraslape && (
@@ -169,11 +198,18 @@ export default function RegistroPermisoPage() {
                     id="motivo"
                     rows={4}
                     value={formData.motivo}
-                    onChange={(e) => setFormData({ ...formData, motivo: e.target.value })}
-                    className={inputClass}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setFormData({ ...formData, motivo: v });
+                      setTouchedMotivo(true);
+                      setErrMotivo(validateMotivo(v));
+                    }}
+                    onBlur={() => { setTouchedMotivo(true); setErrMotivo(validateMotivo(formData.motivo)); }}
+                    className={touchedMotivo && errMotivo ? inputClassErr : inputClass}
                     placeholder="Describe brevemente el motivo de tu ausencia..."
                     disabled={loading}
                   />
+                  {touchedMotivo && errMotivo && <p className="mt-1 text-xs text-red-600">{errMotivo}</p>}
                 </div>
 
 

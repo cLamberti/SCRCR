@@ -86,6 +86,8 @@ export default function ConsultarAsociadosPage() {
     puestoJuntaDirectiva: '', estado: 1, observaciones: '', fechaInactivo: '',
   });
   const [guardando, setGuardando] = useState(false);
+  const [asocErrors, setAsocErrors] = useState<Record<string, string>>({});
+  const [asocTouched, setAsocTouched] = useState<Record<string, boolean>>({});
 
   /* Modal confirmación eliminación masiva */
   const [modalDeleteOpen,    setModalDeleteOpen]    = useState(false);
@@ -159,6 +161,41 @@ export default function ConsultarAsociadosPage() {
     [data, seleccionados]
   );
 
+  function validarCampoAsoc(campo: string, valor: string): string {
+    switch (campo) {
+      case 'nombreCompleto':
+        if (!valor.trim()) return 'El nombre completo es obligatorio.';
+        if (valor.trim().split(/\s+/).length < 2) return 'Incluye al menos nombre y apellido.';
+        if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]+$/.test(valor)) return 'Solo puede contener letras y espacios.';
+        return '';
+      case 'cedula':
+        if (!valor.trim()) return 'La cédula es obligatoria.';
+        if (!/^[0-9-]+$/.test(valor)) return 'Solo puede contener números y guiones.';
+        if (valor.trim().length < 9) return 'Debe tener al menos 9 caracteres.';
+        return '';
+      case 'telefono':
+        if (!valor.trim()) return 'El teléfono es obligatorio.';
+        if (valor.replace(/[\s\-+()]/g, '').length < 8) return 'Debe tener al menos 8 dígitos.';
+        return '';
+      case 'correo':
+        if (valor && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor)) return 'Ingresa un correo válido, por ejemplo: nombre@correo.com';
+        return '';
+      default: return '';
+    }
+  }
+
+  const handleAsocChange = (campo: string, valor: string) => {
+    setFormulario(prev => ({ ...prev, [campo]: valor }));
+    setAsocTouched(prev => ({ ...prev, [campo]: true }));
+    setAsocErrors(prev => ({ ...prev, [campo]: validarCampoAsoc(campo, valor) }));
+  };
+
+  // Solo valida al perder foco — NO reescribe el valor (evita revertir cambios)
+  const handleAsocBlur = (campo: string) => {
+    setAsocTouched(prev => ({ ...prev, [campo]: true }));
+    setAsocErrors(prev => ({ ...prev, [campo]: validarCampoAsoc(campo, String((formulario as any)[campo] ?? '')) }));
+  };
+
   const abrirModalCrear = () => {
     setAsociadoEditando(null);
     setFormulario({
@@ -167,11 +204,13 @@ export default function ConsultarAsociadosPage() {
       profesion: '', anosCongregarse: '', fechaAceptacion: '', perteneceJuntaDirectiva: false,
       puestoJuntaDirectiva: '', estado: 1, observaciones: '', fechaInactivo: '',
     });
+    setAsocErrors({}); setAsocTouched({});
     setModalEditOpen(true); setMensaje(''); setErroresLista([]); setEsError(false);
   };
 
   const abrirModalEdicion = (a: AsociadoRow) => {
     setAsociadoEditando(a);
+    setAsocErrors({}); setAsocTouched({});
     setFormulario({
       nombreCompleto: a.nombreCompleto || '',
       cedula:         a.cedula         || '',
@@ -247,8 +286,25 @@ export default function ConsultarAsociadosPage() {
   };
 
   const guardarCambios = async () => {
+    // Mark required fields as touched and show inline errors
+    const campos = ['nombreCompleto', 'cedula', 'telefono'];
+    const newErrors: Record<string, string> = {};
+    const newTouched: Record<string, boolean> = {};
+    for (const campo of campos) {
+      newTouched[campo] = true;
+      const err = validarCampoAsoc(campo, String((formulario as any)[campo] ?? ''));
+      if (err) newErrors[campo] = err;
+    }
+    if (formulario.correo) {
+      newTouched.correo = true;
+      const errCorreo = validarCampoAsoc('correo', formulario.correo);
+      if (errCorreo) newErrors.correo = errCorreo;
+    }
+    setAsocTouched(prev => ({ ...prev, ...newTouched }));
+    setAsocErrors(prev => ({ ...prev, ...newErrors }));
+
     const erroresValidacion = validarFormularioAsociado();
-    if (erroresValidacion.length > 0) {
+    if (erroresValidacion.length > 0 || Object.keys(newErrors).length > 0) {
       setErroresLista(erroresValidacion);
       setEsError(true);
       return;
@@ -783,31 +839,55 @@ export default function ConsultarAsociadosPage() {
                 {/* Fila 1 */}
                 <div>
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Nombre Completo *</label>
-                  <input required type="text" value={formulario.nombreCompleto} onChange={e => setFormulario({ ...formulario, nombreCompleto: e.target.value })} className={inputClass} />
+                  <input type="text" value={formulario.nombreCompleto}
+                    onChange={e => handleAsocChange('nombreCompleto', e.target.value)}
+                    onBlur={() => handleAsocBlur('nombreCompleto')}
+                    className={`${inputClass}${asocTouched.nombreCompleto && asocErrors.nombreCompleto ? ' border-red-400 bg-red-50/30' : ''}`} />
+                  {asocTouched.nombreCompleto && asocErrors.nombreCompleto && (
+                    <p className="mt-1 text-xs text-red-600">{asocErrors.nombreCompleto}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Cédula *</label>
-                  <input required type="text" value={formulario.cedula} onChange={e => setFormulario({ ...formulario, cedula: e.target.value })} className={inputClass} />
+                  <input type="text" value={formulario.cedula}
+                    onChange={e => handleAsocChange('cedula', e.target.value)}
+                    onBlur={() => handleAsocBlur('cedula')}
+                    className={`${inputClass}${asocTouched.cedula && asocErrors.cedula ? ' border-red-400 bg-red-50/30' : ''}`} />
+                  {asocTouched.cedula && asocErrors.cedula && (
+                    <p className="mt-1 text-xs text-red-600">{asocErrors.cedula}</p>
+                  )}
                 </div>
 
                 {/* Fila 2 */}
                 <div>
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Correo Electrónico</label>
-                  <input type="email" value={formulario.correo} onChange={e => setFormulario({ ...formulario, correo: e.target.value })} className={inputClass} />
+                  <input type="email" value={formulario.correo}
+                    onChange={e => handleAsocChange('correo', e.target.value)}
+                    onBlur={() => handleAsocBlur('correo')}
+                    className={`${inputClass}${asocTouched.correo && asocErrors.correo ? ' border-red-400 bg-red-50/30' : ''}`} />
+                  {asocTouched.correo && asocErrors.correo && (
+                    <p className="mt-1 text-xs text-red-600">{asocErrors.correo}</p>
+                  )}
                 </div>
                 <div>
-                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Teléfono Personal</label>
-                  <input type="text" value={formulario.telefono} onChange={e => setFormulario({ ...formulario, telefono: e.target.value })} className={inputClass} />
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Teléfono Personal *</label>
+                  <input type="text" value={formulario.telefono}
+                    onChange={e => handleAsocChange('telefono', e.target.value)}
+                    onBlur={() => handleAsocBlur('telefono')}
+                    className={`${inputClass}${asocTouched.telefono && asocErrors.telefono ? ' border-red-400 bg-red-50/30' : ''}`} />
+                  {asocTouched.telefono && asocErrors.telefono && (
+                    <p className="mt-1 text-xs text-red-600">{asocErrors.telefono}</p>
+                  )}
                 </div>
 
                 {/* Fila 3 */}
                 <div>
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Teléfono de Contacto (Emergencia)</label>
-                  <input type="text" value={formulario.telefonoContacto} onChange={e => setFormulario({ ...formulario, telefonoContacto: e.target.value })} className={inputClass} />
+                  <input type="text" value={formulario.telefonoContacto} onChange={e => setFormulario(prev => ({ ...prev, telefonoContacto: e.target.value }))} className={inputClass} />
                 </div>
                 <div>
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Estado Civil</label>
-                  <select value={formulario.estadoCivil} onChange={e => setFormulario({ ...formulario, estadoCivil: e.target.value })} className={inputClass}>
+                  <select value={formulario.estadoCivil} onChange={e => setFormulario(prev => ({ ...prev, estadoCivil: e.target.value }))} className={inputClass}>
                     <option value="Soltero(a)">Soltero(a)</option>
                     <option value="Casado(a)">Casado(a)</option>
                     <option value="Divorciado(a)">Divorciado(a)</option>
@@ -819,42 +899,42 @@ export default function ConsultarAsociadosPage() {
                 {/* Fila 4 */}
                 <div>
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Fecha de Nacimiento</label>
-                  <input type="date" value={formulario.fechaNacimiento} onChange={e => setFormulario({ ...formulario, fechaNacimiento: e.target.value })} className={inputClass} />
+                  <input type="date" value={formulario.fechaNacimiento} onChange={e => setFormulario(prev => ({ ...prev, fechaNacimiento: e.target.value }))} className={inputClass} />
                 </div>
                 <div>
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Profesión u Oficio</label>
-                  <input type="text" value={formulario.profesion} onChange={e => setFormulario({ ...formulario, profesion: e.target.value })} className={inputClass} />
+                  <input type="text" value={formulario.profesion} onChange={e => setFormulario(prev => ({ ...prev, profesion: e.target.value }))} className={inputClass} />
                 </div>
 
                 {/* Fila 5 */}
                 <div>
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Años de Congregarse</label>
-                  <input type="number" value={formulario.anosCongregarse} onChange={e => setFormulario({ ...formulario, anosCongregarse: e.target.value === '' ? '' : Number(e.target.value) })} className={inputClass} min="0" />
+                  <input type="number" value={formulario.anosCongregarse} onChange={e => setFormulario(prev => ({ ...prev, anosCongregarse: e.target.value === '' ? '' : Number(e.target.value) }))} className={inputClass} min="0" />
                 </div>
                 <div>
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Fecha de Aceptación (Asociado)</label>
-                  <input type="date" value={formulario.fechaAceptacion} onChange={e => setFormulario({ ...formulario, fechaAceptacion: e.target.value })} className={inputClass} />
+                  <input type="date" value={formulario.fechaAceptacion} onChange={e => setFormulario(prev => ({ ...prev, fechaAceptacion: e.target.value }))} className={inputClass} />
                 </div>
 
                 {/* Fila 6 */}
                 <div>
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Ministerio</label>
-                  <input type="text" value={formulario.ministerio} onChange={e => setFormulario({ ...formulario, ministerio: e.target.value })} className={inputClass} />
+                  <input type="text" value={formulario.ministerio} onChange={e => setFormulario(prev => ({ ...prev, ministerio: e.target.value }))} className={inputClass} />
                 </div>
                 <div>
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Fecha de Ingreso (Congregación)</label>
-                  <input type="date" value={formulario.fechaIngreso} onChange={e => setFormulario({ ...formulario, fechaIngreso: e.target.value })} className={inputClass} />
+                  <input type="date" value={formulario.fechaIngreso} onChange={e => setFormulario(prev => ({ ...prev, fechaIngreso: e.target.value }))} className={inputClass} />
                 </div>
 
                 {/* Fila 7 */}
                 <div className="flex items-center gap-2 mt-4">
-                  <input type="checkbox" id="junta" checked={formulario.perteneceJuntaDirectiva} onChange={e => setFormulario({ ...formulario, perteneceJuntaDirectiva: e.target.checked })} className="w-4 h-4 accent-[#003366] rounded" />
+                  <input type="checkbox" id="junta" checked={formulario.perteneceJuntaDirectiva} onChange={e => setFormulario(prev => ({ ...prev, perteneceJuntaDirectiva: e.target.checked }))} className="w-4 h-4 accent-[#003366] rounded" />
                   <label htmlFor="junta" className="text-gray-700 text-xs font-semibold">¿Pertenece a la Junta Directiva?</label>
                 </div>
                 {formulario.perteneceJuntaDirectiva && (
                   <div>
                     <label className="block text-gray-700 text-xs font-semibold mb-1.5">Puesto en Junta Directiva</label>
-                    <input type="text" value={formulario.puestoJuntaDirectiva} onChange={e => setFormulario({ ...formulario, puestoJuntaDirectiva: e.target.value })} className={inputClass} />
+                    <input type="text" value={formulario.puestoJuntaDirectiva} onChange={e => setFormulario(prev => ({ ...prev, puestoJuntaDirectiva: e.target.value }))} className={inputClass} />
                   </div>
                 )}
 
@@ -863,7 +943,7 @@ export default function ConsultarAsociadosPage() {
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Estado</label>
                   <select
                     value={formulario.estado}
-                    onChange={e => setFormulario({ ...formulario, estado: Number(e.target.value) })}
+                    onChange={e => setFormulario(prev => ({ ...prev, estado: Number(e.target.value) }))}
                     className={inputClass}
                   >
                     <option value={1}>Activo</option>
@@ -875,7 +955,7 @@ export default function ConsultarAsociadosPage() {
                     <label className="block text-gray-700 text-xs font-semibold mb-1.5">Fecha de Inactivo</label>
                     <input
                       type="date" value={formulario.fechaInactivo}
-                      onChange={e => setFormulario({ ...formulario, fechaInactivo: e.target.value })}
+                      onChange={e => setFormulario(prev => ({ ...prev, fechaInactivo: e.target.value }))}
                       className={inputClass}
                     />
                   </div>
@@ -884,7 +964,7 @@ export default function ConsultarAsociadosPage() {
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Dirección</label>
                   <input
                     type="text" value={formulario.direccion}
-                    onChange={e => setFormulario({ ...formulario, direccion: e.target.value })}
+                    onChange={e => setFormulario(prev => ({ ...prev, direccion: e.target.value }))}
                     className={inputClass}
                   />
                 </div>
@@ -892,7 +972,7 @@ export default function ConsultarAsociadosPage() {
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Observaciones</label>
                   <textarea
                     value={formulario.observaciones}
-                    onChange={e => setFormulario({ ...formulario, observaciones: e.target.value })}
+                    onChange={e => setFormulario(prev => ({ ...prev, observaciones: e.target.value }))}
                     rows={3}
                     placeholder="Notas adicionales sobre el asociado..."
                     className={inputClass + ' resize-none'}
