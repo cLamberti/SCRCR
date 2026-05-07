@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
@@ -69,6 +70,7 @@ export default function PermisosPage() {
   }, []);
 
   useEffect(() => { cargar(); }, [cargar]);
+  useAutoRefresh(cargar);
 
   const filtrados = useMemo(() => {
     return data.filter(r => filtros.estado === 'todos' || r.estado === filtros.estado);

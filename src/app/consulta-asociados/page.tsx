@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import Image from 'next/image';
 import {
   FaHome, FaUserPlus, FaList, FaSignOutAlt,
@@ -116,6 +117,7 @@ export default function ConsultarAsociadosPage() {
   }, []);
 
   useEffect(() => { cargar(); }, [cargar]);
+  useAutoRefresh(cargar);
 
   /* Resetear página y selección cuando cambian filtros o pageSize */
   useEffect(() => { setPagina(1); setSeleccionados(new Set()); }, [filtros, pageSize]);

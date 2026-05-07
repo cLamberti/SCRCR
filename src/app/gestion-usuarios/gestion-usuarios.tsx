@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { useRouter } from "next/navigation";
 import {
   FaUsers, FaUserPlus, FaChevronLeft, FaChevronRight,
@@ -59,7 +60,7 @@ export default function GestionUsuariosPage() {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [enviando, setEnviando] = useState(false);
 
-  const cargarUsuarios = async () => {
+  const cargarUsuarios = useCallback(async () => {
     setLoading(true);
     setMensaje("");
     try {
@@ -69,9 +70,10 @@ export default function GestionUsuariosPage() {
       setUsuarios(json.data || []);
     } catch { setMensaje("Error de conexión."); setMensajeOk(false); }
     finally { setLoading(false); }
-  };
+  }, []);
 
-  useEffect(() => { cargarUsuarios(); }, []);
+  useEffect(() => { cargarUsuarios(); }, [cargarUsuarios]);
+  useAutoRefresh(cargarUsuarios);
 
   const validarFormulario = (): string | null => {
     const { nombreCompleto, username, email } = formState;
