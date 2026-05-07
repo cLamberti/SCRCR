@@ -10,14 +10,22 @@ import {
   FaChartLine, FaExclamationTriangle, FaCalendarAlt, FaClipboardList, FaBook
 } from 'react-icons/fa';
 
+const ROL_LABELS: Record<string, string> = {
+  admin: 'Administrador',
+  tesorero: 'Tesorero',
+  pastorGeneral: 'Pastor General',
+  juntaDirectiva: 'Junta Directiva',
+  asistenteAdministrativo: 'Asistente Administrativo',
+};
+
 const modulos = [
-  { titulo: 'Congregados',          descripcion: 'Registra, consulta y gestiona los congregados',    icono: <FaUsers className="text-3xl" />,       href: '/congregados',        roles: ['admin', 'tesorero', 'pastorGeneral', 'asistenteAdministrativo'], color: 'from-[#17609c] to-[#2070ac]' },
-  { titulo: 'Consulta de Asociados',descripcion: 'Buscar y consultar información de asociados',      icono: <FaSearch className="text-3xl" />,       href: '/consulta-asociados', roles: ['admin', 'tesorero', 'juntaDirectiva'],                         color: 'from-[#17609c] to-[#2070ac]' },
-  { titulo: 'Gestión de Usuarios',  descripcion: 'Administrar usuarios del sistema',                 icono: <FaUsers className="text-3xl" />,        href: '/gestion-usuarios',   roles: ['admin', 'asistenteAdministrativo'],                            color: 'from-slate-600 to-slate-700' },
-  { titulo: 'Reportes',             descripcion: 'Generar reportes y estadísticas',                  icono: <FaChartLine className="text-3xl" />,    href: '/reportes',           roles: ['admin', 'tesorero', 'pastorGeneral', 'juntaDirectiva', 'asistenteAdministrativo'], color: 'from-[#2070ac] to-[#3080bc]' },
-  { titulo: 'Eventos',              descripcion: 'Crea, edita y administra eventos',                 icono: <FaCalendarAlt className="text-3xl" />,  href: '/eventos',            roles: ['admin', 'pastorGeneral', 'asistenteAdministrativo'],           color: 'from-[#3080bc] to-[#17609c]' },
-  { titulo: 'Permisos',             descripcion: 'Gestión de permisos de ausencia',                  icono: <FaClipboardList className="text-3xl" />,href: '/permisos',           roles: ['admin', 'pastorGeneral', 'asistenteAdministrativo'],           color: 'from-slate-700 to-slate-800' },
-  { titulo: 'Actas',                descripcion: 'Registro de sesiones y control de asistencia',     icono: <FaBook className="text-3xl" />,         href: '/actas',              roles: ['admin', 'juntaDirectiva'],                                    color: 'from-[#1e3a5f] to-[#003366]' },
+  { titulo: 'Congregados', descripcion: 'Registra, consulta y gestiona los congregados', icono: <FaUsers className="text-3xl" />, href: '/congregados', roles: ['admin', 'tesorero', 'pastorGeneral', 'asistenteAdministrativo'], color: 'from-[#17609c] to-[#2070ac]' },
+  { titulo: 'Consulta de Asociados', descripcion: 'Buscar y consultar información de asociados', icono: <FaSearch className="text-3xl" />, href: '/consulta-asociados', roles: ['admin', 'tesorero', 'juntaDirectiva'], color: 'from-[#17609c] to-[#2070ac]' },
+  { titulo: 'Gestión de Usuarios', descripcion: 'Administrar usuarios del sistema', icono: <FaUsers className="text-3xl" />, href: '/gestion-usuarios', roles: ['admin', 'asistenteAdministrativo'], color: 'from-slate-600 to-slate-700' },
+  { titulo: 'Reportes', descripcion: 'Generar reportes y estadísticas', icono: <FaChartLine className="text-3xl" />, href: '/reportes', roles: ['admin', 'tesorero', 'pastorGeneral', 'juntaDirectiva', 'asistenteAdministrativo'], color: 'from-[#2070ac] to-[#3080bc]' },
+  { titulo: 'Eventos', descripcion: 'Crea, edita y administra eventos', icono: <FaCalendarAlt className="text-3xl" />, href: '/eventos', roles: ['admin', 'pastorGeneral', 'asistenteAdministrativo'], color: 'from-[#3080bc] to-[#17609c]' },
+  { titulo: 'Permisos', descripcion: 'Gestión de permisos de ausencia', icono: <FaClipboardList className="text-3xl" />, href: '/permisos', roles: ['admin', 'pastorGeneral', 'asistenteAdministrativo'], color: 'from-slate-700 to-slate-800' },
+  { titulo: 'Actas', descripcion: 'Registro de sesiones y control de asistencia', icono: <FaBook className="text-3xl" />, href: '/actas', roles: ['admin', 'juntaDirectiva'], color: 'from-[#1e3a5f] to-[#003366]' },
 ];
 
 export default function HomePage() {
@@ -82,7 +90,7 @@ export default function HomePage() {
               </h2>
               <p className="text-gray-500 text-sm">
                 Rol: <span className="font-semibold text-[#003366]">
-                  {user.rol === 'admin' ? 'Administrador' : user.rol === 'tesorero' ? 'Tesorero' : 'Pastor General'}
+                  {ROL_LABELS[user.rol] || user.rol}
                 </span>
               </p>
             </div>
