@@ -24,9 +24,11 @@ const publicRoutes = ['/', '/recuperar-password'];
 
 // ── Helper: verificar JWT en Edge ────────────────────────────────────────────
 
+const JWT_FALLBACK = 'uwrT0PdHQ7gkJeoaD3iKqMGk';
+
 async function getTokenPayload(token: string): Promise<{ rol: string } | null> {
   try {
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET ?? '');
+    const secret = new TextEncoder().encode(process.env.JWT_SECRET ?? JWT_FALLBACK);
     const { payload } = await jwtVerify(token, secret);
     return payload as { rol: string };
   } catch {

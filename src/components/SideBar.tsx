@@ -250,6 +250,7 @@ export default function Sidebar({ activeItem, pageTitle = 'SCRCR' }: SidebarProp
             ].map(nombre => (
               <p key={nombre} className="text-[9px] text-white/20 leading-tight">{nombre}</p>
             ))}
+
           </div>
         </div>
       </div>
