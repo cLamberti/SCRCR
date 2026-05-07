@@ -211,15 +211,15 @@ export default function GestionUsuariosPage() {
               <form onSubmit={handleSubmit} className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className={labelCls}>Nombre completo *</label>
-                  <input type="text" value={formState.nombreCompleto} onChange={e => setFormState(p => ({ ...p, nombreCompleto: e.target.value }))} className={inputCls} required placeholder="Juan Pérez López" />
+                  <input type="text" value={formState.nombreCompleto} onChange={e => setFormState(p => ({ ...p, nombreCompleto: e.target.value }))} className={inputCls} required maxLength={255} placeholder="Juan Pérez López" />
                 </div>
                 <div>
                   <label className={labelCls}>Nombre de usuario *</label>
-                  <input type="text" value={formState.username} onChange={e => setFormState(p => ({ ...p, username: e.target.value }))} className={inputCls} required placeholder="juan_perez" />
+                  <input type="text" value={formState.username} onChange={e => setFormState(p => ({ ...p, username: e.target.value }))} className={inputCls} required maxLength={50} placeholder="juan_perez" />
                 </div>
                 <div>
                   <label className={labelCls}>Correo electrónico *</label>
-                  <input type="email" value={formState.email} onChange={e => setFormState(p => ({ ...p, email: e.target.value }))} className={inputCls} required placeholder="juan@ejemplo.com" />
+                  <input type="email" value={formState.email} onChange={e => setFormState(p => ({ ...p, email: e.target.value }))} className={inputCls} required maxLength={255} placeholder="juan@ejemplo.com" />
                 </div>
                 <div>
                   <label className={labelCls}>Contraseña *</label>
