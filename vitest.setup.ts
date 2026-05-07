@@ -35,7 +35,9 @@ vi.mock('react-icons/fa', () => {
         FaUsers: Icon, FaUserPlus: Icon, FaSearch: Icon, FaEdit: Icon, FaTrash: Icon,
         FaChevronLeft: Icon, FaChevronRight: Icon, FaExclamationTriangle: Icon,
         FaTimes: Icon, FaSave: Icon, FaPlus: Icon, FaFilter: Icon,
-        FaImage: Icon, FaDownload: Icon, FaPrint: Icon, FaCheck: Icon, FaInfoCircle: Icon
+        FaImage: Icon, FaDownload: Icon, FaPrint: Icon, FaCheck: Icon, FaInfoCircle: Icon,
+        FaBook: Icon, FaFileAlt: Icon, FaExclamationCircle: Icon, FaChevronDown: Icon,
+        FaExternalLinkAlt: Icon, FaUpload: Icon, FaSpinner: Icon,
     };
 });
 

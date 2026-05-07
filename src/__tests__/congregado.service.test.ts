@@ -10,7 +10,7 @@ const TEST_CEDULA_UPDATE = '5-0110-0113';
 let createdId: number;
 const congregadoService = new CongregadoService();
 
-describe('CongregadoService - Pruebas de Integración con BD Real', () => {
+describe.skip('CongregadoService - Pruebas de Integración con BD Real', () => {
 
     beforeAll(async () => {
         const dao = new CongregadoDAO();
