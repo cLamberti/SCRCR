@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { useDebounce } from "@/hooks/useDebounce";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -116,6 +117,8 @@ export default function EventosPage() {
   }
 
   useEffect(() => { fetchEventos(); }, [nombreDebounced, fechaDesde, fechaHasta, activo, page, limit]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useAutoRefresh(fetchEventos);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import Sidebar from '@/components/SideBar';
 import {
   FaBook, FaPlus, FaUsers, FaFileAlt, FaTimes, FaCheck,
@@ -479,6 +480,7 @@ export default function ActasPage() {
   }, [apiBase]);
 
   useEffect(() => { cargar(); }, [cargar]);
+  useAutoRefresh(cargar);
 
   async function handleDelete(acta: Acta) {
     setDeletingId(acta.id);

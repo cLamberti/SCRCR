@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState, useCallback } from "react";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import {
   FaUsers, FaUserPlus, FaSearch, FaEdit, FaTrash,
   FaChevronLeft, FaChevronRight, FaExclamationTriangle,
@@ -121,6 +122,7 @@ export default function CongregadosPage() {
   }, []);
 
   useEffect(() => { cargar(); }, [cargar]);
+  useAutoRefresh(cargar);
   useEffect(() => { setPagina(1); setSeleccionados(new Set()); }, [filtros, pageSize]);
 
   // ── Filtrado + paginación ──────────────────────────────────────────────────

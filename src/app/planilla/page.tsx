@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import { FaFileExcel, FaPlus, FaLock, FaTrash, FaEye, FaUserTie, FaSpinner } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 import Sidebar from '@/components/SideBar';
@@ -77,6 +78,7 @@ export default function PlanillaPage() {
   }, []);
 
   useEffect(() => { cargarEmpleados(); cargarPlanillas(); }, [cargarEmpleados, cargarPlanillas]);
+  useAutoRefresh(useCallback(() => { cargarEmpleados(); cargarPlanillas(); }, [cargarEmpleados, cargarPlanillas]));
 
   // Inicializar líneas cuando se abre el modal de generar
   const abrirModalGenerar = () => {

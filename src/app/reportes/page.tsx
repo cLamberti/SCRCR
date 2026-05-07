@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import toast from "react-hot-toast";
 import Swal from "sweetalert2";
 import {
@@ -89,12 +90,16 @@ export default function ReportesPage() {
 
   const personas = tipo === "asociado" ? asociados : congregados;
 
-  useEffect(() => {
+  const cargarTodo = useCallback(() => {
     setCargandoPersonas(true);
     Promise.all([cargarAsociados(), cargarCongregados(), cargarEventos()]).finally(() =>
       setCargandoPersonas(false)
     );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => { cargarTodo(); }, [cargarTodo]);
+  useAutoRefresh(cargarTodo);
 
   useEffect(() => {
     if (eventoId > 0) cargarRegistros();
