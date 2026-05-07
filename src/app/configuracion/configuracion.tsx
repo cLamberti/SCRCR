@@ -58,6 +58,10 @@ export default function ConfiguracionPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [nombreError, setNombreError] = useState('');
+  const [nombreTouched, setNombreTouched] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordTouched, setPasswordTouched] = useState(false);
 
   const pwStrength = passwordStrength(password);
 
@@ -75,9 +79,11 @@ export default function ConfiguracionPage() {
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password && password.length < 8) {
-      Swal.fire("Error", "La contraseña debe tener al menos 8 caracteres", "error"); return;
-    }
+    const nErr = !nombreCompleto.trim() ? 'El nombre completo es obligatorio.' : nombreCompleto.trim().length < 3 ? 'Debe tener al menos 3 caracteres.' : '';
+    const pErr = password && password.length < 8 ? 'La contraseña debe tener al menos 8 caracteres.' : '';
+    setNombreError(nErr); setPasswordError(pErr);
+    setNombreTouched(true); if (password) setPasswordTouched(true);
+    if (nErr || pErr) return;
     if (password && password !== confirmPassword) {
       Swal.fire("Error", "Las contraseñas no coinciden", "error"); return;
     }
@@ -159,9 +165,18 @@ export default function ConfiguracionPage() {
                 <form onSubmit={handleSaveProfile} className="space-y-4">
                   <div>
                     <label className={labelCls}>Nombre Completo</label>
-                    <input type="text" className={inputCls} value={nombreCompleto}
-                      onChange={e => setNombreCompleto(e.target.value)} required
+                    <input type="text"
+                      className={`${inputCls}${nombreTouched && nombreError ? ' border-red-400' : ''}`}
+                      value={nombreCompleto}
+                      onChange={e => {
+                        const v = e.target.value;
+                        setNombreCompleto(v);
+                        setNombreTouched(true);
+                        setNombreError(!v.trim() ? 'El nombre completo es obligatorio.' : v.trim().length < 3 ? 'Debe tener al menos 3 caracteres.' : '');
+                      }}
+                      onBlur={() => { setNombreTouched(true); setNombreError(!nombreCompleto.trim() ? 'El nombre completo es obligatorio.' : nombreCompleto.trim().length < 3 ? 'Debe tener al menos 3 caracteres.' : ''); }}
                       minLength={3} aria-label="Nombre completo" />
+                    {nombreTouched && nombreError && <p className="mt-1 text-xs text-red-500">{nombreError}</p>}
                   </div>
                   <div>
                     <label className={labelCls}>Correo Electrónico</label>
@@ -176,16 +191,25 @@ export default function ConfiguracionPage() {
                       <div>
                         <label className={labelCls}>Nueva Contraseña</label>
                         <div className="relative">
-                          <input type={showPassword ? "text" : "password"} className={inputCls + " pr-10"}
-                            value={password} onChange={e => setPassword(e.target.value)}
+                          <input type={showPassword ? "text" : "password"}
+                            className={`${inputCls} pr-10${passwordTouched && passwordError ? ' border-red-400' : ''}`}
+                            value={password}
+                            onChange={e => {
+                              const v = e.target.value;
+                              setPassword(v);
+                              if (v) { setPasswordTouched(true); setPasswordError(v.length < 8 ? 'La contraseña debe tener al menos 8 caracteres.' : ''); }
+                              else { setPasswordError(''); }
+                            }}
+                            onBlur={() => { if (password) { setPasswordTouched(true); setPasswordError(password.length < 8 ? 'La contraseña debe tener al menos 8 caracteres.' : ''); } }}
                             placeholder="Mín. 8 caracteres" aria-label="Nueva contraseña" />
                           <button type="button" onClick={() => setShowPassword(v => !v)}
                             className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text)] transition">
                             {showPassword ? <FaEyeSlash /> : <FaEye />}
                           </button>
                         </div>
+                        {passwordTouched && passwordError && <p className="mt-1 text-xs text-red-500">{passwordError}</p>}
                         {/* Barra de fortaleza */}
-                        {password && (
+                        {password && !passwordError && (
                           <div className="mt-2">
                             <div className="flex gap-1 h-1.5">
                               {[1,2,3,4,5].map(i => (

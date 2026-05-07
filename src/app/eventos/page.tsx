@@ -79,6 +79,12 @@ export default function EventosPage() {
   const [msg, setMsg] = useState<string | null>(null);
   const [msgOk, setMsgOk] = useState<boolean | null>(null);
 
+  // Inline validation for create form
+  const [errNombre, setErrNombre] = useState('');
+  const [errFecha, setErrFecha] = useState('');
+  const [touchedNombre, setTouchedNombre] = useState(false);
+  const [touchedFecha, setTouchedFecha] = useState(false);
+
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editRow, setEditRow] = useState<Partial<Evento>>({});
 
@@ -122,7 +128,11 @@ export default function EventosPage() {
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    if (!canCreate || sending) return;
+    const nErr = !cNombre.trim() ? 'El nombre del evento es obligatorio.' : '';
+    const fErr = !cFecha || !DATE_RE.test(cFecha) ? 'La fecha es obligatoria y debe ser válida.' : '';
+    setErrNombre(nErr); setErrFecha(fErr);
+    setTouchedNombre(true); setTouchedFecha(true);
+    if (nErr || fErr || sending) return;
     setSending(true);
     setMsg(null);
     try {
@@ -137,6 +147,7 @@ export default function EventosPage() {
       setMsgOk(true);
       setMsg("Evento creado correctamente.");
       setCNombre(""); setCDescripcion(""); setCFecha(todayStr()); setCHora(""); setCActivo(true);
+      setErrNombre(''); setErrFecha(''); setTouchedNombre(false); setTouchedFecha(false);
       setShowForm(false);
     } catch { setMsgOk(false); setMsg("Error de red al crear el evento."); }
     finally { setSending(false); }
@@ -229,11 +240,30 @@ export default function EventosPage() {
               <form onSubmit={handleCreate} className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className={labelCls}>Nombre *</label>
-                  <input type="text" value={cNombre} onChange={e => setCNombre(e.target.value)} className={inputCls} placeholder="Ej. Culto dominical" required />
+                  <input type="text" value={cNombre}
+                    onChange={e => {
+                      const v = e.target.value;
+                      setCNombre(v);
+                      setTouchedNombre(true);
+                      setErrNombre(!v.trim() ? 'El nombre del evento es obligatorio.' : '');
+                    }}
+                    onBlur={() => { setTouchedNombre(true); setErrNombre(!cNombre.trim() ? 'El nombre del evento es obligatorio.' : ''); }}
+                    className={`${inputCls}${touchedNombre && errNombre ? ' border-red-400 bg-red-50/30' : ''}`}
+                    placeholder="Ej. Culto dominical" />
+                  {touchedNombre && errNombre && <p className="mt-1 text-xs text-red-600">{errNombre}</p>}
                 </div>
                 <div>
                   <label className={labelCls}>Fecha *</label>
-                  <input type="date" value={cFecha} onChange={e => setCFecha(e.target.value)} className={inputCls} required />
+                  <input type="date" value={cFecha}
+                    onChange={e => {
+                      const v = e.target.value;
+                      setCFecha(v);
+                      setTouchedFecha(true);
+                      setErrFecha(!v || !DATE_RE.test(v) ? 'La fecha es obligatoria y debe ser válida.' : '');
+                    }}
+                    onBlur={() => { setTouchedFecha(true); setErrFecha(!cFecha || !DATE_RE.test(cFecha) ? 'La fecha es obligatoria.' : ''); }}
+                    className={`${inputCls}${touchedFecha && errFecha ? ' border-red-400 bg-red-50/30' : ''}`} />
+                  {touchedFecha && errFecha && <p className="mt-1 text-xs text-red-600">{errFecha}</p>}
                 </div>
                 <div>
                   <label className={labelCls}>Hora</label>

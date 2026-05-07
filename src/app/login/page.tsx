@@ -12,6 +12,10 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [usernameError, setUsernameError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [usernameTouched, setUsernameTouched] = useState(false);
+  const [passwordTouched, setPasswordTouched] = useState(false);
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect') || '/';
 
@@ -21,6 +25,12 @@ function LoginForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Validate all fields on submit
+    const uErr = !username.trim() ? 'El nombre de usuario es obligatorio.' : '';
+    const pErr = !password ? 'La contraseña es obligatoria.' : '';
+    setUsernameError(uErr); setPasswordError(pErr);
+    setUsernameTouched(true); setPasswordTouched(true);
+    if (uErr || pErr) return;
     setError('');
     setLoading(true);
 
@@ -78,13 +88,28 @@ function LoginForm() {
                   <input
                     id="username"
                     type="text"
-                    required
                     value={username}
-                    onChange={e => setUsername(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-[#003366] focus:border-transparent transition-all"
+                    onChange={e => {
+                      const v = e.target.value;
+                      setUsername(v);
+                      setUsernameTouched(true);
+                      setUsernameError(!v.trim() ? 'El nombre de usuario es obligatorio.' : '');
+                    }}
+                    onBlur={() => {
+                      setUsernameTouched(true);
+                      setUsernameError(!username.trim() ? 'El nombre de usuario es obligatorio.' : '');
+                    }}
+                    className={`w-full pl-10 pr-4 py-2.5 border rounded-lg text-gray-800 text-sm focus:outline-none focus:ring-2 focus:border-transparent transition-all ${
+                      usernameTouched && usernameError
+                        ? 'border-red-400 focus:ring-red-300 bg-red-50/30'
+                        : 'border-gray-300 focus:ring-[#003366]'
+                    }`}
                     placeholder="su_usuario"
                     autoComplete="username"
                   />
+                  {usernameTouched && usernameError && (
+                    <p className="mt-1 text-xs text-red-600">{usernameError}</p>
+                  )}
                 </div>
               </div>
 
@@ -97,13 +122,28 @@ function LoginForm() {
                   <input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
-                    required
                     value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    className="w-full pl-10 pr-11 py-2.5 border border-gray-300 rounded-lg text-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-[#003366] focus:border-transparent transition-all"
+                    onChange={e => {
+                      const v = e.target.value;
+                      setPassword(v);
+                      setPasswordTouched(true);
+                      setPasswordError(!v ? 'La contraseña es obligatoria.' : '');
+                    }}
+                    onBlur={() => {
+                      setPasswordTouched(true);
+                      setPasswordError(!password ? 'La contraseña es obligatoria.' : '');
+                    }}
+                    className={`w-full pl-10 pr-11 py-2.5 border rounded-lg text-gray-800 text-sm focus:outline-none focus:ring-2 focus:border-transparent transition-all ${
+                      passwordTouched && passwordError
+                        ? 'border-red-400 focus:ring-red-300 bg-red-50/30'
+                        : 'border-gray-300 focus:ring-[#003366]'
+                    }`}
                     placeholder="••••••••"
                     autoComplete="current-password"
                   />
+                  {passwordTouched && passwordError && (
+                    <p className="mt-1 text-xs text-red-600">{passwordError}</p>
+                  )}
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}

@@ -81,6 +81,8 @@ function ModalActa({ tipo, acta, onClose, onSaved }: ModalActaProps) {
   const [uploadedName, setUploadedName] = useState<string | null>(acta?.nombreArchivo ?? null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [fechaError, setFechaError] = useState('');
+  const [fechaTouched, setFechaTouched] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -105,7 +107,11 @@ function ModalActa({ tipo, acta, onClose, onSaved }: ModalActaProps) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!fecha) { setError('La fecha es requerida.'); return; }
+    if (!fecha) {
+      setFechaTouched(true);
+      setFechaError('La fecha de la sesión es obligatoria.');
+      return;
+    }
     setSaving(true);
     setError('');
     try {
@@ -149,10 +155,16 @@ function ModalActa({ tipo, acta, onClose, onSaved }: ModalActaProps) {
             <input
               type="date"
               value={fecha}
-              onChange={e => setFecha(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003366]/30"
-              required
+              onChange={e => {
+                const v = e.target.value;
+                setFecha(v);
+                setFechaTouched(true);
+                setFechaError(!v ? 'La fecha de la sesión es obligatoria.' : '');
+              }}
+              onBlur={() => { setFechaTouched(true); setFechaError(!fecha ? 'La fecha de la sesión es obligatoria.' : ''); }}
+              className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003366]/30 ${fechaTouched && fechaError ? 'border-red-400 bg-red-50/30' : 'border-gray-300'}`}
             />
+            {fechaTouched && fechaError && <p className="mt-1 text-xs text-red-600">{fechaError}</p>}
           </div>
 
           {/* Tipo sesión */}

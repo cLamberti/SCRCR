@@ -43,6 +43,8 @@ export default function PlanillaPage() {
   const [enviandoEmp, setEnviandoEmp] = useState(false);
   const [mensajeEmp, setMensajeEmp] = useState('');
   const [mensajeEmpOk, setMensajeEmpOk] = useState(true);
+  const [empErrors, setEmpErrors] = useState<Record<string, string>>({});
+  const [empTouched, setEmpTouched] = useState<Record<string, boolean>>({});
 
   // Planillas
   const [planillas, setPlanillas] = useState<PlanillaResumen[]>([]);
@@ -133,6 +135,31 @@ export default function PlanillaPage() {
   };
 
   // Empleados CRUD
+  function validarCampoEmp(campo: string, valor: string): string {
+    switch (campo) {
+      case 'nombre': return !valor.trim() ? 'El nombre es obligatorio.' : '';
+      case 'cedula': return !valor.trim() ? 'La cédula es obligatoria.' : '';
+      case 'puesto': return !valor.trim() ? 'El puesto es obligatorio.' : '';
+      case 'salarioBase':
+        if (!valor) return 'El salario base es obligatorio.';
+        if (isNaN(Number(valor)) || Number(valor) <= 0) return 'Ingresa un salario válido mayor a 0.';
+        return '';
+      default: return '';
+    }
+  }
+
+  const handleEmpChange = (campo: string, valor: string) => {
+    setFormEmp(p => ({ ...p, [campo]: valor }));
+    setEmpTouched(p => ({ ...p, [campo]: true }));
+    setEmpErrors(p => ({ ...p, [campo]: validarCampoEmp(campo, valor) }));
+  };
+
+  // Solo valida al perder foco — NO reescribe el valor
+  const handleEmpBlur = (campo: string) => {
+    setEmpTouched(p => ({ ...p, [campo]: true }));
+    setEmpErrors(p => ({ ...p, [campo]: validarCampoEmp(campo, (formEmp as any)[campo] ?? '') }));
+  };
+
   const abrirFormEmp = (emp?: Empleado) => {
     setEditandoEmp(emp || null);
     setFormEmp(emp
@@ -140,10 +167,22 @@ export default function PlanillaPage() {
       : { nombre: '', cedula: '', puesto: '', salarioBase: '', cuentaBancaria: '' }
     );
     setMensajeEmp('');
+    setEmpErrors({}); setEmpTouched({});
     setShowFormEmp(true);
   };
 
   const guardarEmpleado = async () => {
+    const campos = ['nombre', 'cedula', 'puesto', 'salarioBase'];
+    const newErrors: Record<string, string> = {};
+    const newTouched: Record<string, boolean> = {};
+    for (const campo of campos) {
+      newTouched[campo] = true;
+      const err = validarCampoEmp(campo, (formEmp as any)[campo]);
+      if (err) newErrors[campo] = err;
+    }
+    setEmpTouched(prev => ({ ...prev, ...newTouched }));
+    setEmpErrors(prev => ({ ...prev, ...newErrors }));
+    if (Object.keys(newErrors).length > 0) return;
     setEnviandoEmp(true); setMensajeEmp('');
     try {
       const body = { ...formEmp, salarioBase: Number(formEmp.salarioBase) };
@@ -354,19 +393,44 @@ export default function PlanillaPage() {
                     )}
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Nombre *</label>
-                      <input className={inputCls} value={formEmp.nombre} onChange={e => setFormEmp(p => ({ ...p, nombre: e.target.value }))} placeholder="Juan Pérez" />
+                      <input
+                        className={`${inputCls}${empTouched.nombre && empErrors.nombre ? ' border-red-400 bg-red-50/30' : ''}`}
+                        value={formEmp.nombre}
+                        onChange={e => handleEmpChange('nombre', e.target.value)}
+                        onBlur={() => handleEmpBlur('nombre')}
+                        placeholder="Juan Pérez" />
+                      {empTouched.nombre && empErrors.nombre && <p className="mt-1 text-xs text-red-600">{empErrors.nombre}</p>}
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Cédula *</label>
-                      <input className={inputCls} value={formEmp.cedula} onChange={e => setFormEmp(p => ({ ...p, cedula: e.target.value }))} placeholder="1-0000-0000" />
+                      <input
+                        className={`${inputCls}${empTouched.cedula && empErrors.cedula ? ' border-red-400 bg-red-50/30' : ''}`}
+                        value={formEmp.cedula}
+                        onChange={e => handleEmpChange('cedula', e.target.value)}
+                        onBlur={() => handleEmpBlur('cedula')}
+                        placeholder="1-0000-0000" />
+                      {empTouched.cedula && empErrors.cedula && <p className="mt-1 text-xs text-red-600">{empErrors.cedula}</p>}
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Puesto *</label>
-                      <input className={inputCls} value={formEmp.puesto} onChange={e => setFormEmp(p => ({ ...p, puesto: e.target.value }))} placeholder="Guarda de Seguridad" />
+                      <input
+                        className={`${inputCls}${empTouched.puesto && empErrors.puesto ? ' border-red-400 bg-red-50/30' : ''}`}
+                        value={formEmp.puesto}
+                        onChange={e => handleEmpChange('puesto', e.target.value)}
+                        onBlur={() => handleEmpBlur('puesto')}
+                        placeholder="Guarda de Seguridad" />
+                      {empTouched.puesto && empErrors.puesto && <p className="mt-1 text-xs text-red-600">{empErrors.puesto}</p>}
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Salario Base (₡) *</label>
-                      <input type="number" className={inputCls} value={formEmp.salarioBase} onChange={e => setFormEmp(p => ({ ...p, salarioBase: e.target.value }))} placeholder="500000" min="1" />
+                      <input
+                        type="number"
+                        className={`${inputCls}${empTouched.salarioBase && empErrors.salarioBase ? ' border-red-400 bg-red-50/30' : ''}`}
+                        value={formEmp.salarioBase}
+                        onChange={e => handleEmpChange('salarioBase', e.target.value)}
+                        onBlur={() => handleEmpBlur('salarioBase')}
+                        placeholder="500000" min="1" />
+                      {empTouched.salarioBase && empErrors.salarioBase && <p className="mt-1 text-xs text-red-600">{empErrors.salarioBase}</p>}
                     </div>
                     <div className="sm:col-span-2">
                       <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Cuenta Bancaria</label>
