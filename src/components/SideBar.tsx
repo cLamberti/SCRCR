@@ -77,13 +77,6 @@ const NAV_ITEMS: Omit<NavItem, 'onClick'>[] = [
     roles: ['admin', 'pastorGeneral', 'juntaDirectiva', 'asistenteAdministrativo'],
   },
   {
-    id: 'historial',
-    href: '/historial',
-    icon: FaClipboardList,
-    label: 'Historial',
-    roles: ['admin', 'tesorero', 'pastorGeneral'],
-  },
-  {
     id: 'permisos',
     href: '/permisos',
     icon: FaClipboardList,
@@ -237,7 +230,7 @@ export default function Sidebar({ activeItem, pageTitle = 'SCRCR' }: SidebarProp
       </nav>
 
       <div className="px-4 py-4 border-t border-white/10 space-y-2">
-        <p className="text-[10px] text-white/25 text-center">v1.0 · 2025</p>
+        <p className="text-[10px] text-white/25 text-center">v1.0 · 2026</p>
         <div className="text-center">
           <p className="text-[9px] text-white/20 uppercase tracking-widest mb-1">Desarrollado por</p>
           <p className="text-[9px] text-white/25 leading-tight">Estudiantes de la Universidad Nacional</p>
