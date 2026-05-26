@@ -55,6 +55,15 @@ export class AsociadoService {
       perteneceJuntaDirectiva: asociado.perteneceJuntaDirectiva,
       puestoJuntaDirectiva:    asociado.puestoJuntaDirectiva,
       estado:                  asociado.estado,
+      observaciones:           asociado.observaciones,
+      fechaInactivo:           asociado.fechaInactivo instanceof Date
+                                 ? asociado.fechaInactivo.toISOString()
+                                 : asociado.fechaInactivo,
+      urlCedula:               asociado.urlCedula,
+      urlCartaSolicitud:       asociado.urlCartaSolicitud,
+      urlCartaRenuncia:        asociado.urlCartaRenuncia,
+      urlCartaDesafiliacion:   asociado.urlCartaDesafiliacion,
+      urlOtros:                asociado.urlOtros,
     };
   }
 

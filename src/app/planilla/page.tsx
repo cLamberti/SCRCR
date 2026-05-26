@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
-import { FaFileExcel, FaPlus, FaLock, FaTrash, FaEye, FaUserTie, FaSpinner } from 'react-icons/fa';
+import { FaFileExcel, FaFilePdf, FaPlus, FaLock, FaTrash, FaEye, FaUserTie, FaSpinner, FaCalendarAlt, FaClipboardList } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 import Sidebar from '@/components/SideBar';
 
@@ -28,12 +28,27 @@ type LineaDetalle = {
 
 type PlanillaDetalle = PlanillaResumen & { lineas: LineaDetalle[] };
 
+type VacacionRow = {
+  id: number; empleadoId: number;
+  empleado: { nombre: string; cedula: string; puesto: string };
+  fechaInicio: string; fechaFin: string; cantidadDias: number;
+  documentoUrl?: string; estado: string; observaciones?: string;
+  createdAt: string;
+};
+
+type PermisoEmpRow = {
+  id: number; empleadoId: number;
+  empleado: { nombre: string; cedula: string; puesto: string };
+  fechaInicio: string; fechaFin: string; justificacion: string;
+  documentoUrl?: string; estado: string; createdAt: string;
+};
+
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
 const inputCls = 'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#003366]/30 focus:border-[#003366] transition';
 
 export default function PlanillaPage() {
-  const [tab, setTab] = useState<'historial' | 'empleados'>('historial');
+  const [tab, setTab] = useState<'historial' | 'empleados' | 'vacaciones' | 'permisos'>('historial');
 
   // Empleados
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
@@ -52,6 +67,28 @@ export default function PlanillaPage() {
   const [loadingEmpleados, setLoadingEmpleados] = useState(true);
   const [detalle, setDetalle] = useState<PlanillaDetalle | null>(null);
   const [modalDetalle, setModalDetalle] = useState(false);
+
+  // Vacaciones
+  const [vacaciones, setVacaciones] = useState<VacacionRow[]>([]);
+  const [loadingVac, setLoadingVac] = useState(true);
+  const [showFormVac, setShowFormVac] = useState(false);
+  const [enviandoVac, setEnviandoVac] = useState(false);
+  const [mensajeVac, setMensajeVac] = useState('');
+  const [mensajeVacOk, setMensajeVacOk] = useState(true);
+  const [formVac, setFormVac] = useState({ empleadoId: '', fechaInicio: '', fechaFin: '', cantidadDias: '', observaciones: '', documentoUrl: '' });
+  const [archivoVac, setArchivoVac] = useState<File | null>(null);
+  const [subiendoVac, setSubiendoVac] = useState(false);
+
+  // Permisos empleados
+  const [permisosEmp, setPermisosEmp] = useState<PermisoEmpRow[]>([]);
+  const [loadingPerm, setLoadingPerm] = useState(true);
+  const [showFormPerm, setShowFormPerm] = useState(false);
+  const [enviandoPerm, setEnviandoPerm] = useState(false);
+  const [mensajePerm, setMensajePerm] = useState('');
+  const [mensajePermOk, setMensajePermOk] = useState(true);
+  const [formPerm, setFormPerm] = useState({ empleadoId: '', fechaInicio: '', fechaFin: '', justificacion: '', documentoUrl: '' });
+  const [archivoPerm, setArchivoPerm] = useState<File | null>(null);
+  const [subiendoPerm, setSubiendoPerm] = useState(false);
 
   // Generar planilla
   const [modalGenerar, setModalGenerar] = useState(false);
@@ -79,8 +116,26 @@ export default function PlanillaPage() {
     } finally { setLoadingPlanillas(false); }
   }, []);
 
-  useEffect(() => { cargarEmpleados(); cargarPlanillas(); }, [cargarEmpleados, cargarPlanillas]);
-  useAutoRefresh(useCallback(() => { cargarEmpleados(); cargarPlanillas(); }, [cargarEmpleados, cargarPlanillas]));
+  const cargarVacaciones = useCallback(async () => {
+    setLoadingVac(true);
+    try {
+      const res = await fetch('/api/empleados/vacaciones');
+      const json = await res.json();
+      if (json.success) setVacaciones(json.data);
+    } finally { setLoadingVac(false); }
+  }, []);
+
+  const cargarPermisosEmp = useCallback(async () => {
+    setLoadingPerm(true);
+    try {
+      const res = await fetch('/api/empleados/permisos');
+      const json = await res.json();
+      if (json.success) setPermisosEmp(json.data);
+    } finally { setLoadingPerm(false); }
+  }, []);
+
+  useEffect(() => { cargarEmpleados(); cargarPlanillas(); cargarVacaciones(); cargarPermisosEmp(); }, [cargarEmpleados, cargarPlanillas, cargarVacaciones, cargarPermisosEmp]);
+  useAutoRefresh(useCallback(() => { cargarEmpleados(); cargarPlanillas(); cargarVacaciones(); cargarPermisosEmp(); }, [cargarEmpleados, cargarPlanillas, cargarVacaciones, cargarPermisosEmp]));
 
   // Inicializar líneas cuando se abre el modal de generar
   const abrirModalGenerar = () => {
@@ -209,6 +264,116 @@ export default function PlanillaPage() {
     await cargarEmpleados();
   };
 
+  // ─── Upload helper ────────────────────────────────────────────────────────
+  const subirDocumento = async (file: File, folder: string): Promise<string | null> => {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('folder', folder);
+    const res = await fetch('/api/documentos/upload', { method: 'POST', body: fd });
+    const json = await res.json();
+    return json.success ? json.url : null;
+  };
+
+  // ─── Vacaciones handlers ──────────────────────────────────────────────────
+  const guardarVacacion = async () => {
+    if (!formVac.empleadoId || !formVac.fechaInicio || !formVac.fechaFin || !formVac.cantidadDias) {
+      setMensajeVac('Empleado, fechas y cantidad de días son obligatorios.'); setMensajeVacOk(false); return;
+    }
+    setEnviandoVac(true); setMensajeVac('');
+    try {
+      let docUrl = formVac.documentoUrl;
+      if (archivoVac) {
+        setSubiendoVac(true);
+        const url = await subirDocumento(archivoVac, 'vacaciones');
+        setSubiendoVac(false);
+        if (!url) { setMensajeVac('Error al subir el documento.'); setMensajeVacOk(false); return; }
+        docUrl = url;
+      }
+      const res = await fetch('/api/empleados/vacaciones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...formVac, empleadoId: Number(formVac.empleadoId), cantidadDias: Number(formVac.cantidadDias), documentoUrl: docUrl || undefined }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) { setMensajeVac(json.message || 'Error.'); setMensajeVacOk(false); return; }
+      setMensajeVac('Vacación registrada exitosamente.'); setMensajeVacOk(true);
+      setShowFormVac(false);
+      setFormVac({ empleadoId: '', fechaInicio: '', fechaFin: '', cantidadDias: '', observaciones: '', documentoUrl: '' });
+      setArchivoVac(null);
+      await cargarVacaciones();
+    } catch { setMensajeVac('Error de conexión.'); setMensajeVacOk(false); }
+    finally { setEnviandoVac(false); setSubiendoVac(false); }
+  };
+
+  // ─── Permisos empleados handlers ─────────────────────────────────────────
+  const guardarPermisoEmp = async () => {
+    if (!formPerm.empleadoId || !formPerm.fechaInicio || !formPerm.fechaFin || !formPerm.justificacion.trim()) {
+      setMensajePerm('Empleado, fechas y justificación son obligatorios.'); setMensajePermOk(false); return;
+    }
+    setEnviandoPerm(true); setMensajePerm('');
+    try {
+      let docUrl = formPerm.documentoUrl;
+      if (archivoPerm) {
+        setSubiendoPerm(true);
+        const url = await subirDocumento(archivoPerm, 'permisos-emp');
+        setSubiendoPerm(false);
+        if (!url) { setMensajePerm('Error al subir el documento.'); setMensajePermOk(false); return; }
+        docUrl = url;
+      }
+      const res = await fetch('/api/empleados/permisos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...formPerm, empleadoId: Number(formPerm.empleadoId), documentoUrl: docUrl || undefined }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) { setMensajePerm(json.message || 'Error.'); setMensajePermOk(false); return; }
+      setMensajePerm('Permiso registrado exitosamente.'); setMensajePermOk(true);
+      setShowFormPerm(false);
+      setFormPerm({ empleadoId: '', fechaInicio: '', fechaFin: '', justificacion: '', documentoUrl: '' });
+      setArchivoPerm(null);
+      await cargarPermisosEmp();
+    } catch { setMensajePerm('Error de conexión.'); setMensajePermOk(false); }
+    finally { setEnviandoPerm(false); setSubiendoPerm(false); }
+  };
+
+  // ─── Export empleados ────────────────────────────────────────────────────
+  const exportarEmpleadosExcel = async () => {
+    const { utils, writeFile } = await import('xlsx');
+    const filas = empleados.map((e, i) => ({
+      '#': i + 1, 'Nombre': e.nombre, 'Cédula': e.cedula, 'Puesto': e.puesto,
+      'Salario Base (₡)': e.salarioBase, 'Cuenta Bancaria': e.cuentaBancaria || '-',
+      'Estado': e.estado === 1 ? 'Activo' : 'Inactivo',
+    }));
+    const ws = utils.json_to_sheet(filas);
+    ws['!cols'] = [{ wch: 4 }, { wch: 30 }, { wch: 14 }, { wch: 25 }, { wch: 18 }, { wch: 26 }, { wch: 10 }];
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, 'Empleados');
+    writeFile(wb, 'listado_empleados.xlsx');
+  };
+
+  const exportarEmpleadosPDF = async () => {
+    const { default: jsPDF } = await import('jspdf');
+    const { default: autoTable } = await import('jspdf-autotable');
+    const doc = new jsPDF({ orientation: 'landscape' });
+    doc.setFontSize(14);
+    doc.text('Listado de Empleados', 14, 16);
+    doc.setFontSize(9);
+    doc.text(`Generado: ${new Date().toLocaleDateString('es-CR')}  · Total: ${empleados.length}`, 14, 22);
+    autoTable(doc, {
+      startY: 27,
+      head: [['#', 'Nombre', 'Cédula', 'Puesto', 'Salario Base (₡)', 'Cuenta Bancaria', 'Estado']],
+      body: empleados.map((e, i) => [
+        i + 1, e.nombre, e.cedula, e.puesto,
+        e.salarioBase.toLocaleString('es-CR', { minimumFractionDigits: 2 }),
+        e.cuentaBancaria || '-', e.estado === 1 ? 'Activo' : 'Inactivo',
+      ]),
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [0, 51, 102] },
+      alternateRowStyles: { fillColor: [245, 247, 250] },
+    });
+    doc.save('listado_empleados.pdf');
+  };
+
   const diasTrabajados = (l: LineaForm) => Math.max(0, 30 - l.diasAusentes - l.diasVacaciones - l.diasIncapacidad);
   const montoEstimado = (l: LineaForm, emp: Empleado) => Math.max(0, emp.salarioBase - l.diasAusentes * (emp.salarioBase / 30));
 
@@ -235,11 +400,16 @@ export default function PlanillaPage() {
 
         <main className="flex-1 px-4 md:px-8 py-6 space-y-5">
           {/* Tabs */}
-          <div className="flex gap-2 border-b border-gray-200">
-            {(['historial', 'empleados'] as const).map(t => (
-              <button key={t} onClick={() => setTab(t)}
-                className={`px-4 py-2 text-sm font-semibold capitalize transition border-b-2 -mb-px ${tab === t ? 'border-[#003366] text-[#003366]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
-                {t === 'historial' ? 'Historial de Planillas' : 'Empleados'}
+          <div className="flex gap-1 border-b border-gray-200 overflow-x-auto">
+            {([
+              { id: 'historial', label: 'Historial de Planillas', icon: FaFileExcel },
+              { id: 'empleados', label: 'Empleados', icon: FaUserTie },
+              { id: 'vacaciones', label: 'Vacaciones', icon: FaCalendarAlt },
+              { id: 'permisos', label: 'Permisos', icon: FaClipboardList },
+            ] as const).map(t => (
+              <button key={t.id} onClick={() => setTab(t.id)}
+                className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold whitespace-nowrap transition border-b-2 -mb-px ${tab === t.id ? 'border-[#003366] text-[#003366]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                <t.icon className="text-xs" />{t.label}
               </button>
             ))}
           </div>
@@ -363,7 +533,15 @@ export default function PlanillaPage() {
           {/* ── TAB EMPLEADOS ── */}
           {tab === 'empleados' && (
             <div className="space-y-4">
-              <div className="flex justify-end">
+              <div className="flex justify-end gap-2 flex-wrap">
+                <button onClick={exportarEmpleadosExcel} title="Exportar Excel"
+                  className="inline-flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-3 py-2 rounded-lg transition">
+                  <FaFileExcel className="text-xs" /> Excel
+                </button>
+                <button onClick={exportarEmpleadosPDF} title="Exportar PDF"
+                  className="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-3 py-2 rounded-lg transition">
+                  <FaFilePdf className="text-xs" /> PDF
+                </button>
                 <button onClick={() => abrirFormEmp()}
                   className="inline-flex items-center gap-2 bg-[#003366] hover:bg-[#004488] text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
                   <FaPlus className="text-xs" /> Nuevo Empleado
@@ -543,6 +721,255 @@ export default function PlanillaPage() {
                       ))}
                     </div>
                   </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── TAB VACACIONES ── */}
+          {tab === 'vacaciones' && (
+            <div className="space-y-4">
+              <div className="flex justify-end">
+                <button onClick={() => { setShowFormVac(true); setMensajeVac(''); }}
+                  className="inline-flex items-center gap-2 bg-[#003366] hover:bg-[#004488] text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+                  <FaPlus className="text-xs" /> Registrar Vacación
+                </button>
+              </div>
+
+              {mensajeVac && !showFormVac && (
+                <div className={`rounded-lg px-4 py-3 text-sm border ${mensajeVacOk ? 'bg-green-50 text-green-800 border-green-200' : 'bg-red-50 text-red-800 border-red-200'}`}>
+                  {mensajeVac}
+                </div>
+              )}
+
+              {showFormVac && (
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                  <div className="bg-[#003366] px-6 py-4 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FaCalendarAlt className="text-white text-sm" />
+                      <h2 className="text-white font-semibold text-sm">Registrar Vacaciones</h2>
+                    </div>
+                    <button onClick={() => setShowFormVac(false)} className="text-white/70 hover:text-white text-sm">✕</button>
+                  </div>
+                  <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {mensajeVac && (
+                      <div className={`sm:col-span-2 rounded-lg px-4 py-3 text-sm border ${mensajeVacOk ? 'bg-green-50 text-green-800 border-green-200' : 'bg-red-50 text-red-800 border-red-200'}`}>
+                        {mensajeVac}
+                      </div>
+                    )}
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Empleado *</label>
+                      <select className={inputCls} value={formVac.empleadoId} onChange={e => setFormVac(p => ({ ...p, empleadoId: e.target.value }))}>
+                        <option value="">-- Seleccionar empleado --</option>
+                        {empleados.filter(e => e.estado === 1).map(e => (
+                          <option key={e.id} value={e.id}>{e.nombre}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Cantidad de Días *</label>
+                      <input type="number" min="1" className={inputCls} value={formVac.cantidadDias}
+                        onChange={e => setFormVac(p => ({ ...p, cantidadDias: e.target.value }))} placeholder="0" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Fecha Inicial *</label>
+                      <input type="date" className={inputCls} value={formVac.fechaInicio}
+                        onChange={e => setFormVac(p => ({ ...p, fechaInicio: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Fecha Final *</label>
+                      <input type="date" className={inputCls} value={formVac.fechaFin}
+                        onChange={e => setFormVac(p => ({ ...p, fechaFin: e.target.value }))} />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Observaciones</label>
+                      <textarea className={inputCls} rows={2} value={formVac.observaciones}
+                        onChange={e => setFormVac(p => ({ ...p, observaciones: e.target.value }))} placeholder="Observaciones opcionales..." />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Boleta de Vacaciones (PDF)</label>
+                      <input type="file" accept=".pdf,image/*" className="w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#003366] file:text-white hover:file:bg-[#004488]"
+                        onChange={e => setArchivoVac(e.target.files?.[0] ?? null)} />
+                      {archivoVac && <p className="mt-1 text-xs text-gray-500 truncate">{archivoVac.name}</p>}
+                    </div>
+                    <div className="sm:col-span-2 flex justify-end gap-3">
+                      <button onClick={() => setShowFormVac(false)} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition">Cancelar</button>
+                      <button onClick={guardarVacacion} disabled={enviandoVac || subiendoVac}
+                        className="px-5 py-2 text-sm font-semibold text-white bg-[#003366] hover:bg-[#004488] disabled:opacity-50 rounded-lg transition inline-flex items-center gap-2">
+                        {(enviandoVac || subiendoVac) && <FaSpinner className="animate-spin text-xs" />}
+                        {enviandoVac ? 'Guardando...' : subiendoVac ? 'Subiendo...' : 'Registrar'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                {loadingVac ? (
+                  <div className="p-8 text-center"><FaSpinner className="animate-spin text-gray-400 text-2xl mx-auto" /></div>
+                ) : vacaciones.length === 0 ? (
+                  <div className="p-12 text-center">
+                    <FaCalendarAlt className="mx-auto text-gray-300 text-3xl mb-3" />
+                    <p className="text-gray-500 text-sm">No hay vacaciones registradas.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-100">
+                          {['Empleado', 'Puesto', 'Fecha Inicio', 'Fecha Fin', 'Días', 'Estado', 'Boleta'].map(h => (
+                            <th key={h} className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {vacaciones.map(v => (
+                          <tr key={v.id} className="hover:bg-gray-50 transition">
+                            <td className="px-5 py-4 font-medium text-gray-900 whitespace-nowrap">{v.empleado.nombre}</td>
+                            <td className="px-5 py-4 text-gray-500 text-xs">{v.empleado.puesto}</td>
+                            <td className="px-5 py-4 text-gray-600 whitespace-nowrap">{new Date(v.fechaInicio).toLocaleDateString('es-CR')}</td>
+                            <td className="px-5 py-4 text-gray-600 whitespace-nowrap">{new Date(v.fechaFin).toLocaleDateString('es-CR')}</td>
+                            <td className="px-5 py-4 text-center font-semibold text-gray-900">{v.cantidadDias}</td>
+                            <td className="px-5 py-4">
+                              <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold ${v.estado === 'APROBADO' ? 'bg-green-100 text-green-800' : v.estado === 'RECHAZADO' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                                {v.estado}
+                              </span>
+                            </td>
+                            <td className="px-5 py-4">
+                              {v.documentoUrl ? (
+                                <a href={v.documentoUrl} target="_blank" rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium">
+                                  <FaEye className="text-xs" /> Ver
+                                </a>
+                              ) : <span className="text-gray-400 text-xs">—</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── TAB PERMISOS EMPLEADOS ── */}
+          {tab === 'permisos' && (
+            <div className="space-y-4">
+              <div className="flex justify-end">
+                <button onClick={() => { setShowFormPerm(true); setMensajePerm(''); }}
+                  className="inline-flex items-center gap-2 bg-[#003366] hover:bg-[#004488] text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+                  <FaPlus className="text-xs" /> Registrar Permiso
+                </button>
+              </div>
+
+              {mensajePerm && !showFormPerm && (
+                <div className={`rounded-lg px-4 py-3 text-sm border ${mensajePermOk ? 'bg-green-50 text-green-800 border-green-200' : 'bg-red-50 text-red-800 border-red-200'}`}>
+                  {mensajePerm}
+                </div>
+              )}
+
+              {showFormPerm && (
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                  <div className="bg-[#003366] px-6 py-4 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FaClipboardList className="text-white text-sm" />
+                      <h2 className="text-white font-semibold text-sm">Registrar Permiso de Empleado</h2>
+                    </div>
+                    <button onClick={() => setShowFormPerm(false)} className="text-white/70 hover:text-white text-sm">✕</button>
+                  </div>
+                  <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {mensajePerm && (
+                      <div className={`sm:col-span-2 rounded-lg px-4 py-3 text-sm border ${mensajePermOk ? 'bg-green-50 text-green-800 border-green-200' : 'bg-red-50 text-red-800 border-red-200'}`}>
+                        {mensajePerm}
+                      </div>
+                    )}
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Empleado *</label>
+                      <select className={inputCls} value={formPerm.empleadoId} onChange={e => setFormPerm(p => ({ ...p, empleadoId: e.target.value }))}>
+                        <option value="">-- Seleccionar empleado --</option>
+                        {empleados.filter(e => e.estado === 1).map(e => (
+                          <option key={e.id} value={e.id}>{e.nombre}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Fecha Inicial *</label>
+                      <input type="date" className={inputCls} value={formPerm.fechaInicio}
+                        onChange={e => setFormPerm(p => ({ ...p, fechaInicio: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Fecha Final *</label>
+                      <input type="date" className={inputCls} value={formPerm.fechaFin}
+                        onChange={e => setFormPerm(p => ({ ...p, fechaFin: e.target.value }))} />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Justificación *</label>
+                      <textarea className={inputCls} rows={3} value={formPerm.justificacion}
+                        onChange={e => setFormPerm(p => ({ ...p, justificacion: e.target.value }))} placeholder="Describa el motivo del permiso..." />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Documento de Respaldo (PDF)</label>
+                      <input type="file" accept=".pdf,image/*" className="w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#003366] file:text-white hover:file:bg-[#004488]"
+                        onChange={e => setArchivoPerm(e.target.files?.[0] ?? null)} />
+                      {archivoPerm && <p className="mt-1 text-xs text-gray-500 truncate">{archivoPerm.name}</p>}
+                    </div>
+                    <div className="sm:col-span-2 flex justify-end gap-3">
+                      <button onClick={() => setShowFormPerm(false)} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition">Cancelar</button>
+                      <button onClick={guardarPermisoEmp} disabled={enviandoPerm || subiendoPerm}
+                        className="px-5 py-2 text-sm font-semibold text-white bg-[#003366] hover:bg-[#004488] disabled:opacity-50 rounded-lg transition inline-flex items-center gap-2">
+                        {(enviandoPerm || subiendoPerm) && <FaSpinner className="animate-spin text-xs" />}
+                        {enviandoPerm ? 'Guardando...' : subiendoPerm ? 'Subiendo...' : 'Registrar'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                {loadingPerm ? (
+                  <div className="p-8 text-center"><FaSpinner className="animate-spin text-gray-400 text-2xl mx-auto" /></div>
+                ) : permisosEmp.length === 0 ? (
+                  <div className="p-12 text-center">
+                    <FaClipboardList className="mx-auto text-gray-300 text-3xl mb-3" />
+                    <p className="text-gray-500 text-sm">No hay permisos registrados.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-100">
+                          {['Empleado', 'Puesto', 'Fecha Inicio', 'Fecha Fin', 'Justificación', 'Estado', 'Documento'].map(h => (
+                            <th key={h} className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {permisosEmp.map(p => (
+                          <tr key={p.id} className="hover:bg-gray-50 transition">
+                            <td className="px-5 py-4 font-medium text-gray-900 whitespace-nowrap">{p.empleado.nombre}</td>
+                            <td className="px-5 py-4 text-gray-500 text-xs">{p.empleado.puesto}</td>
+                            <td className="px-5 py-4 text-gray-600 whitespace-nowrap">{new Date(p.fechaInicio).toLocaleDateString('es-CR')}</td>
+                            <td className="px-5 py-4 text-gray-600 whitespace-nowrap">{new Date(p.fechaFin).toLocaleDateString('es-CR')}</td>
+                            <td className="px-5 py-4 text-gray-700 text-xs max-w-[200px] truncate" title={p.justificacion}>{p.justificacion}</td>
+                            <td className="px-5 py-4">
+                              <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold ${p.estado === 'APROBADO' ? 'bg-green-100 text-green-800' : p.estado === 'RECHAZADO' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                                {p.estado}
+                              </span>
+                            </td>
+                            <td className="px-5 py-4">
+                              {p.documentoUrl ? (
+                                <a href={p.documentoUrl} target="_blank" rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium">
+                                  <FaEye className="text-xs" /> Ver
+                                </a>
+                              ) : <span className="text-gray-400 text-xs">—</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             </div>

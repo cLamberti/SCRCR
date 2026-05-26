@@ -19,6 +19,11 @@ export interface CrearAsociadoRequest {
   estado?: EstadoAsociado;
   observaciones?: string;
   fechaInactivo?: string;
+  urlCedula?: string;
+  urlCartaSolicitud?: string;
+  urlCartaRenuncia?: string;
+  urlCartaDesafiliacion?: string;
+  urlOtros?: string;
 }
 
 export interface ActualizarAsociadoRequest {
@@ -40,6 +45,11 @@ export interface ActualizarAsociadoRequest {
   estado?: EstadoAsociado;
   observaciones?: string;
   fechaInactivo?: string;
+  urlCedula?: string;
+  urlCartaSolicitud?: string;
+  urlCartaRenuncia?: string;
+  urlCartaDesafiliacion?: string;
+  urlOtros?: string;
 }
 
 export interface AsociadoResponse {
@@ -62,6 +72,11 @@ export interface AsociadoResponse {
   estado: number;
   observaciones?: string;
   fechaInactivo?: string;
+  urlCedula?: string;
+  urlCartaSolicitud?: string;
+  urlCartaRenuncia?: string;
+  urlCartaDesafiliacion?: string;
+  urlOtros?: string;
 }
 
 export interface AsociadoResponseWithMessage {

@@ -60,14 +60,14 @@ const NAV_ITEMS: Omit<NavItem, 'onClick'>[] = [
     href: '/gestion-usuarios',
     icon: FaUsers,
     label: 'Gestión de Usuarios',
-    roles: ['admin', 'asistenteAdministrativo'],
+    roles: ['admin'],
   },
   {
     id: 'planilla',
     href: '/planilla',
     icon: FaFileAlt,
     label: 'Planilla',
-    roles: ['admin', 'juntaDirectiva'],
+    roles: ['admin', 'pastorGeneral'],
   },
   {
     id: 'reportes',
@@ -81,14 +81,14 @@ const NAV_ITEMS: Omit<NavItem, 'onClick'>[] = [
     href: '/permisos',
     icon: FaClipboardList,
     label: 'Permisos',
-    roles: ['admin', 'pastorGeneral', 'asistenteAdministrativo'],
+    roles: ['admin', 'pastorGeneral', 'juntaDirectiva', 'asistenteAdministrativo'],
   },
   {
     id: 'actas',
     href: '/actas',
     icon: FaBook,
     label: 'Actas',
-    roles: ['admin', 'juntaDirectiva'],
+    roles: ['admin', 'juntaDirectiva', 'pastorGeneral'],
   },
   {
     id: 'configuracion',

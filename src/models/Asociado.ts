@@ -19,6 +19,11 @@ export interface Asociado {
   estado: number;
   observaciones?: string;
   fechaInactivo?: Date;
+  urlCedula?: string;
+  urlCartaSolicitud?: string;
+  urlCartaRenuncia?: string;
+  urlCartaDesafiliacion?: string;
+  urlOtros?: string;
 }
 
 export class AsociadoModel implements Asociado {
@@ -41,6 +46,11 @@ export class AsociadoModel implements Asociado {
   estado: number;
   observaciones?: string;
   fechaInactivo?: Date;
+  urlCedula?: string;
+  urlCartaSolicitud?: string;
+  urlCartaRenuncia?: string;
+  urlCartaDesafiliacion?: string;
+  urlOtros?: string;
 
   constructor(data: Partial<Asociado>) {
     this.id = data.id || 0;
@@ -62,6 +72,11 @@ export class AsociadoModel implements Asociado {
     this.estado = data.estado ?? 0;
     this.observaciones = data.observaciones;
     this.fechaInactivo = data.fechaInactivo;
+    this.urlCedula = data.urlCedula;
+    this.urlCartaSolicitud = data.urlCartaSolicitud;
+    this.urlCartaRenuncia = data.urlCartaRenuncia;
+    this.urlCartaDesafiliacion = data.urlCartaDesafiliacion;
+    this.urlOtros = data.urlOtros;
   }
 
   isActivo(): boolean {
@@ -89,6 +104,11 @@ export class AsociadoModel implements Asociado {
       estado: this.estado,
       observaciones: this.observaciones,
       fechaInactivo: this.fechaInactivo,
+      urlCedula: this.urlCedula,
+      urlCartaSolicitud: this.urlCartaSolicitud,
+      urlCartaRenuncia: this.urlCartaRenuncia,
+      urlCartaDesafiliacion: this.urlCartaDesafiliacion,
+      urlOtros: this.urlOtros,
     };
   }
 }

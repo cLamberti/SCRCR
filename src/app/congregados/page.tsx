@@ -7,6 +7,7 @@ import {
   FaUsers, FaUserPlus, FaSearch, FaEdit, FaTrash,
   FaChevronLeft, FaChevronRight, FaExclamationTriangle,
   FaTimes, FaSave, FaPlus, FaFilter, FaCheckCircle,
+  FaFileExcel, FaFilePdf,
 } from "react-icons/fa";
 import Sidebar from "@/components/SideBar";
 import { EstadoCivil } from "@/models/Congregado";
@@ -116,6 +117,53 @@ const Badge = ({ activo }: { activo: boolean }) => (
 );
 
 export default function CongregadosPage() {
+  /* ─── Export helpers (defined before state so filtrados is in scope via closure at call time) ─── */
+  const exportarExcel = async (rows: CongregadoRow[]) => {
+    const { utils, writeFile } = await import('xlsx');
+    const filas = rows.map((c, i) => ({
+      '#': i + 1,
+      'Nombre': c.nombre,
+      'Cédula': c.cedula,
+      'Teléfono': c.telefono || '-',
+      'Estado Civil': c.estadoCivil || '-',
+      'Ministerio': c.ministerio || '-',
+      'Correo': c.correo || '-',
+      'Profesión': c.profesion || '-',
+      'Dirección': c.direccion || '-',
+      'Fecha Ingreso': c.fechaIngreso ? new Date(c.fechaIngreso).toLocaleDateString('es-CR') : '-',
+      'Estado': c.estado === 1 ? 'Activo' : 'Inactivo',
+    }));
+    const ws = utils.json_to_sheet(filas);
+    ws['!cols'] = [{ wch: 4 }, { wch: 30 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 18 }, { wch: 28 }, { wch: 18 }, { wch: 25 }, { wch: 14 }, { wch: 10 }];
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, 'Congregados');
+    writeFile(wb, 'listado_congregados.xlsx');
+  };
+
+  const exportarPDF = async (rows: CongregadoRow[]) => {
+    const { default: jsPDF } = await import('jspdf');
+    const { default: autoTable } = await import('jspdf-autotable');
+    const doc = new jsPDF({ orientation: 'landscape' });
+    doc.setFontSize(14);
+    doc.text('Listado de Congregados', 14, 16);
+    doc.setFontSize(9);
+    doc.text(`Generado: ${new Date().toLocaleDateString('es-CR')}  · Total: ${rows.length}`, 14, 22);
+    autoTable(doc, {
+      startY: 27,
+      head: [['#', 'Nombre', 'Cédula', 'Teléfono', 'Estado Civil', 'Ministerio', 'Correo', 'Fecha Ingreso', 'Estado']],
+      body: rows.map((c, i) => [
+        i + 1, c.nombre, c.cedula, c.telefono || '-', c.estadoCivil || '-',
+        c.ministerio || '-', c.correo || '-',
+        c.fechaIngreso ? new Date(c.fechaIngreso).toLocaleDateString('es-CR') : '-',
+        c.estado === 1 ? 'Activo' : 'Inactivo',
+      ]),
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [0, 51, 102] },
+      alternateRowStyles: { fillColor: [245, 247, 250] },
+    });
+    doc.save('listado_congregados.pdf');
+  };
+
   const [data, setData] = useState<CongregadoRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [mensaje, setMensaje] = useState("");
@@ -354,7 +402,15 @@ export default function CongregadosPage() {
                 <h1 className="text-xl sm:text-2xl font-bold text-[#003366]">Gestión de Congregados</h1>
                 <div className="w-16 h-1 bg-[#003366] rounded mt-1" />
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                <button onClick={() => exportarExcel(filtrados)} title="Exportar Excel"
+                  className="inline-flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-3 py-2 rounded-lg transition">
+                  <FaFileExcel className="text-xs" /> Excel
+                </button>
+                <button onClick={() => exportarPDF(filtrados)} title="Exportar PDF"
+                  className="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-3 py-2 rounded-lg transition">
+                  <FaFilePdf className="text-xs" /> PDF
+                </button>
                 <button
                   onClick={abrirCrear}
                   className="inline-flex items-center gap-2 bg-[#003366] hover:bg-[#004488] text-white text-sm font-semibold px-4 py-2 rounded-lg transition"

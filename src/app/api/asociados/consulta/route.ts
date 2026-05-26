@@ -25,6 +25,12 @@ const mapAsociadosToResponse = (asociados: Asociado[]): AsociadoResponse[] => {
     puestoJuntaDirectiva: a.puestoJuntaDirectiva,
     estado: a.estado,
     observaciones: a.observaciones,
+    fechaInactivo: a.fechaInactivo instanceof Date ? a.fechaInactivo.toISOString() : a.fechaInactivo,
+    urlCedula: (a as any).urlCedula,
+    urlCartaSolicitud: (a as any).urlCartaSolicitud,
+    urlCartaRenuncia: (a as any).urlCartaRenuncia,
+    urlCartaDesafiliacion: (a as any).urlCartaDesafiliacion,
+    urlOtros: (a as any).urlOtros,
   }));
 };
 

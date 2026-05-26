@@ -47,6 +47,11 @@ function mapToAsociado(row: any): Asociado {
     estado: row.estado,
     observaciones: row.observaciones ?? undefined,
     fechaInactivo: row.fechaInactivo ?? undefined,
+    urlCedula: (row as any).urlCedula ?? undefined,
+    urlCartaSolicitud: (row as any).urlCartaSolicitud ?? undefined,
+    urlCartaRenuncia: (row as any).urlCartaRenuncia ?? undefined,
+    urlCartaDesafiliacion: (row as any).urlCartaDesafiliacion ?? undefined,
+    urlOtros: (row as any).urlOtros ?? undefined,
   });
 }
 
@@ -73,6 +78,11 @@ export class AsociadoDAO {
           estado: data.estado ?? 1,
           observaciones: data.observaciones ?? null,
           fechaInactivo: data.fechaInactivo ? new Date(data.fechaInactivo) : null,
+          urlCedula: data.urlCedula ?? null,
+          urlCartaSolicitud: data.urlCartaSolicitud ?? null,
+          urlCartaRenuncia: data.urlCartaRenuncia ?? null,
+          urlCartaDesafiliacion: data.urlCartaDesafiliacion ?? null,
+          urlOtros: data.urlOtros ?? null,
         },
       });
       const asociado = mapToAsociado(row);
@@ -175,6 +185,11 @@ export class AsociadoDAO {
           fechaInactivo: data.fechaInactivo !== undefined
             ? (data.fechaInactivo ? new Date(data.fechaInactivo) : null)
             : (existente.fechaInactivo ?? null),
+          urlCedula: data.urlCedula !== undefined ? (data.urlCedula || null) : ((existente as any).urlCedula ?? null),
+          urlCartaSolicitud: data.urlCartaSolicitud !== undefined ? (data.urlCartaSolicitud || null) : ((existente as any).urlCartaSolicitud ?? null),
+          urlCartaRenuncia: data.urlCartaRenuncia !== undefined ? (data.urlCartaRenuncia || null) : ((existente as any).urlCartaRenuncia ?? null),
+          urlCartaDesafiliacion: data.urlCartaDesafiliacion !== undefined ? (data.urlCartaDesafiliacion || null) : ((existente as any).urlCartaDesafiliacion ?? null),
+          urlOtros: data.urlOtros !== undefined ? (data.urlOtros || null) : ((existente as any).urlOtros ?? null),
         },
       });
       const actualizado = mapToAsociado(row);

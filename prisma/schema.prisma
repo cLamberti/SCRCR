@@ -70,6 +70,11 @@ model Asociado {
   updatedAt               DateTime?           @default(now()) @updatedAt @map("updated_at")
   fechaInactivo           DateTime?           @map("fecha_inactivo")
   observaciones           String?
+  urlCedula               String?             @map("url_cedula")
+  urlCartaSolicitud       String?             @map("url_carta_solicitud")
+  urlCartaRenuncia        String?             @map("url_carta_renuncia")
+  urlCartaDesafiliacion   String?             @map("url_carta_desafiliacion")
+  urlOtros                String?             @map("url_otros")
   asistencias             Asistencia[]
   reportes                ReporteAsistencia[]
   asistenciasActaAsociacion AsistenciaActaAsociacion[]
@@ -140,11 +145,15 @@ model Empleado {
   cedula         String          @unique @db.VarChar(20)
   puesto         String          @db.VarChar(100)
   salarioBase    Decimal         @map("salario_base") @db.Decimal(12, 2)
-  cuentaBancaria String?         @map("cuenta_bancaria") @db.VarChar(50)
-  estado         Int             @default(1) @db.SmallInt
-  createdAt      DateTime        @default(now()) @map("created_at")
-  updatedAt      DateTime        @default(now()) @updatedAt @map("updated_at")
-  lineasPlanilla LineaPlanilla[]
+  cuentaBancaria   String?            @map("cuenta_bancaria") @db.VarChar(50)
+  estado           Int                @default(1) @db.SmallInt
+  urlCedula        String?            @map("url_cedula")
+  urlHojaSolicitud String?            @map("url_hoja_solicitud")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @default(now()) @updatedAt @map("updated_at")
+  lineasPlanilla   LineaPlanilla[]
+  vacaciones       VacacionEmpleado[]
+  permisosEmp      PermisoEmpleado[]
 
   @@map("empleados")
 }
@@ -267,4 +276,35 @@ model Auditoria {
   usuarioId  Int?     @map("usuario_id")
 
   @@map("auditoria")
+}
+
+model VacacionEmpleado {
+  id            Int      @id @default(autoincrement())
+  empleadoId    Int      @map("empleado_id")
+  fechaInicio   DateTime @map("fecha_inicio") @db.Date
+  fechaFin      DateTime @map("fecha_fin") @db.Date
+  cantidadDias  Int      @map("cantidad_dias")
+  documentoUrl  String?  @map("documento_url")
+  estado        String   @default("PENDIENTE") @db.VarChar(20)
+  observaciones String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+  empleado      Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+
+  @@map("vacaciones_empleado")
+}
+
+model PermisoEmpleado {
+  id            Int      @id @default(autoincrement())
+  empleadoId    Int      @map("empleado_id")
+  fechaInicio   DateTime @map("fecha_inicio") @db.Date
+  fechaFin      DateTime @map("fecha_fin") @db.Date
+  justificacion String
+  documentoUrl  String?  @map("documento_url")
+  estado        String   @default("PENDIENTE") @db.VarChar(20)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+  empleado      Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+
+  @@map("permisos_empleado")
 }

@@ -7,11 +7,12 @@ import {
   FaHome, FaUserPlus, FaList, FaSignOutAlt,
   FaSearch, FaEdit, FaTrash, FaUsers,
   FaChevronLeft, FaChevronRight, FaExclamationTriangle,
-  FaCalendarAlt, FaCheckCircle
+  FaCalendarAlt, FaCheckCircle, FaFileExcel, FaFilePdf
 } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 import { AsociadoResponse } from '@/dto/asociado.dto';
 import Sidebar from '@/components/SideBar';
+import { useAuth } from '@/contexts/AuthContext';
 
 /* ─── Menú (sin "Eliminar Asociados" porque ahora esta vista lo maneja) ─── */
 const menuItems = [
@@ -36,6 +37,9 @@ type FormularioEdicion = {
   profesion: string; anosCongregarse: number | ''; fechaAceptacion: string;
   perteneceJuntaDirectiva: boolean; puestoJuntaDirectiva: string;
   estado: number; observaciones: string; fechaInactivo: string;
+  // Documentos
+  urlCedula: string; urlCartaSolicitud: string; urlCartaRenuncia: string;
+  urlCartaDesafiliacion: string; urlOtros: string;
 };
 
 type PageSize = 10 | 25 | 50;
@@ -60,6 +64,55 @@ const Badge = ({ activo }: { activo: boolean }) => (
    COMPONENTE PRINCIPAL
 ══════════════════════════════════════════════════════════════════════════ */
 export default function ConsultarAsociadosPage() {
+  const { usuario } = useAuth();
+  const esJuntaDirectiva = usuario?.rol === 'juntaDirectiva';
+
+  /* ─── Exportar Excel ─── */
+  const exportarExcel = async () => {
+    const { utils, writeFile } = await import('xlsx');
+    const filas = filtrados.map((a, i) => ({
+      '#': i + 1,
+      'Nombre Completo': a.nombreCompleto,
+      'Cédula': a.cedula,
+      'Correo': a.correo ?? '-',
+      'Teléfono': a.telefono ?? '-',
+      'Ministerio': a.ministerio ?? '-',
+      'Dirección': a.direccion ?? '-',
+      'Fecha Ingreso': a.fechaIngreso ? new Date(a.fechaIngreso).toLocaleDateString('es-CR') : '-',
+      'Estado': a.estado === 1 ? 'Activo' : 'Eliminado',
+    }));
+    const ws = utils.json_to_sheet(filas);
+    ws['!cols'] = [{ wch: 4 }, { wch: 35 }, { wch: 14 }, { wch: 30 }, { wch: 14 }, { wch: 18 }, { wch: 30 }, { wch: 14 }, { wch: 10 }];
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, 'Asociados');
+    writeFile(wb, 'listado_asociados.xlsx');
+  };
+
+  /* ─── Exportar PDF ─── */
+  const exportarPDF = async () => {
+    const { default: jsPDF } = await import('jspdf');
+    const { default: autoTable } = await import('jspdf-autotable');
+    const doc = new jsPDF({ orientation: 'landscape' });
+    doc.setFontSize(14);
+    doc.text('Listado de Asociados', 14, 16);
+    doc.setFontSize(9);
+    doc.text(`Generado: ${new Date().toLocaleDateString('es-CR')}  · Total: ${filtrados.length}`, 14, 22);
+    autoTable(doc, {
+      startY: 27,
+      head: [['#', 'Nombre Completo', 'Cédula', 'Correo', 'Teléfono', 'Ministerio', 'Fecha Ingreso', 'Estado']],
+      body: filtrados.map((a, i) => [
+        i + 1, a.nombreCompleto, a.cedula,
+        a.correo ?? '-', a.telefono ?? '-', a.ministerio ?? '-',
+        a.fechaIngreso ? new Date(a.fechaIngreso).toLocaleDateString('es-CR') : '-',
+        a.estado === 1 ? 'Activo' : 'Eliminado',
+      ]),
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [0, 51, 102] },
+      alternateRowStyles: { fillColor: [245, 247, 250] },
+    });
+    doc.save('listado_asociados.pdf');
+  };
+
   const [data,      setData]      = useState<AsociadoRow[]>([]);
   const [loading,   setLoading]   = useState(false);
   const [mensaje,   setMensaje]   = useState('');
@@ -84,7 +137,12 @@ export default function ConsultarAsociadosPage() {
     ministerio: '', direccion: '', fechaIngreso: '', fechaNacimiento: '', estadoCivil: 'Soltero(a)',
     profesion: '', anosCongregarse: '', fechaAceptacion: '', perteneceJuntaDirectiva: false,
     puestoJuntaDirectiva: '', estado: 1, observaciones: '', fechaInactivo: '',
+    urlCedula: '', urlCartaSolicitud: '', urlCartaRenuncia: '', urlCartaDesafiliacion: '', urlOtros: '',
   });
+  const [archivosAsoc, setArchivosAsoc] = useState<Record<string, File | null>>({
+    cedula: null, solicitud: null, renuncia: null, desafiliacion: null, otros: null,
+  });
+  const [subiendoAsoc, setSubiendoAsoc] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [asocErrors, setAsocErrors] = useState<Record<string, string>>({});
   const [asocTouched, setAsocTouched] = useState<Record<string, boolean>>({});
@@ -203,7 +261,9 @@ export default function ConsultarAsociadosPage() {
       ministerio: '', direccion: '', fechaIngreso: '', fechaNacimiento: '', estadoCivil: 'Soltero(a)',
       profesion: '', anosCongregarse: '', fechaAceptacion: '', perteneceJuntaDirectiva: false,
       puestoJuntaDirectiva: '', estado: 1, observaciones: '', fechaInactivo: '',
+      urlCedula: '', urlCartaSolicitud: '', urlCartaRenuncia: '', urlCartaDesafiliacion: '', urlOtros: '',
     });
+    setArchivosAsoc({ cedula: null, solicitud: null, renuncia: null, desafiliacion: null, otros: null });
     setAsocErrors({}); setAsocTouched({});
     setModalEditOpen(true); setMensaje(''); setErroresLista([]); setEsError(false);
   };
@@ -234,7 +294,13 @@ export default function ConsultarAsociadosPage() {
       fechaInactivo: (a as any).fechaInactivo
         ? new Date((a as any).fechaInactivo).toISOString().split('T')[0]
         : '',
+      urlCedula: (a as any).urlCedula || '',
+      urlCartaSolicitud: (a as any).urlCartaSolicitud || '',
+      urlCartaRenuncia: (a as any).urlCartaRenuncia || '',
+      urlCartaDesafiliacion: (a as any).urlCartaDesafiliacion || '',
+      urlOtros: (a as any).urlOtros || '',
     });
+    setArchivosAsoc({ cedula: null, solicitud: null, renuncia: null, desafiliacion: null, otros: null });
     setModalEditOpen(true); setMensaje(''); setErroresLista([]); setEsError(false);
   };
 
@@ -285,6 +351,15 @@ export default function ConsultarAsociadosPage() {
     return errores;
   };
 
+  const subirDocAsoc = async (file: File): Promise<string | null> => {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('folder', 'asociados');
+    const res = await fetch('/api/documentos/upload', { method: 'POST', body: fd });
+    const json = await res.json();
+    return json.success ? json.url : null;
+  };
+
   const guardarCambios = async () => {
     // Mark required fields as touched and show inline errors
     const campos = ['nombreCompleto', 'cedula', 'telefono'];
@@ -311,7 +386,23 @@ export default function ConsultarAsociadosPage() {
     }
 
     try {
-      setGuardando(true); setMensaje(''); setErroresLista([]); setEsError(false);
+      setGuardando(true); setSubiendoAsoc(true); setMensaje(''); setErroresLista([]); setEsError(false);
+
+      // Subir archivos si los hay
+      const docUrls: Record<string, string> = {};
+      const docKeys: [string, string][] = [
+        ['cedula', 'urlCedula'], ['solicitud', 'urlCartaSolicitud'],
+        ['renuncia', 'urlCartaRenuncia'], ['desafiliacion', 'urlCartaDesafiliacion'],
+        ['otros', 'urlOtros'],
+      ];
+      for (const [fileKey, urlKey] of docKeys) {
+        const file = archivosAsoc[fileKey];
+        if (file) {
+          const url = await subirDocAsoc(file);
+          if (url) docUrls[urlKey] = url;
+        }
+      }
+      setSubiendoAsoc(false);
 
       const url = asociadoEditando
         ? `/api/asociados/update?id=${asociadoEditando.id}`
@@ -319,7 +410,7 @@ export default function ConsultarAsociadosPage() {
       const method = asociadoEditando ? 'PUT' : 'POST';
 
       // Limpiar campos opcionales vacíos para no romper validación del servidor
-      const payload: Record<string, unknown> = { ...formulario };
+      const payload: Record<string, unknown> = { ...formulario, ...docUrls };
       // anosCongregarse debe ser número o ausente (nunca string vacío)
       if (payload.anosCongregarse === '' || payload.anosCongregarse === null) {
         delete payload.anosCongregarse;
@@ -356,7 +447,7 @@ export default function ConsultarAsociadosPage() {
       setMensaje(err instanceof Error ? err.message : 'Error de conexión.'); 
       setEsError(true);
       Swal.fire('Error', 'Error de conexión con el servidor', 'error');
-    } finally { setGuardando(false); }
+    } finally { setGuardando(false); setSubiendoAsoc(false); }
   };
 
   /* ─── Reactivar ─── */
@@ -449,13 +540,23 @@ export default function ConsultarAsociadosPage() {
                 <h1 className="text-xl sm:text-2xl font-bold text-[#003366]">Gestión de Asociados</h1>
                 <div className="w-16 h-1 bg-[#003366] rounded mt-1" />
               </div>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={abrirModalCrear}
-                  className="inline-flex items-center gap-2 bg-[#003366] hover:bg-[#004488] text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
-                >
-                  <FaUserPlus className="text-xs" /> Nuevo
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                <button onClick={exportarExcel} title="Exportar Excel"
+                  className="inline-flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-3 py-2 rounded-lg transition">
+                  <FaFileExcel className="text-xs" /> Excel
                 </button>
+                <button onClick={exportarPDF} title="Exportar PDF"
+                  className="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-3 py-2 rounded-lg transition">
+                  <FaFilePdf className="text-xs" /> PDF
+                </button>
+                {!esJuntaDirectiva && (
+                  <button
+                    onClick={abrirModalCrear}
+                    className="inline-flex items-center gap-2 bg-[#003366] hover:bg-[#004488] text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
+                  >
+                    <FaUserPlus className="text-xs" /> Nuevo
+                  </button>
+                )}
                 <div className="relative w-[80px] h-[55px] hidden sm:block">
                   <Image src="/logo-iglesia.png" alt="Logo" fill className="object-contain" sizes="80px" />
                 </div>
@@ -977,6 +1078,39 @@ export default function ConsultarAsociadosPage() {
                     placeholder="Notas adicionales sobre el asociado..."
                     className={inputClass + ' resize-none'}
                   />
+                </div>
+
+                {/* ── Documentos ── */}
+                <div className="sm:col-span-2">
+                  <div className="border-t pt-4 mt-1">
+                    <h3 className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-3 flex items-center gap-2">
+                      <span className="w-5 h-5 rounded bg-[#003366]/10 flex items-center justify-center text-[#003366] text-[10px]">📎</span>
+                      Documentos (PDF, JPG, PNG — máx. 10 MB)
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {([
+                        { label: 'Cédula', key: 'cedula', urlKey: 'urlCedula' },
+                        { label: 'Carta de Solicitud', key: 'solicitud', urlKey: 'urlCartaSolicitud' },
+                        { label: 'Carta de Renuncia', key: 'renuncia', urlKey: 'urlCartaRenuncia' },
+                        { label: 'Carta de Desafiliación', key: 'desafiliacion', urlKey: 'urlCartaDesafiliacion' },
+                        { label: 'Otros documentos', key: 'otros', urlKey: 'urlOtros' },
+                      ] as const).map(({ label, key, urlKey }) => (
+                        <div key={key}>
+                          <label className="block text-xs font-semibold text-gray-500 mb-1">{label}</label>
+                          <input type="file" accept=".pdf,image/*"
+                            className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-[#003366] file:text-white hover:file:bg-[#004488]"
+                            onChange={e => setArchivosAsoc(prev => ({ ...prev, [key]: e.target.files?.[0] ?? null }))} />
+                          {archivosAsoc[key] && <p className="mt-0.5 text-[10px] text-gray-400 truncate">{archivosAsoc[key]!.name}</p>}
+                          {!archivosAsoc[key] && formulario[urlKey] && (
+                            <a href={formulario[urlKey]} target="_blank" rel="noopener noreferrer"
+                              className="mt-0.5 inline-flex items-center gap-1 text-[10px] text-blue-600 hover:text-blue-800">
+                              📄 Ver archivo existente
+                            </a>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </form>
             </div>
