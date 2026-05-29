@@ -7,6 +7,22 @@ import {
 
 // Regex para validar formato de teléfono (dígitos, espacios, +, -, paréntesis)
 const PHONE_REGEX = /^[\d\s\-+()]+$/;
+const PHONE_MAX_LENGTH = 20;
+
+function validarTelefonoOpcional(valor: string, label: string): string[] {
+    const errors: string[] = [];
+    const cleanPhone = valor.replace(/[\s\-+()]/g, '');
+    if (!PHONE_REGEX.test(valor)) {
+        errors.push(`${label} contiene caracteres no válidos`);
+    } else if (cleanPhone.length < 8) {
+        errors.push(`${label} debe tener al menos 8 dígitos`);
+    } else if (cleanPhone.length > PHONE_MAX_LENGTH) {
+        errors.push(`${label} no puede exceder ${PHONE_MAX_LENGTH} dígitos`);
+    } else if (valor.length > PHONE_MAX_LENGTH) {
+        errors.push(`${label} no puede exceder ${PHONE_MAX_LENGTH} caracteres`);
+    }
+    return errors;
+}
 
 // Regex básico para validar URL (http o https)
 const URL_REGEX = /^https?:\/\/.+/i;
@@ -75,14 +91,7 @@ export class CongregadoValidator {
 
         // Segundo teléfono (opcional)
         if (data.segundoTelefono !== undefined && data.segundoTelefono !== null && data.segundoTelefono !== '') {
-            const cleanPhone2 = data.segundoTelefono.replace(/[\s\-+()]/g, '');
-            if (!PHONE_REGEX.test(data.segundoTelefono)) {
-                errors.push('El segundo teléfono contiene caracteres no válidos');
-            } else if (cleanPhone2.length < 8) {
-                errors.push('El segundo teléfono debe tener al menos 8 dígitos');
-            } else if (cleanPhone2.length > 20) {
-                errors.push('El segundo teléfono no puede exceder 20 dígitos');
-            }
+            errors.push(...validarTelefonoOpcional(data.segundoTelefono, 'El segundo teléfono'));
         }
 
         // Estado civil
@@ -188,14 +197,7 @@ export class CongregadoValidator {
         if (data.segundoTelefono !== undefined) {
             check(data.segundoTelefono);
             if (data.segundoTelefono !== null && data.segundoTelefono !== '') {
-                const cleanPhone2 = data.segundoTelefono.replace(/[\s\-+()]/g, '');
-                if (!PHONE_REGEX.test(data.segundoTelefono)) {
-                    errors.push('El segundo teléfono contiene caracteres no válidos');
-                } else if (cleanPhone2.length < 8) {
-                    errors.push('El segundo teléfono debe tener al menos 8 dígitos');
-                } else if (cleanPhone2.length > 20) {
-                    errors.push('El segundo teléfono no puede exceder 20 dígitos');
-                }
+                errors.push(...validarTelefonoOpcional(data.segundoTelefono, 'El segundo teléfono'));
             }
         }
 
@@ -229,14 +231,14 @@ export class CongregadoValidator {
             }
         }
 
-        // URL foto cédula (si se proporciona y no es vacía)
-        if (data.urlFotoCedula !== undefined && data.urlFotoCedula.trim().length > 0) {
+        // URL foto cédula (en actualización se acepta ruta relativa o URL ya guardada)
+        if (data.urlFotoCedula !== undefined) {
             check(data.urlFotoCedula);
-            if (!URL_REGEX.test(data.urlFotoCedula)) {
-                errors.push('La URL de la foto de cédula no es válida (debe comenzar con http:// o https://)');
+            if (data.urlFotoCedula.trim().length === 0) {
+                errors.push('La URL de la foto de cédula no puede estar vacía');
+            } else if (data.urlFotoCedula.length > 500) {
+                errors.push('La URL de la foto de cédula no puede exceder 500 caracteres');
             }
-        } else if (data.urlFotoCedula !== undefined) {
-            check(data.urlFotoCedula);
         }
 
         // Estado (si se proporciona)
@@ -266,9 +268,15 @@ export class CongregadoValidator {
         if (sanitized.nombre) sanitized.nombre = sanitized.nombre.trim();
         if (sanitized.cedula) sanitized.cedula = sanitized.cedula.trim();
         if (sanitized.telefono) sanitized.telefono = sanitized.telefono.trim();
-        if (sanitized.segundoTelefono) sanitized.segundoTelefono = sanitized.segundoTelefono.trim();
+        if (sanitized.segundoTelefono !== undefined && sanitized.segundoTelefono !== null) {
+            const trimmed = sanitized.segundoTelefono.trim();
+            sanitized.segundoTelefono = trimmed.length > 0 ? trimmed : null;
+        }
         if (sanitized.ministerio) sanitized.ministerio = sanitized.ministerio.trim();
-        if (sanitized.segundoMinisterio) sanitized.segundoMinisterio = sanitized.segundoMinisterio.trim();
+        if (sanitized.segundoMinisterio !== undefined && sanitized.segundoMinisterio !== null) {
+            const trimmed = sanitized.segundoMinisterio.trim();
+            sanitized.segundoMinisterio = trimmed.length > 0 ? trimmed : null;
+        }
         if (sanitized.urlFotoCedula) sanitized.urlFotoCedula = sanitized.urlFotoCedula.trim();
 
         return sanitized;
