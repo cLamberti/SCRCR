@@ -161,10 +161,14 @@ export class CongregadoDAO {
           cedula: data.cedula ?? existente.cedula,
           fechaIngreso: data.fechaIngreso ? new Date(data.fechaIngreso) : existente.fechaIngreso,
           telefono: data.telefono ?? existente.telefono,
-          segundoTelefono: data.segundoTelefono === null ? null : (data.segundoTelefono ?? existente.segundoTelefono ?? null),
+          segundoTelefono: data.segundoTelefono === null || data.segundoTelefono === ''
+            ? null
+            : (data.segundoTelefono ?? existente.segundoTelefono ?? null),
           estadoCivil: data.estadoCivil ?? existente.estadoCivil,
           ministerio: data.ministerio ?? existente.ministerio,
-          segundoMinisterio: data.segundoMinisterio === null ? null : (data.segundoMinisterio ?? existente.segundoMinisterio ?? null),
+          segundoMinisterio: data.segundoMinisterio === null || data.segundoMinisterio === ''
+            ? null
+            : (data.segundoMinisterio ?? existente.segundoMinisterio ?? null),
           urlFotoCedula: data.urlFotoCedula ?? existente.urlFotoCedula,
           estado: data.estado ?? existente.estado,
           observaciones: data.observaciones === undefined ? (existente.observaciones ?? null) : (data.observaciones || null),

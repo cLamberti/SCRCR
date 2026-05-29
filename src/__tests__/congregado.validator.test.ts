@@ -33,6 +33,18 @@ describe('CongregadoValidator.validarActualizar', () => {
         expect(result.valid).toBe(true);
     });
 
+    it('acepta segundo teléfono vacío o null al editar', () => {
+        const vacio = CongregadoValidator.validarActualizar(
+            CongregadoValidator.sanitizarDatos({ ...fullFormPayload, segundoTelefono: '' })
+        );
+        const nulo = CongregadoValidator.validarActualizar(
+            CongregadoValidator.sanitizarDatos({ ...fullFormPayload, segundoTelefono: null })
+        );
+        expect(vacio.valid).toBe(true);
+        expect(nulo.valid).toBe(true);
+        expect(CongregadoValidator.sanitizarDatos({ segundoTelefono: '' }).segundoTelefono).toBeNull();
+    });
+
     it('rechaza segundo teléfono con menos de 8 dígitos', () => {
         const payload = { ...fullFormPayload, segundoTelefono: '8888' };
         const result = CongregadoValidator.validarActualizar(CongregadoValidator.sanitizarDatos(payload));

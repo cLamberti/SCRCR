@@ -81,7 +81,9 @@ function validarTelefonoCongregado(valor: string, obligatorio = false): string |
   if (!trimmed) return obligatorio ? 'El teléfono es obligatorio.' : undefined;
   const digitos = trimmed.replace(/[\s\-+()]/g, '');
   if (!/^[\d\s\-+()]+$/.test(trimmed)) return 'Solo se permiten números, espacios, +, - y paréntesis.';
-  if (digitos.length < 8) return 'Debe tener al menos 8 dígitos.';
+  if (digitos.length < 8) return obligatorio
+    ? 'Debe tener al menos 8 dígitos.'
+    : 'Si ingresa un segundo teléfono, debe tener al menos 8 dígitos. De lo contrario, déjalo vacío.';
   if (digitos.length > 20 || trimmed.length > 20) return 'No puede exceder 20 caracteres.';
   return undefined;
 }
@@ -257,13 +259,26 @@ export default function CongregadosPage() {
   const handleCampoCong = (campo: keyof CongregadoFormErrors, valor: string) => {
     setForm(prev => ({ ...prev, [campo]: valor }));
     setFormTouched(prev => ({ ...prev, [campo]: true }));
-    setFormErrors(prev => ({ ...prev, [campo]: validarCampoCongregado(campo, valor) }));
+    setFormErrors(prev => {
+      const err = validarCampoCongregado(campo, valor);
+      const next = { ...prev };
+      if (err) next[campo] = err;
+      else delete next[campo];
+      return next;
+    });
   };
 
-  // Solo valida al perder foco — NO reescribe el valor (evita revertir cambios)
-  const handleBlurCong = (campo: keyof CongregadoFormErrors) => {
+  // Solo valida al perder foco — usa el valor del input para evitar estado desactualizado
+  const handleBlurCong = (campo: keyof CongregadoFormErrors, valor?: string) => {
+    const valorActual = valor ?? String((form as any)[campo] ?? '');
     setFormTouched(prev => ({ ...prev, [campo]: true }));
-    setFormErrors(prev => ({ ...prev, [campo]: validarCampoCongregado(campo, String((form as any)[campo] ?? '')) }));
+    setFormErrors(prev => {
+      const err = validarCampoCongregado(campo, valorActual);
+      const next = { ...prev };
+      if (err) next[campo] = err;
+      else delete next[campo];
+      return next;
+    });
   };
 
   const abrirCrear = () => {
@@ -313,13 +328,12 @@ export default function CongregadosPage() {
       const errCorreo = validarCampoCongregado('correo', form.correo);
       if (errCorreo) newErrors.correo = errCorreo;
     }
-    if (form.segundoTelefono.trim()) {
-      newTouched.segundoTelefono = true;
-      const errSegundoTel = validarCampoCongregado('segundoTelefono', form.segundoTelefono);
-      if (errSegundoTel) newErrors.segundoTelefono = errSegundoTel;
-    }
+    newTouched.segundoTelefono = true;
+    const errSegundoTel = validarCampoCongregado('segundoTelefono', form.segundoTelefono);
+    if (errSegundoTel) newErrors.segundoTelefono = errSegundoTel;
+
     setFormTouched(prev => ({ ...prev, ...newTouched }));
-    setFormErrors(prev => ({ ...prev, ...newErrors }));
+    setFormErrors(newErrors);
     if (Object.keys(newErrors).length > 0) return;
     setGuardando(true); setMensaje(""); setEsError(false);
     try {
@@ -777,7 +791,7 @@ export default function CongregadosPage() {
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Segundo teléfono</label>
                   <input type="tel" value={form.segundoTelefono}
                     onChange={e => handleCampoCong('segundoTelefono', e.target.value)}
-                    onBlur={() => handleBlurCong('segundoTelefono')}
+                    onBlur={e => handleBlurCong('segundoTelefono', e.target.value)}
                     className={formTouched.segundoTelefono && formErrors.segundoTelefono ? inputClassError : inputClass}
                     placeholder="Opcional (mín. 8 dígitos)" />
                   {formTouched.segundoTelefono && formErrors.segundoTelefono && (
