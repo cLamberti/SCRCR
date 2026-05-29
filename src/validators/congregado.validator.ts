@@ -184,19 +184,19 @@ export class CongregadoValidator {
             }
         }
 
-        // Segundo teléfono (si se proporciona; null = eliminar)
-        if (data.segundoTelefono !== undefined && data.segundoTelefono !== null && data.segundoTelefono !== '') {
+        // Segundo teléfono (si se proporciona; null o '' = eliminar/limpiar)
+        if (data.segundoTelefono !== undefined) {
             check(data.segundoTelefono);
-            const cleanPhone2 = data.segundoTelefono.replace(/[\s\-+()]/g, '');
-            if (!PHONE_REGEX.test(data.segundoTelefono)) {
-                errors.push('El segundo teléfono contiene caracteres no válidos');
-            } else if (cleanPhone2.length < 8) {
-                errors.push('El segundo teléfono debe tener al menos 8 dígitos');
-            } else if (cleanPhone2.length > 20) {
-                errors.push('El segundo teléfono no puede exceder 20 dígitos');
+            if (data.segundoTelefono !== null && data.segundoTelefono !== '') {
+                const cleanPhone2 = data.segundoTelefono.replace(/[\s\-+()]/g, '');
+                if (!PHONE_REGEX.test(data.segundoTelefono)) {
+                    errors.push('El segundo teléfono contiene caracteres no válidos');
+                } else if (cleanPhone2.length < 8) {
+                    errors.push('El segundo teléfono debe tener al menos 8 dígitos');
+                } else if (cleanPhone2.length > 20) {
+                    errors.push('El segundo teléfono no puede exceder 20 dígitos');
+                }
             }
-        } else if (data.segundoTelefono === null) {
-            check(data.segundoTelefono);
         }
 
         // Estado civil (si se proporciona)
@@ -217,16 +217,16 @@ export class CongregadoValidator {
             }
         }
 
-        // Segundo ministerio (si se proporciona; null = eliminar)
-        if (data.segundoMinisterio !== undefined && data.segundoMinisterio !== null && data.segundoMinisterio !== '') {
+        // Segundo ministerio (si se proporciona; null o '' = eliminar/limpiar)
+        if (data.segundoMinisterio !== undefined) {
             check(data.segundoMinisterio);
-            if (data.segundoMinisterio.length > 50) {
-                errors.push('El segundo ministerio no puede exceder 50 caracteres');
-            } else if (data.ministerio && data.segundoMinisterio.trim().toLowerCase() === data.ministerio.trim().toLowerCase()) {
-                errors.push('El segundo ministerio no puede ser igual al ministerio principal');
+            if (data.segundoMinisterio !== null && data.segundoMinisterio !== '') {
+                if (data.segundoMinisterio.length > 50) {
+                    errors.push('El segundo ministerio no puede exceder 50 caracteres');
+                } else if (data.ministerio && data.segundoMinisterio.trim().toLowerCase() === data.ministerio.trim().toLowerCase()) {
+                    errors.push('El segundo ministerio no puede ser igual al ministerio principal');
+                }
             }
-        } else if (data.segundoMinisterio === null) {
-            check(data.segundoMinisterio);
         }
 
         // URL foto cédula (si se proporciona y no es vacía)
