@@ -10,7 +10,7 @@ import {
   FaFileExcel, FaFilePdf,
 } from "react-icons/fa";
 import Sidebar from "@/components/SideBar";
-import { EstadoCivil } from "@/models/Congregado";
+import { EstadoCivil, normalizarEstadoCivil } from "@/models/Congregado";
 
 type CongregadoRow = {
   id: number;
@@ -283,7 +283,7 @@ export default function CongregadosPage() {
       fechaIngreso: row.fechaIngreso ? new Date(row.fechaIngreso).toISOString().split("T")[0] : "",
       telefono: row.telefono || "",
       segundoTelefono: row.segundoTelefono || "",
-      estadoCivil: row.estadoCivil || EstadoCivil.SOLTERO,
+      estadoCivil: normalizarEstadoCivil(row.estadoCivil) ?? EstadoCivil.SOLTERO,
       ministerio: row.ministerio || "",
       segundoMinisterio: row.segundoMinisterio || "",
       urlFotoCedula: row.urlFotoCedula || "",

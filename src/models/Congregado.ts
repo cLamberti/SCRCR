@@ -8,6 +8,33 @@ export enum EstadoCivil {
     UNION_LIBRE = 'union_libre',
 }
 
+/** Normaliza valores legacy de BD (ej. "Soltero(a)") al enum canónico. */
+export function normalizarEstadoCivil(valor: string | undefined | null): EstadoCivil | null {
+    if (!valor) return null;
+
+    const clave = valor
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\(a\)/g, '')
+        .replace(/\//g, ' ')
+        .replace(/[_-]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    const mapa: Record<string, EstadoCivil> = {
+        soltero: EstadoCivil.SOLTERO,
+        casado: EstadoCivil.CASADO,
+        divorciado: EstadoCivil.DIVORCIADO,
+        viudo: EstadoCivil.VIUDO,
+        'union libre': EstadoCivil.UNION_LIBRE,
+        unionlibre: EstadoCivil.UNION_LIBRE,
+    };
+
+    return mapa[clave] ?? null;
+}
+
 // Nota: El ministerio es un string libre (varchar(50) en la DB).
 // No se usa un enum cerrado para permitir que nuevos ministerios
 // se agreguen sin modificar el código.
