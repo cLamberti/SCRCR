@@ -72,9 +72,19 @@ const inputClassError = inputBase + " border-red-400 bg-red-50/30";
 
 type CongregadoFormErrors = {
   nombre?: string; cedula?: string; fechaIngreso?: string;
-  telefono?: string; ministerio?: string; urlFotoCedula?: string; correo?: string;
+  telefono?: string; segundoTelefono?: string; ministerio?: string; urlFotoCedula?: string; correo?: string;
 };
 type CongregadoFormTouched = Partial<Record<keyof CongregadoFormErrors, boolean>>;
+
+function validarTelefonoCongregado(valor: string, obligatorio = false): string | undefined {
+  const trimmed = valor.trim();
+  if (!trimmed) return obligatorio ? 'El teléfono es obligatorio.' : undefined;
+  const digitos = trimmed.replace(/[\s\-+()]/g, '');
+  if (!/^[\d\s\-+()]+$/.test(trimmed)) return 'Solo se permiten números, espacios, +, - y paréntesis.';
+  if (digitos.length < 8) return 'Debe tener al menos 8 dígitos.';
+  if (digitos.length > 20 || trimmed.length > 20) return 'No puede exceder 20 caracteres.';
+  return undefined;
+}
 
 function validarCampoCongregado(campo: keyof CongregadoFormErrors, valor: string): string | undefined {
   switch (campo) {
@@ -89,8 +99,9 @@ function validarCampoCongregado(campo: keyof CongregadoFormErrors, valor: string
       if (!valor) return 'La fecha de ingreso es obligatoria.';
       return undefined;
     case 'telefono':
-      if (!valor.trim()) return 'El teléfono es obligatorio.';
-      return undefined;
+      return validarTelefonoCongregado(valor, true);
+    case 'segundoTelefono':
+      return validarTelefonoCongregado(valor, false);
     case 'ministerio':
       if (!valor.trim()) return 'El ministerio es obligatorio.';
       return undefined;
@@ -302,6 +313,11 @@ export default function CongregadosPage() {
       const errCorreo = validarCampoCongregado('correo', form.correo);
       if (errCorreo) newErrors.correo = errCorreo;
     }
+    if (form.segundoTelefono.trim()) {
+      newTouched.segundoTelefono = true;
+      const errSegundoTel = validarCampoCongregado('segundoTelefono', form.segundoTelefono);
+      if (errSegundoTel) newErrors.segundoTelefono = errSegundoTel;
+    }
     setFormTouched(prev => ({ ...prev, ...newTouched }));
     setFormErrors(prev => ({ ...prev, ...newErrors }));
     if (Object.keys(newErrors).length > 0) return;
@@ -309,10 +325,10 @@ export default function CongregadosPage() {
     try {
       const body = {
         ...form,
-        segundoTelefono: form.segundoTelefono || null,
-        segundoMinisterio: form.segundoMinisterio || null,
+        segundoTelefono: form.segundoTelefono.trim() || null,
+        segundoMinisterio: form.segundoMinisterio.trim() || null,
         // Garantizar URL válida para no romper validación
-        urlFotoCedula: form.urlFotoCedula || "https://placeholder.com/cedula.jpg",
+        urlFotoCedula: form.urlFotoCedula.trim() || "https://placeholder.com/cedula.jpg",
         // Campos de fecha opcionales: excluir si están vacíos
         ...(form.fechaNacimiento ? {} : { fechaNacimiento: undefined }),
       };
@@ -324,7 +340,12 @@ export default function CongregadosPage() {
       const json = await res.json();
 
       if (!res.ok || !json.success) {
-        setMensaje(json.message || "Error al guardar"); setEsError(true); return;
+        const detalle = Array.isArray(json.errors) && json.errors.length > 0
+          ? `: ${json.errors.join('. ')}`
+          : '';
+        setMensaje((json.message || "Error al guardar") + detalle);
+        setEsError(true);
+        return;
       }
 
       setMensaje(editando ? "Congregado actualizado exitosamente." : "Congregado registrado exitosamente.");
@@ -754,7 +775,14 @@ export default function CongregadosPage() {
                 {/* Segundo teléfono */}
                 <div>
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Segundo teléfono</label>
-                  <input type="tel" value={form.segundoTelefono} onChange={e => setForm(prev => ({ ...prev, segundoTelefono: e.target.value }))} className={inputClass} placeholder="Opcional" />
+                  <input type="tel" value={form.segundoTelefono}
+                    onChange={e => handleCampoCong('segundoTelefono', e.target.value)}
+                    onBlur={() => handleBlurCong('segundoTelefono')}
+                    className={formTouched.segundoTelefono && formErrors.segundoTelefono ? inputClassError : inputClass}
+                    placeholder="Opcional (mín. 8 dígitos)" />
+                  {formTouched.segundoTelefono && formErrors.segundoTelefono && (
+                    <p className="mt-1 text-xs text-red-600">{formErrors.segundoTelefono}</p>
+                  )}
                 </div>
 
                 {/* Estado civil */}

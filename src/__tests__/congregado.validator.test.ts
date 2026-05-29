@@ -1,0 +1,54 @@
+import { describe, it, expect } from 'vitest';
+import { CongregadoValidator } from '@/validators/congregado.validator';
+import { EstadoCivil } from '@/models/Congregado';
+
+describe('CongregadoValidator.validarActualizar', () => {
+    const fullFormPayload = {
+        nombre: 'Juan Pérez',
+        cedula: '5-0291-0483',
+        fechaIngreso: '2020-05-15',
+        telefono: '8888-8888',
+        segundoTelefono: '7777-7777',
+        estadoCivil: EstadoCivil.SOLTERO,
+        ministerio: 'Alabanza',
+        segundoMinisterio: null as string | null,
+        urlFotoCedula: 'https://example.com/foto.jpg',
+        estado: 1,
+        observaciones: '',
+        correo: '',
+        profesion: '',
+        direccion: '',
+    };
+
+    it('acepta payload completo del frontend al agregar segundo teléfono', () => {
+        const sanitized = CongregadoValidator.sanitizarDatos(fullFormPayload);
+        const result = CongregadoValidator.validarActualizar(sanitized);
+        expect(result.valid).toBe(true);
+        expect(result.errors).toEqual([]);
+    });
+
+    it('acepta segundo teléfono con prefijo +506', () => {
+        const payload = { ...fullFormPayload, segundoTelefono: '+506 7777-7777' };
+        const result = CongregadoValidator.validarActualizar(CongregadoValidator.sanitizarDatos(payload));
+        expect(result.valid).toBe(true);
+    });
+
+    it('rechaza segundo teléfono con menos de 8 dígitos', () => {
+        const payload = { ...fullFormPayload, segundoTelefono: '8888' };
+        const result = CongregadoValidator.validarActualizar(CongregadoValidator.sanitizarDatos(payload));
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContain('El segundo teléfono debe tener al menos 8 dígitos');
+    });
+
+    it('acepta URL relativa en urlFotoCedula al editar', () => {
+        const payload = { ...fullFormPayload, urlFotoCedula: '/uploads/cedula.jpg' };
+        const result = CongregadoValidator.validarActualizar(CongregadoValidator.sanitizarDatos(payload));
+        expect(result.valid).toBe(true);
+    });
+
+    it('convierte segundo teléfono vacío a null al sanitizar', () => {
+        const payload = { segundoTelefono: '   ' };
+        const sanitized = CongregadoValidator.sanitizarDatos(payload);
+        expect(sanitized.segundoTelefono).toBeNull();
+    });
+});
