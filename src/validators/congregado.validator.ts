@@ -1,4 +1,4 @@
-import { EstadoCivil, EstadoCongregado } from '@/models/Congregado';
+import { EstadoCivil, EstadoCongregado, normalizarEstadoCivil } from '@/models/Congregado';
 import {
     CrearCongregadoRequest,
     ActualizarCongregadoRequest,
@@ -278,6 +278,10 @@ export class CongregadoValidator {
             sanitized.segundoMinisterio = trimmed.length > 0 ? trimmed : null;
         }
         if (sanitized.urlFotoCedula) sanitized.urlFotoCedula = sanitized.urlFotoCedula.trim();
+        if (sanitized.estadoCivil) {
+            const estadoCivilNormalizado = normalizarEstadoCivil(sanitized.estadoCivil);
+            if (estadoCivilNormalizado) sanitized.estadoCivil = estadoCivilNormalizado;
+        }
 
         return sanitized;
     }

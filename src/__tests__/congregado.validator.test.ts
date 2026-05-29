@@ -46,9 +46,14 @@ describe('CongregadoValidator.validarActualizar', () => {
         expect(result.valid).toBe(true);
     });
 
-    it('convierte segundo teléfono vacío a null al sanitizar', () => {
-        const payload = { segundoTelefono: '   ' };
-        const sanitized = CongregadoValidator.sanitizarDatos(payload);
-        expect(sanitized.segundoTelefono).toBeNull();
+    it('acepta estado civil legacy de la BD (Soltero(a)) al agregar segundo teléfono', () => {
+        const payload = {
+            ...fullFormPayload,
+            estadoCivil: 'Soltero(a)' as unknown as EstadoCivil,
+            segundoTelefono: '7777-7777',
+        };
+        const result = CongregadoValidator.validarActualizar(CongregadoValidator.sanitizarDatos(payload));
+        expect(result.valid).toBe(true);
+        expect(CongregadoValidator.sanitizarDatos(payload).estadoCivil).toBe(EstadoCivil.SOLTERO);
     });
 });
