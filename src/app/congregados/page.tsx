@@ -7,7 +7,7 @@ import {
   FaUsers, FaUserPlus, FaSearch, FaEdit, FaTrash,
   FaChevronLeft, FaChevronRight, FaExclamationTriangle,
   FaTimes, FaSave, FaPlus, FaFilter, FaCheckCircle,
-  FaFileExcel, FaFilePdf, FaUpload, FaExternalLinkAlt,
+  FaFileExcel, FaFilePdf, FaUpload, FaExternalLinkAlt, FaFolderOpen,
 } from "react-icons/fa";
 import Sidebar from "@/components/SideBar";
 import { EstadoCivil, normalizarEstadoCivil } from "@/models/Congregado";
@@ -201,6 +201,10 @@ export default function CongregadosPage() {
   const [formTouched, setFormTouched] = useState<CongregadoFormTouched>({});
   const [archivoCedula, setArchivoCedula] = useState<File | null>(null);
   const [subiendoCedula, setSubiendoCedula] = useState(false);
+
+  // modal documentos
+  const [modalDocsOpen, setModalDocsOpen] = useState(false);
+  const [docsCongregado, setDocsCongregado] = useState<CongregadoRow | null>(null);
 
   // modal eliminar masivo
   const [modalDelete, setModalDelete] = useState(false);
@@ -630,6 +634,10 @@ export default function CongregadosPage() {
                                 className="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg transition whitespace-nowrap">
                                 <FaEdit className="text-xs" /> Editar
                               </button>
+                              <button onClick={() => { setDocsCongregado(r); setModalDocsOpen(true); }}
+                                className="inline-flex items-center gap-1 bg-[#003366] hover:bg-[#002244] text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg transition whitespace-nowrap">
+                                <FaFolderOpen className="text-xs" /> Docs
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -706,6 +714,12 @@ export default function CongregadosPage() {
                             className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition"
                           >
                             <FaEdit className="text-xs" /> Editar
+                          </button>
+                          <button
+                            onClick={() => { setDocsCongregado(r); setModalDocsOpen(true); }}
+                            className="inline-flex items-center gap-1.5 bg-[#003366] hover:bg-[#002244] text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition"
+                          >
+                            <FaFolderOpen className="text-xs" /> Docs
                           </button>
                         </div>
                       </div>
@@ -1020,6 +1034,64 @@ export default function CongregadosPage() {
           </div>
         </div>
       )}
+
+      {/* Modal Documentos */}
+      {modalDocsOpen && docsCongregado && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+          onClick={() => { setModalDocsOpen(false); setDocsCongregado(null); }}>
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden"
+            onClick={e => e.stopPropagation()}>
+            <div className="bg-[#003366] px-6 py-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-white font-bold text-base">Documentos</h2>
+                <p className="text-blue-200 text-xs mt-0.5">{docsCongregado.nombre}</p>
+              </div>
+              <button onClick={() => { setModalDocsOpen(false); setDocsCongregado(null); }}
+                className="text-white/70 hover:text-white transition-colors">
+                <FaTimes />
+              </button>
+            </div>
+            <div className="p-6">
+              <CongregadoDocViewer label="Cédula" url={docsCongregado.urlFotoCedula ?? ''} />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CongregadoDocViewer({ label, url }: { label: string; url: string }) {
+  const proxyUrl = url ? `/api/blob-download?url=${encodeURIComponent(url)}` : '';
+  const esImagen = url ? /\.(jpg|jpeg|png|webp|gif)$/i.test(url) : false;
+  const esPdf    = url ? /\.pdf$/i.test(url) : false;
+
+  return (
+    <div className="border border-gray-200 rounded-xl overflow-hidden">
+      <div className="bg-gray-50 px-3 py-2 border-b border-gray-200 flex items-center justify-between">
+        <span className="text-xs font-semibold text-gray-700">{label}</span>
+        {url && (
+          <a href={proxyUrl} target="_blank" rel="noopener noreferrer"
+            className="text-[10px] text-blue-600 hover:underline flex items-center gap-1">
+            Abrir <FaFolderOpen className="text-[10px]" />
+          </a>
+        )}
+      </div>
+      <div className="flex items-center justify-center bg-gray-50 h-48">
+        {!url ? (
+          <p className="text-xs text-gray-400">Sin archivo</p>
+        ) : esImagen ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={proxyUrl} alt={label} className="max-h-48 max-w-full object-contain" />
+        ) : esPdf ? (
+          <iframe src={proxyUrl} className="w-full h-48 border-0" title={label} />
+        ) : (
+          <a href={proxyUrl} target="_blank" rel="noopener noreferrer"
+            className="text-xs text-blue-600 hover:underline">
+            Ver documento
+          </a>
+        )}
+      </div>
     </div>
   );
 }

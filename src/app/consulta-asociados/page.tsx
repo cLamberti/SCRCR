@@ -7,7 +7,8 @@ import {
   FaHome, FaUserPlus, FaList, FaSignOutAlt,
   FaSearch, FaEdit, FaTrash, FaUsers,
   FaChevronLeft, FaChevronRight, FaExclamationTriangle,
-  FaCalendarAlt, FaCheckCircle, FaFileExcel, FaFilePdf
+  FaCalendarAlt, FaCheckCircle, FaFileExcel, FaFilePdf,
+  FaFolderOpen, FaTimes
 } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 import { AsociadoResponse } from '@/dto/asociado.dto';
@@ -96,6 +97,10 @@ export default function ConsultarAsociadosPage() {
   const [guardando, setGuardando] = useState(false);
   const [asocErrors, setAsocErrors] = useState<Record<string, string>>({});
   const [asocTouched, setAsocTouched] = useState<Record<string, boolean>>({});
+
+  /* Modal documentos */
+  const [modalDocsOpen, setModalDocsOpen] = useState(false);
+  const [docsAsociado, setDocsAsociado] = useState<AsociadoRow | null>(null);
 
   /* Modal confirmación eliminación masiva */
   const [modalDeleteOpen,    setModalDeleteOpen]    = useState(false);
@@ -751,6 +756,12 @@ export default function ConsultarAsociadosPage() {
                               >
                                 <FaEdit className="text-xs" /> Editar
                               </button>
+                              <button
+                                onClick={() => { setDocsAsociado(r); setModalDocsOpen(true); }}
+                                className="inline-flex items-center gap-1 bg-[#003366] hover:bg-[#002244] text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+                              >
+                                <FaFolderOpen className="text-xs" /> Docs
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -827,6 +838,12 @@ export default function ConsultarAsociadosPage() {
                             className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
                           >
                             <FaEdit className="text-xs" /> Editar
+                          </button>
+                          <button
+                            onClick={() => { setDocsAsociado(r); setModalDocsOpen(true); }}
+                            className="inline-flex items-center gap-1.5 bg-[#003366] hover:bg-[#002244] text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                          >
+                            <FaFolderOpen className="text-xs" /> Docs
                           </button>
                         </div>
                       </div>
@@ -1199,6 +1216,85 @@ export default function ConsultarAsociadosPage() {
           </div>
         </div>
       )}
+
+      {/* ── Modal Documentos ── */}
+      {modalDocsOpen && docsAsociado && (
+        <ModalDocumentosAsociado
+          asociado={docsAsociado}
+          onClose={() => { setModalDocsOpen(false); setDocsAsociado(null); }}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MODAL DOCUMENTOS ASOCIADO
+══════════════════════════════════════════════════════════════════════════ */
+type DocEntry = { label: string; url: string };
+
+function ModalDocumentosAsociado({ asociado, onClose }: { asociado: AsociadoRow; onClose: () => void }) {
+  const docs: DocEntry[] = [
+    { label: 'Cédula',               url: asociado.urlCedula ?? '' },
+    { label: 'Carta de Solicitud',   url: asociado.urlCartaSolicitud ?? '' },
+    { label: 'Carta de Renuncia',    url: asociado.urlCartaRenuncia ?? '' },
+    { label: 'Carta de Desafiliación', url: asociado.urlCartaDesafiliacion ?? '' },
+    { label: 'Otros',                url: asociado.urlOtros ?? '' },
+  ];
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="bg-[#003366] px-6 py-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-white font-bold text-base">Documentos</h2>
+            <p className="text-blue-200 text-xs mt-0.5">{asociado.nombreCompleto}</p>
+          </div>
+          <button onClick={onClose} className="text-white/70 hover:text-white transition-colors">
+            <FaTimes />
+          </button>
+        </div>
+        <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[70vh] overflow-y-auto">
+          {docs.map(doc => (
+            <DocViewer key={doc.label} label={doc.label} url={doc.url} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DocViewer({ label, url }: { label: string; url: string }) {
+  const proxyUrl = url ? `/api/blob-download?url=${encodeURIComponent(url)}` : '';
+  const esImagen = url ? /\.(jpg|jpeg|png|webp|gif)$/i.test(url) : false;
+  const esPdf    = url ? /\.pdf$/i.test(url) : false;
+
+  return (
+    <div className="border border-gray-200 rounded-xl overflow-hidden">
+      <div className="bg-gray-50 px-3 py-2 border-b border-gray-200 flex items-center justify-between">
+        <span className="text-xs font-semibold text-gray-700">{label}</span>
+        {url && (
+          <a href={proxyUrl} target="_blank" rel="noopener noreferrer"
+            className="text-[10px] text-blue-600 hover:underline flex items-center gap-1">
+            Abrir <FaFolderOpen className="text-[10px]" />
+          </a>
+        )}
+      </div>
+      <div className="flex items-center justify-center bg-gray-50 h-40">
+        {!url ? (
+          <p className="text-xs text-gray-400">Sin archivo</p>
+        ) : esImagen ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img src={proxyUrl} alt={label} className="max-h-40 max-w-full object-contain" />
+        ) : esPdf ? (
+          <iframe src={proxyUrl} className="w-full h-40 border-0" title={label} />
+        ) : (
+          <a href={proxyUrl} target="_blank" rel="noopener noreferrer"
+            className="text-xs text-blue-600 hover:underline">
+            Ver documento
+          </a>
+        )}
+      </div>
     </div>
   );
 }
