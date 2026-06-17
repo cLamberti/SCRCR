@@ -45,7 +45,7 @@ export default function Navbar() {
                 </div>
 
                 {/* Configuración (admin | tesorero | pastorGeneral) */}
-                {['admin', 'tesorero', 'pastorGeneral'].includes(user.rol) && (
+                {['admin', 'tesorero', 'pastorGeneral', 'asistenteAdministrativo'].includes(user.rol) && (
                   <Link
                     href="/configuracion"
                     className="flex items-center gap-2 hover:text-gray-300 transition-colors text-sm font-medium"
@@ -97,7 +97,7 @@ export default function Navbar() {
                   {ROL_LABELS[user.rol] || user.rol}
                 </span>
               </div>
-              {user.rol === 'admin' && (
+              {['admin', 'tesorero', 'pastorGeneral', 'asistenteAdministrativo'].includes(user.rol) && (
                 <Link
                   href="/configuracion"
                   onClick={() => setMenuOpen(false)}
