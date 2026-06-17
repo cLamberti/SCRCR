@@ -1,116 +1,111 @@
-
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { jwtVerify } from 'jose';
 
-// Definir permisos por ruta y rol
-const routePermissions: Record<string, string[]> = {
-  '/registro-asociados': ['admin', 'tesorero', 'pastorGeneral'],
-  '/consulta-asociados': ['admin', 'tesorero', 'pastorGeneral'],
-  '/eliminar-asociados': ['admin', 'pastorGeneral'],
-  '/gestion-usuarios': ['admin', 'pastorGeneral'],
-  '/reportes': ['admin', 'tesorero', 'pastorGeneral'],
-  '/configuracion': ['admin'],
-  '/dashboard': ['admin', 'tesorero', 'pastorGeneral', 'asistenteAdministrativo'],
-  '/congregados': ['admin', 'tesorero', 'pastorGeneral', 'asistenteAdministrativo'],
-  '/permisos': ['admin', 'tesorero', 'pastorGeneral', 'asistenteAdministrativo'],
-};
+// Rutas que solo admin puede acceder (protección fuerte en Edge)
+const ADMIN_ONLY_ROUTES = ['/gestion-roles', '/gestion-usuarios'];
 
-// Rutas que solo pueden acceder usuarios no autenticados
-const authRoutes = ['/login'];
+// Rutas que requieren cualquier JWT válido
+const PROTECTED_ROUTES = [
+  '/consulta-asociados',
+  '/congregados',
+  '/eventos',
+  '/planilla',
+  '/reportes',
+  '/permisos',
+  '/actas',
+  '/configuracion',
+];
 
-// Rutas públicas que no requieren autenticación
-const publicRoutes = ['/', '/recuperar-password'];
+// Rutas solo para no autenticados
+const AUTH_ROUTES = ['/login'];
+
+// Rutas públicas sin restricción
+const PUBLIC_ROUTES = ['/', '/recuperar-password'];
+
+// Rutas API que no requieren autenticación
+const PUBLIC_API_ROUTES = ['/api/auth/'];
+
+async function getTokenPayload(token: string): Promise<{ rol: string } | null> {
+  const jwtSecret = process.env.JWT_SECRET;
+  if (!jwtSecret) return null;
+  try {
+    const { payload } = await jwtVerify(token, new TextEncoder().encode(jwtSecret));
+    return payload as { rol: string };
+  } catch {
+    return null;
+  }
+}
 
 export async function middleware(request: NextRequest) {
   const token = request.cookies.get('auth-token')?.value;
   const { pathname } = request.nextUrl;
 
-  console.log(' MIDDLEWARE ');
-  console.log('Path:', pathname);
-  console.log('Token presente:', !!token);
-
-  // Permitir rutas públicas
-  if (publicRoutes.includes(pathname)) {
-    console.log('Ruta pública, permitiendo acceso');
-    return NextResponse.next();
-  }
-
-  // Si está intentando acceder a una ruta de autenticación y ya tiene token
-  if (authRoutes.some(route => pathname.startsWith(route))) {
-    if (token) {
-      console.log('Usuario con token intentando acceder a login, redirigiendo a home');
-      return NextResponse.redirect(new URL('/', request.url));
-    }
-    return NextResponse.next();
-  }
-
-  // Verificar si la ruta requiere autenticación
-  const protectedRoute = Object.keys(routePermissions).find(route => 
-    pathname.startsWith(route)
-  );
-
-  if (protectedRoute) {
-    // Si no hay token, redirigir a login
-    if (!token) {
-      console.log('No hay token, redirigiendo a login');
-      const loginUrl = new URL('/login', request.url);
-      loginUrl.searchParams.set('redirect', pathname);
-      return NextResponse.redirect(loginUrl);
-    }
-
-    // Verificar el rol del usuario
-    try {
-      console.log('Verificando permisos para:', protectedRoute);
-      
-      // Hacer una petición interna para verificar el usuario y su rol
-      const verifyUrl = new URL('/api/auth/verify-role', request.url);
-      const verifyResponse = await fetch(verifyUrl, {
-        headers: {
-          'Cookie': `auth-token=${token}`,
-        },
-      });
-
-      if (!verifyResponse.ok) {
-        console.log('Token inválido, redirigiendo a login');
-        const loginUrl = new URL('/login', request.url);
-        loginUrl.searchParams.set('redirect', pathname);
-        return NextResponse.redirect(loginUrl);
-      }
-
-      const { rol } = await verifyResponse.json();
-      console.log('Rol del usuario:', rol);
-
-      const allowedRoles = routePermissions[protectedRoute];
-      console.log('Roles permitidos:', allowedRoles);
-
-      if (!allowedRoles.includes(rol)) {
-        console.log('Rol no autorizado, redirigiendo a home');
-        const response = NextResponse.redirect(new URL('/', request.url));
-        
-        // Agregar header para mostrar mensaje de error
-        response.headers.set('X-Unauthorized', 'true');
-        response.headers.set('X-Unauthorized-Message', 'No tienes permisos para acceder a esta página');
-        
-        return response;
-      }
-
-      console.log('Rol autorizado, permitiendo acceso');
+  // ── API routes ─────────────────────────────────────────────────────────────
+  if (pathname.startsWith('/api/')) {
+    if (PUBLIC_API_ROUTES.some(r => pathname.startsWith(r))) {
       return NextResponse.next();
+    }
+    if (!token) {
+      return NextResponse.json({ success: false, message: 'No autorizado.' }, { status: 401 });
+    }
+    const payload = await getTokenPayload(token);
+    if (!payload) {
+      return NextResponse.json({ success: false, message: 'Token inválido o expirado.' }, { status: 401 });
+    }
+    return NextResponse.next();
+  }
 
-    } catch (error) {
-      console.error('Error verificando rol:', error);
+  // ── Rutas públicas ─────────────────────────────────────────────────────────
+  if (PUBLIC_ROUTES.includes(pathname)) return NextResponse.next();
+
+  // ── Login (solo para no autenticados) ─────────────────────────────────────
+  if (AUTH_ROUTES.some(r => pathname.startsWith(r))) {
+    if (token) {
+      const payload = await getTokenPayload(token);
+      if (payload) return NextResponse.redirect(new URL('/', request.url));
+    }
+    return NextResponse.next();
+  }
+
+  // ── Rutas solo admin ───────────────────────────────────────────────────────
+  if (ADMIN_ONLY_ROUTES.some(r => pathname.startsWith(r))) {
+    if (!token) {
       const loginUrl = new URL('/login', request.url);
       loginUrl.searchParams.set('redirect', pathname);
       return NextResponse.redirect(loginUrl);
     }
+    const payload = await getTokenPayload(token);
+    if (!payload) {
+      const res = NextResponse.redirect(new URL('/login', request.url));
+      res.cookies.delete('auth-token');
+      return res;
+    }
+    if (payload.rol !== 'admin') return NextResponse.redirect(new URL('/', request.url));
+    return NextResponse.next();
   }
 
-  // Rutas no protegidas
+  // ── Rutas protegidas (cualquier usuario autenticado) ───────────────────────
+  if (PROTECTED_ROUTES.some(r => pathname.startsWith(r))) {
+    if (!token) {
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('redirect', pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+    const payload = await getTokenPayload(token);
+    if (!payload) {
+      const res = NextResponse.redirect(new URL('/login', request.url));
+      res.cookies.delete('auth-token');
+      return res;
+    }
+    return NextResponse.next();
+  }
+
   return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.png$|.*\\.jpg$|.*\\.jpeg$|.*\\.svg$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.png$|.*\\.jpg$|.*\\.jpeg$|.*\\.svg$).*)',
   ],
 };

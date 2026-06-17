@@ -46,6 +46,13 @@ export class CongregadoService {
             segundoMinisterio: congregado.segundoMinisterio,
             urlFotoCedula: congregado.urlFotoCedula,
             estado: congregado.estado,
+            observaciones: congregado.observaciones,
+            fechaNacimiento: congregado.fechaNacimiento instanceof Date
+                ? congregado.fechaNacimiento.toISOString()
+                : congregado.fechaNacimiento,
+            correo: congregado.correo,
+            profesion: congregado.profesion,
+            direccion: congregado.direccion,
             createdAt: congregado.createdAt instanceof Date
                 ? congregado.createdAt.toISOString()
                 : congregado.createdAt,

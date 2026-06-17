@@ -62,6 +62,10 @@ export default function RegistroAsistenciaPage() {
   const [msg, setMsg] = useState<string | null>(null);
   const [ok, setOk] = useState<boolean | null>(null);
 
+  // Validación inline
+  const [eventoTouched, setEventoTouched] = useState(false);
+  const eventoError = eventoTouched && !eventoId ? 'Debes seleccionar un evento.' : '';
+
   // Eventos, vacio por ahora
   useEffect(() => {
     let cancel = false;
@@ -158,6 +162,7 @@ export default function RegistroAsistenciaPage() {
     setOk(null);
 
     if (!eventoId) {
+      setEventoTouched(true);
       setMsg("Selecciona un evento para registrar asistencia.");
       setOk(false);
       return;
@@ -258,9 +263,15 @@ export default function RegistroAsistenciaPage() {
               Evento
             </label>
             <select
-              className="w-full rounded-md border border-gray-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#17609c]"
+              className={`w-full rounded-md border px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#17609c] ${
+                eventoError ? 'border-red-400 bg-red-50/30' : 'border-gray-300'
+              }`}
               value={eventoId}
-              onChange={(e) => setEventoId(Number(e.target.value))}
+              onChange={(e) => {
+                setEventoId(Number(e.target.value));
+                setEventoTouched(true);
+              }}
+              onBlur={() => setEventoTouched(true)}
               disabled={cargandoEventos || eventos.length === 0}
             >
               <option value={0}>
@@ -276,6 +287,9 @@ export default function RegistroAsistenciaPage() {
                 </option>
               ))}
             </select>
+            {eventoError && (
+              <p className="mt-1 text-xs text-red-600">{eventoError}</p>
+            )}
           </div>
 
           {/* Búsqueda y Seleccionar todos */}

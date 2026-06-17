@@ -2,13 +2,17 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState, useCallback } from "react";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import {
   FaUsers, FaUserPlus, FaSearch, FaEdit, FaTrash,
   FaChevronLeft, FaChevronRight, FaExclamationTriangle,
-  FaTimes, FaSave, FaPlus, FaFilter,
+  FaTimes, FaSave, FaPlus, FaFilter, FaCheckCircle,
+  FaFileExcel, FaFilePdf, FaUpload, FaExternalLinkAlt, FaFolderOpen,
+  FaFileImport, FaDownload,
 } from "react-icons/fa";
 import Sidebar from "@/components/SideBar";
-import { EstadoCivil } from "@/models/Congregado";
+import { EstadoCivil, normalizarEstadoCivil } from "@/models/Congregado";
+import Swal from 'sweetalert2';
 
 type CongregadoRow = {
   id: number;
@@ -22,6 +26,11 @@ type CongregadoRow = {
   urlFotoCedula: string;
   fechaIngreso: string;
   estado: number;
+  observaciones?: string;
+  fechaNacimiento?: string;
+  correo?: string;
+  profesion?: string;
+  direccion?: string;
 };
 
 type FormState = {
@@ -35,13 +44,19 @@ type FormState = {
   segundoMinisterio: string;
   urlFotoCedula: string;
   estado: number;
+  observaciones: string;
+  fechaNacimiento: string;
+  correo: string;
+  profesion: string;
+  direccion: string;
 };
 
 const FORM_INICIAL: FormState = {
   nombre: "", cedula: "", fechaIngreso: "", telefono: "",
   segundoTelefono: "", estadoCivil: EstadoCivil.SOLTERO,
   ministerio: "", segundoMinisterio: "",
-  urlFotoCedula: "https://placeholder.com/cedula.jpg", estado: 1,
+  urlFotoCedula: "", estado: 1,
+  observaciones: "", fechaNacimiento: "", correo: "", profesion: "", direccion: "",
 };
 
 const ESTADO_CIVIL_LABELS: Record<string, string> = {
@@ -51,9 +66,59 @@ const ESTADO_CIVIL_LABELS: Record<string, string> = {
 
 type PageSize = 10 | 25 | 50;
 
-const inputClass =
+const inputBase =
   "shadow-sm border rounded-lg w-full py-2 px-3 text-gray-700 text-sm leading-tight " +
-  "focus:outline-none focus:ring-2 focus:ring-[#003366]/30 focus:border-[#003366] border-gray-300 transition-colors";
+  "focus:outline-none focus:ring-2 focus:ring-[#003366]/30 focus:border-[#003366] transition-colors";
+const inputClass = inputBase + " border-gray-300";
+const inputClassError = inputBase + " border-red-400 bg-red-50/30";
+
+type CongregadoFormErrors = {
+  nombre?: string; cedula?: string; fechaIngreso?: string;
+  telefono?: string; segundoTelefono?: string; ministerio?: string; urlFotoCedula?: string; correo?: string;
+};
+type CongregadoFormTouched = Partial<Record<keyof CongregadoFormErrors, boolean>>;
+
+function validarTelefonoCongregado(valor: string, obligatorio = false): string | undefined {
+  const trimmed = valor.trim();
+  if (!trimmed) return obligatorio ? 'El teléfono es obligatorio.' : undefined;
+  const digitos = trimmed.replace(/[\s\-+()]/g, '');
+  if (!/^[\d\s\-+()]+$/.test(trimmed)) return 'Solo se permiten números, espacios, +, - y paréntesis.';
+  if (digitos.length < 8) return obligatorio
+    ? 'Debe tener al menos 8 dígitos.'
+    : 'Si ingresa un segundo teléfono, debe tener al menos 8 dígitos. De lo contrario, déjalo vacío.';
+  if (digitos.length > 20 || trimmed.length > 20) return 'No puede exceder 20 caracteres.';
+  return undefined;
+}
+
+function validarCampoCongregado(campo: keyof CongregadoFormErrors, valor: string): string | undefined {
+  switch (campo) {
+    case 'nombre':
+      if (!valor.trim()) return 'El nombre completo es obligatorio.';
+      if (valor.trim().length < 3) return 'Debe tener al menos 3 caracteres.';
+      return undefined;
+    case 'cedula':
+      if (!valor.trim()) return 'La cédula es obligatoria.';
+      return undefined;
+    case 'fechaIngreso':
+      if (!valor) return 'La fecha de ingreso es obligatoria.';
+      return undefined;
+    case 'telefono':
+      return validarTelefonoCongregado(valor, true);
+    case 'segundoTelefono':
+      return validarTelefonoCongregado(valor, false);
+    case 'ministerio':
+      if (!valor.trim()) return 'El ministerio es obligatorio.';
+      return undefined;
+    case 'urlFotoCedula':
+      return undefined;
+    case 'correo':
+      if (valor && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor))
+        return 'Ingresa un correo válido, por ejemplo: nombre@correo.com';
+      return undefined;
+    default:
+      return undefined;
+  }
+}
 
 const formatFecha = (iso: string) =>
   iso ? new Date(iso).toLocaleDateString("es-CR") : "-";
@@ -66,6 +131,103 @@ const Badge = ({ activo }: { activo: boolean }) => (
 );
 
 export default function CongregadosPage() {
+  /* ─── Importar Excel ─── */
+  const descargarPlantillaCongregados = async () => {
+    const { utils, writeFile } = await import('xlsx');
+    const cols = ['nombre','cedula','telefono','segundoTelefono','estadoCivil','ministerio','segundoMinisterio','fechaIngreso','fechaNacimiento','correo','profesion','direccion','observaciones'];
+    const ejemplo = [{ nombre:'María López', cedula:'987654321', telefono:'88005678', segundoTelefono:'', estadoCivil:'soltero', ministerio:'Danza', segundoMinisterio:'', fechaIngreso:'2024-03-01', fechaNacimiento:'1995-08-10', correo:'maria@correo.com', profesion:'Maestra', direccion:'Heredia', observaciones:'' }];
+    const ws = utils.json_to_sheet(ejemplo, { header: cols });
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, 'Congregados');
+    writeFile(wb, 'plantilla_congregados.xlsx');
+  };
+
+  const parsearArchivoCongregados = async (file: File) => {
+    const { read, utils } = await import('xlsx');
+    const buf = await file.arrayBuffer();
+    const wb = read(buf, { type: 'array', cellDates: true });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows: any[] = utils.sheet_to_json(ws, { defval: '' });
+    setImportRows(rows);
+    setImportResult(null);
+  };
+
+  const confirmarImportacionCongregados = async () => {
+    if (importRows.length === 0) return;
+    setImportLoading(true);
+    try {
+      const payload = importRows.map(r => ({
+        nombre: String(r.nombre ?? '').trim(),
+        cedula: String(r.cedula ?? '').trim(),
+        telefono: String(r.telefono ?? '').trim() || '00000000',
+        segundoTelefono: String(r.segundoTelefono ?? '').trim() || undefined,
+        estadoCivil: String(r.estadoCivil ?? 'soltero').trim() || 'soltero',
+        ministerio: String(r.ministerio ?? '').trim() || 'Sin ministerio',
+        segundoMinisterio: String(r.segundoMinisterio ?? '').trim() || undefined,
+        urlFotoCedula: '',
+        fechaIngreso: String(r.fechaIngreso ?? '').trim() || new Date().toISOString().split('T')[0],
+        fechaNacimiento: String(r.fechaNacimiento ?? '').trim() || undefined,
+        correo: String(r.correo ?? '').trim() || undefined,
+        profesion: String(r.profesion ?? '').trim() || undefined,
+        direccion: String(r.direccion ?? '').trim() || undefined,
+        observaciones: String(r.observaciones ?? '').trim() || undefined,
+      })).filter(r => r.nombre && r.cedula);
+      const res = await fetch('/api/congregados/importar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const json = await res.json();
+      setImportResult(json);
+      if (json.importados > 0) await cargar();
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  /* ─── Export helpers (defined before state so filtrados is in scope via closure at call time) ─── */
+  const exportarExcel = async (rows: CongregadoRow[]) => {
+    const { utils, writeFile } = await import('xlsx');
+    const filas = rows.map((c, i) => ({
+      '#': i + 1,
+      'Nombre': c.nombre,
+      'Cédula': c.cedula,
+      'Teléfono': c.telefono || '-',
+      'Estado Civil': c.estadoCivil || '-',
+      'Ministerio': c.ministerio || '-',
+      'Correo': c.correo || '-',
+      'Profesión': c.profesion || '-',
+      'Dirección': c.direccion || '-',
+      'Fecha Ingreso': c.fechaIngreso ? new Date(c.fechaIngreso).toLocaleDateString('es-CR') : '-',
+      'Estado': c.estado === 1 ? 'Activo' : 'Inactivo',
+    }));
+    const ws = utils.json_to_sheet(filas);
+    ws['!cols'] = [{ wch: 4 }, { wch: 30 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 18 }, { wch: 28 }, { wch: 18 }, { wch: 25 }, { wch: 14 }, { wch: 10 }];
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, 'Congregados');
+    writeFile(wb, 'listado_congregados.xlsx');
+  };
+
+  const exportarPDF = async (rows: CongregadoRow[]) => {
+    const { default: jsPDF } = await import('jspdf');
+    const { default: autoTable } = await import('jspdf-autotable');
+    const doc = new jsPDF({ orientation: 'landscape' });
+    doc.setFontSize(14);
+    doc.text('Listado de Congregados', 14, 16);
+    doc.setFontSize(9);
+    doc.text(`Generado: ${new Date().toLocaleDateString('es-CR')}  · Total: ${rows.length}`, 14, 22);
+    autoTable(doc, {
+      startY: 27,
+      head: [['#', 'Nombre', 'Cédula', 'Teléfono', 'Estado Civil', 'Ministerio', 'Correo', 'Fecha Ingreso', 'Estado']],
+      body: rows.map((c, i) => [
+        i + 1, c.nombre, c.cedula, c.telefono || '-', c.estadoCivil || '-',
+        c.ministerio || '-', c.correo || '-',
+        c.fechaIngreso ? new Date(c.fechaIngreso).toLocaleDateString('es-CR') : '-',
+        c.estado === 1 ? 'Activo' : 'Inactivo',
+      ]),
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [0, 51, 102] },
+      alternateRowStyles: { fillColor: [245, 247, 250] },
+    });
+    doc.save('listado_congregados.pdf');
+  };
+
   const [data, setData] = useState<CongregadoRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [mensaje, setMensaje] = useState("");
@@ -86,6 +248,20 @@ export default function CongregadosPage() {
   const [editando, setEditando] = useState<CongregadoRow | null>(null);
   const [form, setForm] = useState<FormState>(FORM_INICIAL);
   const [guardando, setGuardando] = useState(false);
+  const [formErrors, setFormErrors] = useState<CongregadoFormErrors>({});
+  const [formTouched, setFormTouched] = useState<CongregadoFormTouched>({});
+  const [archivoCedula, setArchivoCedula] = useState<File | null>(null);
+  const [subiendoCedula, setSubiendoCedula] = useState(false);
+
+  // modal documentos
+  const [modalDocsOpen, setModalDocsOpen] = useState(false);
+  const [docsCongregado, setDocsCongregado] = useState<CongregadoRow | null>(null);
+
+  // modal importar
+  const [modalImportOpen, setModalImportOpen] = useState(false);
+  const [importRows, setImportRows] = useState<any[]>([]);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importResult, setImportResult] = useState<{ importados: number; omitidos: number; errores: { fila: number; cedula: string; motivo: string }[] } | null>(null);
 
   // modal eliminar masivo
   const [modalDelete, setModalDelete] = useState(false);
@@ -110,6 +286,7 @@ export default function CongregadosPage() {
   }, []);
 
   useEffect(() => { cargar(); }, [cargar]);
+  useAutoRefresh(cargar);
   useEffect(() => { setPagina(1); setSeleccionados(new Set()); }, [filtros, pageSize]);
 
   // ── Filtrado + paginación ──────────────────────────────────────────────────
@@ -142,38 +319,111 @@ export default function CongregadosPage() {
   );
 
   // ── Crear / Editar ─────────────────────────────────────────────────────────
+  const handleCampoCong = (campo: keyof CongregadoFormErrors, valor: string) => {
+    setForm(prev => ({ ...prev, [campo]: valor }));
+    setFormTouched(prev => ({ ...prev, [campo]: true }));
+    setFormErrors(prev => {
+      const err = validarCampoCongregado(campo, valor);
+      const next = { ...prev };
+      if (err) next[campo] = err;
+      else delete next[campo];
+      return next;
+    });
+  };
+
+  // Solo valida al perder foco — usa el valor del input para evitar estado desactualizado
+  const handleBlurCong = (campo: keyof CongregadoFormErrors, valor?: string) => {
+    const valorActual = valor ?? String((form as any)[campo] ?? '');
+    setFormTouched(prev => ({ ...prev, [campo]: true }));
+    setFormErrors(prev => {
+      const err = validarCampoCongregado(campo, valorActual);
+      const next = { ...prev };
+      if (err) next[campo] = err;
+      else delete next[campo];
+      return next;
+    });
+  };
+
   const abrirCrear = () => {
     setEditando(null);
     setForm(FORM_INICIAL);
+    setFormErrors({}); setFormTouched({});
+    setArchivoCedula(null);
     setShowForm(true);
     setMensaje(""); setEsError(false);
   };
 
   const abrirEditar = (row: CongregadoRow) => {
     setEditando(row);
+    setFormErrors({}); setFormTouched({});
     setForm({
       nombre: row.nombre || "",
       cedula: row.cedula || "",
       fechaIngreso: row.fechaIngreso ? new Date(row.fechaIngreso).toISOString().split("T")[0] : "",
       telefono: row.telefono || "",
       segundoTelefono: row.segundoTelefono || "",
-      estadoCivil: row.estadoCivil || EstadoCivil.SOLTERO,
+      estadoCivil: normalizarEstadoCivil(row.estadoCivil) ?? EstadoCivil.SOLTERO,
       ministerio: row.ministerio || "",
       segundoMinisterio: row.segundoMinisterio || "",
       urlFotoCedula: row.urlFotoCedula || "",
       estado: row.estado,
+      observaciones: row.observaciones || "",
+      fechaNacimiento: row.fechaNacimiento ? new Date(row.fechaNacimiento).toISOString().split("T")[0] : "",
+      correo: row.correo || "",
+      profesion: row.profesion || "",
+      direccion: row.direccion || "",
     });
+    setArchivoCedula(null);
     setShowForm(true);
     setMensaje(""); setEsError(false);
   };
 
   const guardar = async () => {
+    const camposReq: (keyof CongregadoFormErrors)[] = ['nombre', 'cedula', 'fechaIngreso', 'telefono', 'ministerio'];
+    const newErrors: CongregadoFormErrors = {};
+    const newTouched: CongregadoFormTouched = {};
+    for (const campo of camposReq) {
+      newTouched[campo] = true;
+      const err = validarCampoCongregado(campo, String((form as any)[campo] ?? ''));
+      if (err) newErrors[campo] = err;
+    }
+    if (form.correo) {
+      newTouched.correo = true;
+      const errCorreo = validarCampoCongregado('correo', form.correo);
+      if (errCorreo) newErrors.correo = errCorreo;
+    }
+    newTouched.segundoTelefono = true;
+    const errSegundoTel = validarCampoCongregado('segundoTelefono', form.segundoTelefono);
+    if (errSegundoTel) newErrors.segundoTelefono = errSegundoTel;
+
+    setFormTouched(prev => ({ ...prev, ...newTouched }));
+    setFormErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) return;
+
     setGuardando(true); setMensaje(""); setEsError(false);
     try {
+      let urlCedula = form.urlFotoCedula;
+
+      if (archivoCedula) {
+        setSubiendoCedula(true);
+        const fd = new FormData();
+        fd.append('file', archivoCedula);
+        fd.append('folder', 'congregados');
+        const uploadRes = await fetch('/api/documentos/upload', { method: 'POST', body: fd });
+        const uploadJson = await uploadRes.json();
+        setSubiendoCedula(false);
+        if (!uploadRes.ok || !uploadJson.success) {
+          setMensaje(uploadJson.message || 'Error al subir el documento.'); setEsError(true); setGuardando(false); return;
+        }
+        urlCedula = uploadJson.url;
+      }
+
       const body = {
         ...form,
-        segundoTelefono: form.segundoTelefono || null,
-        segundoMinisterio: form.segundoMinisterio || null,
+        segundoTelefono: form.segundoTelefono.trim() || null,
+        segundoMinisterio: form.segundoMinisterio.trim() || null,
+        ...(urlCedula.trim() ? { urlFotoCedula: urlCedula.trim() } : {}),
+        ...(form.fechaNacimiento ? {} : { fechaNacimiento: undefined }),
       };
 
       const url = editando ? `/api/congregados/${editando.id}` : "/api/congregados";
@@ -183,7 +433,12 @@ export default function CongregadosPage() {
       const json = await res.json();
 
       if (!res.ok || !json.success) {
-        setMensaje(json.message || "Error al guardar"); setEsError(true); return;
+        const detalle = Array.isArray(json.errors) && json.errors.length > 0
+          ? `: ${json.errors.join('. ')}`
+          : '';
+        setMensaje((json.message || "Error al guardar") + detalle);
+        setEsError(true);
+        return;
       }
 
       setMensaje(editando ? "Congregado actualizado exitosamente." : "Congregado registrado exitosamente.");
@@ -192,7 +447,38 @@ export default function CongregadosPage() {
     } catch {
       setMensaje("Error de conexión."); setEsError(true);
     } finally {
-      setGuardando(false);
+      setGuardando(false); setSubiendoCedula(false);
+    }
+  };
+
+  // ── Reactivar ─────────────────────────────────────────────────────────────
+  const reactivar = async (id: number) => {
+    const confirm = await Swal.fire({
+      title: '¿Reactivar congregado?',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#16a34a',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Reactivar',
+      cancelButtonText: 'Cancelar',
+    });
+    if (!confirm.isConfirmed) return;
+    try {
+      const res = await fetch(`/api/congregados/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estado: 1 }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setMensaje("Congregado reactivado exitosamente.");
+        setEsError(false);
+        await cargar();
+      } else {
+        setMensaje(json.message || "Error al reactivar"); setEsError(true);
+      }
+    } catch {
+      setMensaje("Error de conexión."); setEsError(true);
     }
   };
 
@@ -240,7 +526,23 @@ export default function CongregadosPage() {
                 <h1 className="text-xl sm:text-2xl font-bold text-[#003366]">Gestión de Congregados</h1>
                 <div className="w-16 h-1 bg-[#003366] rounded mt-1" />
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                <button onClick={descargarPlantillaCongregados} title="Descargar plantilla"
+                  className="inline-flex items-center gap-1.5 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold px-3 py-2 rounded-lg transition">
+                  <FaDownload className="text-xs" /> Plantilla
+                </button>
+                <button onClick={() => { setModalImportOpen(true); setImportRows([]); setImportResult(null); }} title="Importar desde Excel"
+                  className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-3 py-2 rounded-lg transition">
+                  <FaFileImport className="text-xs" /> Importar
+                </button>
+                <button onClick={() => exportarExcel(filtrados)} title="Exportar Excel"
+                  className="inline-flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-3 py-2 rounded-lg transition">
+                  <FaFileExcel className="text-xs" /> Excel
+                </button>
+                <button onClick={() => exportarPDF(filtrados)} title="Exportar PDF"
+                  className="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-3 py-2 rounded-lg transition">
+                  <FaFilePdf className="text-xs" /> PDF
+                </button>
                 <button
                   onClick={abrirCrear}
                   className="inline-flex items-center gap-2 bg-[#003366] hover:bg-[#004488] text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
@@ -349,8 +651,8 @@ export default function CongregadosPage() {
               )}
             </div>
 
-            {/* Tabla */}
-            <div className="overflow-x-auto rounded-xl border border-gray-200 mb-4">
+            {/* Tabla (desktop) */}
+            <div className="hidden md:block overflow-x-auto rounded-xl border border-gray-200 mb-4">
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="bg-[#003366] text-white">
@@ -362,7 +664,7 @@ export default function CongregadosPage() {
                 </thead>
                 <tbody data-testid="table-body">
                   {loading ? (
-                    <tr><td colSpan={10} className="p-8 text-center text-gray-400 text-sm">Cargando datos...</td></tr>
+                    <tr><td colSpan={10} className="p-8 text-center text-gray-400"><span className="inline-flex items-center gap-2 text-sm"><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Cargando...</span></td></tr>
                   ) : paginados.length > 0 ? (
                     paginados.map(r => {
                       const checked = seleccionados.has(r.id);
@@ -384,10 +686,22 @@ export default function CongregadosPage() {
                           <td className="px-4 py-3"><Badge activo={r.estado === 1} /></td>
                           <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{formatFecha(r.fechaIngreso)}</td>
                           <td className="px-4 py-3">
-                            <button onClick={() => abrirEditar(r)}
-                              className="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg transition whitespace-nowrap">
-                              <FaEdit className="text-xs" /> Editar
-                            </button>
+                            <div className="flex items-center gap-1.5">
+                              {r.estado === 0 && (
+                                <button onClick={() => reactivar(r.id)}
+                                  className="inline-flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg transition whitespace-nowrap">
+                                  <FaCheckCircle className="text-xs" /> Activar
+                                </button>
+                              )}
+                              <button onClick={() => abrirEditar(r)}
+                                className="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg transition whitespace-nowrap">
+                                <FaEdit className="text-xs" /> Editar
+                              </button>
+                              <button onClick={() => { setDocsCongregado(r); setModalDocsOpen(true); }}
+                                className="inline-flex items-center gap-1 bg-[#003366] hover:bg-[#002244] text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg transition whitespace-nowrap">
+                                <FaFolderOpen className="text-xs" /> Docs
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -402,6 +716,80 @@ export default function CongregadosPage() {
                   )}
                 </tbody>
               </table>
+            </div>
+
+            {/* Tarjetas (mobile) */}
+            <div className="md:hidden mb-4">
+              {loading ? (
+                <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Cargando...
+                </div>
+              ) : paginados.length === 0 ? (
+                <div className="bg-white rounded-xl border border-gray-200 p-10 text-center text-gray-400">
+                  <FaSearch className="mx-auto mb-2 text-2xl opacity-30" />
+                  <p className="text-sm">No se encontraron resultados</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {paginados.map(r => {
+                    const checked = seleccionados.has(r.id);
+                    return (
+                      <div
+                        key={r.id}
+                        className={`rounded-xl border shadow-sm p-4 transition-colors ${
+                          checked ? "bg-blue-50 border-blue-200" : r.estado === 0 ? "bg-red-50/30 border-gray-200" : "bg-white border-gray-200"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between mb-2 gap-2">
+                          <div className="flex items-start gap-2 min-w-0 flex-1">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleFila(r.id)}
+                              className="w-4 h-4 accent-[#003366] cursor-pointer mt-0.5 flex-shrink-0"
+                            />
+                            <div className="min-w-0">
+                              <p className={`font-semibold text-sm truncate ${r.estado === 0 ? "line-through text-gray-400" : "text-gray-900"}`}>
+                                {r.nombre}
+                              </p>
+                              <p className="text-xs text-gray-400 mt-0.5">#{r.id} · {r.cedula}</p>
+                            </div>
+                          </div>
+                          <Badge activo={r.estado === 1} />
+                        </div>
+                        <div className="text-xs text-gray-600 space-y-1 mb-3 pl-6">
+                          {r.telefono && <p><span className="font-semibold">Tel:</span> {r.telefono}</p>}
+                          {r.ministerio && <p><span className="font-semibold">Ministerio:</span> {r.ministerio}</p>}
+                          {r.estadoCivil && <p><span className="font-semibold">Est. Civil:</span> {ESTADO_CIVIL_LABELS[r.estadoCivil] || r.estadoCivil}</p>}
+                          <p><span className="font-semibold">Ingreso:</span> {formatFecha(r.fechaIngreso)}</p>
+                        </div>
+                        <div className="pl-6 flex items-center gap-2">
+                          {r.estado === 0 && (
+                            <button
+                              onClick={() => reactivar(r.id)}
+                              className="inline-flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition"
+                            >
+                              <FaCheckCircle className="text-xs" /> Activar
+                            </button>
+                          )}
+                          <button
+                            onClick={() => abrirEditar(r)}
+                            className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition"
+                          >
+                            <FaEdit className="text-xs" /> Editar
+                          </button>
+                          <button
+                            onClick={() => { setDocsCongregado(r); setModalDocsOpen(true); }}
+                            className="inline-flex items-center gap-1.5 bg-[#003366] hover:bg-[#002244] text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition"
+                          >
+                            <FaFolderOpen className="text-xs" /> Docs
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Paginación */}
@@ -447,7 +835,7 @@ export default function CongregadosPage() {
               <h2 className="text-base font-bold flex items-center gap-2">
                 {editando ? <><FaEdit className="text-sm" /> Editar Congregado — ID: {editando.id}</> : <><FaUserPlus className="text-sm" /> Registrar Congregado</>}
               </h2>
-              <button onClick={() => { setShowForm(false); setEditando(null); }} className="text-white/70 hover:text-white transition">
+              <button onClick={() => { setShowForm(false); setEditando(null); setArchivoCedula(null); }} className="text-white/70 hover:text-white transition">
                 <FaTimes />
               </button>
             </div>
@@ -457,37 +845,71 @@ export default function CongregadosPage() {
                 {/* Nombre */}
                 <div className="sm:col-span-2">
                   <label htmlFor="nombre" className="block text-gray-700 text-xs font-semibold mb-1.5">Nombre completo *</label>
-                  <input id="nombre" type="text" value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} className={inputClass} placeholder="Ej: María Fernanda Solano Mora" />
+                  <input id="nombre" type="text" value={form.nombre}
+                    onChange={e => handleCampoCong('nombre', e.target.value)}
+                    onBlur={() => handleBlurCong('nombre')}
+                    className={formTouched.nombre && formErrors.nombre ? inputClassError : inputClass}
+                    placeholder="Ej: María Fernanda Solano Mora" />
+                  {formTouched.nombre && formErrors.nombre && (
+                    <p className="mt-1 text-xs text-red-600">{formErrors.nombre}</p>
+                  )}
                 </div>
 
                 {/* Cédula */}
                 <div>
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Cédula *</label>
-                  <input type="text" value={form.cedula} onChange={e => setForm({ ...form, cedula: e.target.value })} className={inputClass} placeholder="5-0291-0483" />
+                  <input type="text" value={form.cedula}
+                    onChange={e => handleCampoCong('cedula', e.target.value)}
+                    onBlur={() => handleBlurCong('cedula')}
+                    className={formTouched.cedula && formErrors.cedula ? inputClassError : inputClass}
+                    placeholder="5-0291-0483" />
+                  {formTouched.cedula && formErrors.cedula && (
+                    <p className="mt-1 text-xs text-red-600">{formErrors.cedula}</p>
+                  )}
                 </div>
 
                 {/* Fecha ingreso */}
                 <div>
-                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Fecha de ingreso *</label>
-                  <input type="date" value={form.fechaIngreso} onChange={e => setForm({ ...form, fechaIngreso: e.target.value })} className={inputClass} />
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Fecha de ingreso a la congregación *</label>
+                  <input type="date" value={form.fechaIngreso}
+                    onChange={e => handleCampoCong('fechaIngreso', e.target.value)}
+                    onBlur={() => handleBlurCong('fechaIngreso')}
+                    className={formTouched.fechaIngreso && formErrors.fechaIngreso ? inputClassError : inputClass} />
+                  {formTouched.fechaIngreso && formErrors.fechaIngreso && (
+                    <p className="mt-1 text-xs text-red-600">{formErrors.fechaIngreso}</p>
+                  )}
                 </div>
 
                 {/* Teléfono */}
                 <div>
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Teléfono *</label>
-                  <input type="tel" value={form.telefono} onChange={e => setForm({ ...form, telefono: e.target.value })} className={inputClass} placeholder="8888-8888" />
+                  <input type="tel" value={form.telefono}
+                    onChange={e => handleCampoCong('telefono', e.target.value)}
+                    onBlur={() => handleBlurCong('telefono')}
+                    className={formTouched.telefono && formErrors.telefono ? inputClassError : inputClass}
+                    placeholder="8888-8888" />
+                  {formTouched.telefono && formErrors.telefono && (
+                    <p className="mt-1 text-xs text-red-600">{formErrors.telefono}</p>
+                  )}
                 </div>
 
                 {/* Segundo teléfono */}
                 <div>
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Segundo teléfono</label>
-                  <input type="tel" value={form.segundoTelefono} onChange={e => setForm({ ...form, segundoTelefono: e.target.value })} className={inputClass} placeholder="Opcional" />
+                  <input type="tel" value={form.segundoTelefono}
+                    onChange={e => handleCampoCong('segundoTelefono', e.target.value)}
+                    onBlur={e => handleBlurCong('segundoTelefono', e.target.value)}
+                    className={formTouched.segundoTelefono && formErrors.segundoTelefono ? inputClassError : inputClass}
+                    placeholder="Opcional (mín. 8 dígitos)" />
+                  {formTouched.segundoTelefono && formErrors.segundoTelefono && (
+                    <p className="mt-1 text-xs text-red-600">{formErrors.segundoTelefono}</p>
+                  )}
                 </div>
 
                 {/* Estado civil */}
                 <div>
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Estado civil *</label>
-                  <select value={form.estadoCivil} onChange={e => setForm({ ...form, estadoCivil: e.target.value })} className={inputClass}>
+                  <select value={form.estadoCivil} onChange={e => setForm(prev => ({ ...prev, estadoCivil: e.target.value }))} className={inputClass}>
                     {Object.entries(ESTADO_CIVIL_LABELS).map(([v, l]) => (
                       <option key={v} value={v}>{l}</option>
                     ))}
@@ -497,7 +919,7 @@ export default function CongregadosPage() {
                 {/* Estado */}
                 <div>
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Estado</label>
-                  <select value={form.estado} onChange={e => setForm({ ...form, estado: Number(e.target.value) })} className={inputClass}>
+                  <select value={form.estado} onChange={e => setForm(prev => ({ ...prev, estado: Number(e.target.value) }))} className={inputClass}>
                     <option value={1}>Activo</option>
                     <option value={0}>Inactivo</option>
                   </select>
@@ -506,32 +928,120 @@ export default function CongregadosPage() {
                 {/* Ministerio */}
                 <div>
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Ministerio *</label>
-                  <input type="text" value={form.ministerio} onChange={e => setForm({ ...form, ministerio: e.target.value })} className={inputClass} placeholder="Ej: Alabanza" />
+                  <input type="text" value={form.ministerio}
+                    onChange={e => handleCampoCong('ministerio', e.target.value)}
+                    onBlur={() => handleBlurCong('ministerio')}
+                    className={formTouched.ministerio && formErrors.ministerio ? inputClassError : inputClass}
+                    placeholder="Ej: Alabanza" />
+                  {formTouched.ministerio && formErrors.ministerio && (
+                    <p className="mt-1 text-xs text-red-600">{formErrors.ministerio}</p>
+                  )}
                 </div>
 
                 {/* Segundo ministerio */}
                 <div>
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Segundo ministerio</label>
-                  <input type="text" value={form.segundoMinisterio} onChange={e => setForm({ ...form, segundoMinisterio: e.target.value })} className={inputClass} placeholder="Opcional" />
+                  <input type="text" value={form.segundoMinisterio} onChange={e => setForm(prev => ({ ...prev, segundoMinisterio: e.target.value }))} className={inputClass} placeholder="Opcional" />
                 </div>
 
-                {/* URL foto cédula */}
+                {/* Foto cédula */}
                 <div className="sm:col-span-2">
-                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">URL foto cédula *</label>
-                  <input type="url" value={form.urlFotoCedula} onChange={e => setForm({ ...form, urlFotoCedula: e.target.value })} className={inputClass} placeholder="https://..." />
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">
+                    Foto / documento de cédula *
+                  </label>
+                  <label className={`flex items-center gap-3 cursor-pointer px-3 py-2.5 rounded-lg border text-sm transition-colors ${
+                    formTouched.urlFotoCedula && formErrors.urlFotoCedula
+                      ? 'border-red-400 bg-red-50/30'
+                      : 'border-gray-300 hover:border-[#003366] bg-white'
+                  }`}>
+                    <FaUpload className="text-[#003366] flex-shrink-0" />
+                    <span className="text-gray-500 truncate flex-1">
+                      {archivoCedula ? archivoCedula.name : 'Seleccionar archivo (JPG, PNG, PDF — máx. 10 MB)'}
+                    </span>
+                    <input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png,.webp"
+                      className="sr-only"
+                      onChange={e => {
+                        const f = e.target.files?.[0] ?? null;
+                        setArchivoCedula(f);
+                        if (f) setFormErrors(prev => ({ ...prev, urlFotoCedula: undefined }));
+                      }}
+                    />
+                  </label>
+                  {editando && form.urlFotoCedula && !archivoCedula && (
+                    <p className="mt-1.5 text-xs text-gray-500 flex items-center gap-1">
+                      <FaExternalLinkAlt className="text-[10px]" />
+                      Documento actual:&nbsp;
+                      <a href={`/api/blob-download?url=${encodeURIComponent(form.urlFotoCedula)}`} target="_blank" rel="noreferrer"
+                        className="text-[#003366] underline truncate max-w-[260px]">
+                        ver archivo
+                      </a>
+                      &nbsp;·&nbsp;selecciona un archivo para reemplazarlo
+                    </p>
+                  )}
+                  {formTouched.urlFotoCedula && formErrors.urlFotoCedula && (
+                    <p className="mt-1 text-xs text-red-600">{formErrors.urlFotoCedula}</p>
+                  )}
+                </div>
+
+                {/* Fecha de nacimiento */}
+                <div>
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Fecha de nacimiento</label>
+                  <input type="date" value={form.fechaNacimiento} onChange={e => setForm(prev => ({ ...prev, fechaNacimiento: e.target.value }))} className={inputClass} />
+                </div>
+
+                {/* Correo electrónico */}
+                <div>
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Correo electrónico (opcional)</label>
+                  <input type="email" value={form.correo}
+                    onChange={e => handleCampoCong('correo', e.target.value)}
+                    onBlur={() => handleBlurCong('correo')}
+                    className={formTouched.correo && formErrors.correo ? inputClassError : inputClass}
+                    placeholder="Ej: correo@ejemplo.com" />
+                  {formTouched.correo && formErrors.correo && (
+                    <p className="mt-1 text-xs text-red-600">{formErrors.correo}</p>
+                  )}
+                </div>
+
+                {/* Oficio o profesión */}
+                <div>
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Oficio o profesión</label>
+                  <input type="text" value={form.profesion} onChange={e => setForm(prev => ({ ...prev, profesion: e.target.value }))} className={inputClass} placeholder="Ej: Estudiante, Ingeniero" />
+                </div>
+
+                {/* Dirección */}
+                <div className="sm:col-span-2">
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Dirección</label>
+                  <input type="text" value={form.direccion} onChange={e => setForm(prev => ({ ...prev, direccion: e.target.value }))} className={inputClass} placeholder="Dirección completa" />
+                </div>
+
+                {/* Observaciones */}
+                <div className="sm:col-span-2">
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Observaciones</label>
+                  <textarea value={form.observaciones} onChange={e => setForm(prev => ({ ...prev, observaciones: e.target.value }))} rows={3} className={inputClass + ' resize-none'} placeholder="Notas adicionales..." />
                 </div>
               </div>
             </div>
 
             <div className="bg-gray-50 border-t px-6 py-4 flex justify-end gap-3 flex-shrink-0">
-              <button onClick={() => { setShowForm(false); setEditando(null); }} disabled={guardando}
+              <button onClick={() => { setShowForm(false); setEditando(null); setArchivoCedula(null); }} disabled={guardando}
                 className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50 transition">
                 Cancelar
               </button>
               <button onClick={guardar} disabled={guardando}
                 className={`px-5 py-2 text-sm rounded-lg font-semibold text-white flex items-center gap-2 transition ${guardando ? "bg-gray-400 cursor-not-allowed" : "bg-[#003366] hover:bg-[#004488]"}`}>
-                <FaSave className="text-xs" />
-                {guardando ? "Guardando..." : editando ? "Guardar cambios" : "Registrar"}
+                {guardando ? (
+                  <>
+                    <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                    </svg>
+                    {subiendoCedula ? "Subiendo documento..." : "Guardando..."}
+                  </>
+                ) : (
+                  <><FaSave className="text-xs" />{editando ? "Guardar cambios" : "Registrar"}</>
+                )}
               </button>
             </div>
           </div>
@@ -587,6 +1097,141 @@ export default function CongregadosPage() {
           </div>
         </div>
       )}
+
+      {/* Modal Importar */}
+      {modalImportOpen && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setModalImportOpen(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="bg-[#003366] px-6 py-4 flex items-center justify-between">
+              <h2 className="text-white font-bold text-base">Importar Congregados desde Excel</h2>
+              <button onClick={() => setModalImportOpen(false)} className="text-white/70 hover:text-white"><FaTimes /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              {!importResult ? (
+                <>
+                  <p className="text-sm text-gray-600">Seleccioná un archivo <strong>.xlsx</strong> o <strong>.xls</strong>. Las filas con cédula duplicada serán omitidas automáticamente.</p>
+                  <input type="file" accept=".xlsx,.xls"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) parsearArchivoCongregados(f); }}
+                    className="block w-full text-sm text-gray-700 border border-gray-300 rounded-lg px-3 py-2 cursor-pointer file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-[#003366] file:text-white hover:file:bg-[#002244]"
+                  />
+                  {importRows.length > 0 && (
+                    <>
+                      <p className="text-xs text-gray-500">{importRows.length} filas detectadas. Vista previa (primeras 5):</p>
+                      <div className="overflow-x-auto rounded-lg border border-gray-200">
+                        <table className="min-w-full text-xs">
+                          <thead className="bg-gray-50">
+                            <tr>{Object.keys(importRows[0]).slice(0,6).map(k => <th key={k} className="px-3 py-2 text-left font-semibold text-gray-600">{k}</th>)}</tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {importRows.slice(0,5).map((r,i) => (
+                              <tr key={i}>{Object.values(r).slice(0,6).map((v:any,j) => <td key={j} className="px-3 py-2 text-gray-700 truncate max-w-[120px]">{String(v)}</td>)}</tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="flex justify-end gap-3">
+                        <button onClick={() => setModalImportOpen(false)} className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100">Cancelar</button>
+                        <button onClick={confirmarImportacionCongregados} disabled={importLoading}
+                          className="px-5 py-2 text-sm rounded-lg font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50">
+                          {importLoading ? 'Importando...' : `Importar ${importRows.length} filas`}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </>
+              ) : (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-3 gap-3 text-center">
+                    <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                      <p className="text-2xl font-bold text-green-700">{importResult.importados}</p>
+                      <p className="text-xs text-green-600 mt-1">Importados</p>
+                    </div>
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+                      <p className="text-2xl font-bold text-yellow-700">{importResult.omitidos}</p>
+                      <p className="text-xs text-yellow-600 mt-1">Omitidos (duplicados)</p>
+                    </div>
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                      <p className="text-2xl font-bold text-red-700">{importResult.errores.length}</p>
+                      <p className="text-xs text-red-600 mt-1">Con error</p>
+                    </div>
+                  </div>
+                  {importResult.errores.length > 0 && (
+                    <div className="rounded-lg border border-red-200 overflow-hidden">
+                      <p className="bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">Filas con error:</p>
+                      <ul className="divide-y divide-red-100 max-h-40 overflow-y-auto">
+                        {importResult.errores.map((e,i) => (
+                          <li key={i} className="px-3 py-2 text-xs text-gray-700">Fila {e.fila} · {e.cedula} — {e.motivo}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  <div className="flex justify-end">
+                    <button onClick={() => setModalImportOpen(false)} className="px-5 py-2 text-sm rounded-lg font-semibold text-white bg-[#003366] hover:bg-[#002244]">Cerrar</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Documentos */}
+      {modalDocsOpen && docsCongregado && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+          onClick={() => { setModalDocsOpen(false); setDocsCongregado(null); }}>
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden"
+            onClick={e => e.stopPropagation()}>
+            <div className="bg-[#003366] px-6 py-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-white font-bold text-base">Documentos</h2>
+                <p className="text-blue-200 text-xs mt-0.5">{docsCongregado.nombre}</p>
+              </div>
+              <button onClick={() => { setModalDocsOpen(false); setDocsCongregado(null); }}
+                className="text-white/70 hover:text-white transition-colors">
+                <FaTimes />
+              </button>
+            </div>
+            <div className="p-6">
+              <CongregadoDocViewer label="Cédula" url={docsCongregado.urlFotoCedula ?? ''} />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CongregadoDocViewer({ label, url }: { label: string; url: string }) {
+  const proxyUrl = url ? `/api/blob-download?url=${encodeURIComponent(url)}` : '';
+  const esImagen = url ? /\.(jpg|jpeg|png|webp|gif)$/i.test(url) : false;
+  const esPdf    = url ? /\.pdf$/i.test(url) : false;
+
+  return (
+    <div className="border border-gray-200 rounded-xl overflow-hidden">
+      <div className="bg-gray-50 px-3 py-2 border-b border-gray-200 flex items-center justify-between">
+        <span className="text-xs font-semibold text-gray-700">{label}</span>
+        {url && (
+          <a href={proxyUrl} target="_blank" rel="noopener noreferrer"
+            className="text-[10px] text-blue-600 hover:underline flex items-center gap-1">
+            Abrir <FaFolderOpen className="text-[10px]" />
+          </a>
+        )}
+      </div>
+      <div className="flex items-center justify-center bg-gray-50 h-48">
+        {!url ? (
+          <p className="text-xs text-gray-400">Sin archivo</p>
+        ) : esImagen ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={proxyUrl} alt={label} className="max-h-48 max-w-full object-contain" />
+        ) : esPdf ? (
+          <iframe src={proxyUrl} className="w-full h-48 border-0" title={label} />
+        ) : (
+          <a href={proxyUrl} target="_blank" rel="noopener noreferrer"
+            className="text-xs text-blue-600 hover:underline">
+            Ver documento
+          </a>
+        )}
+      </div>
     </div>
   );
 }

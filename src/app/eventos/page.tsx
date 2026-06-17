@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
+import { useDebounce } from "@/hooks/useDebounce";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -53,6 +55,7 @@ export default function EventosPage() {
   const router = useRouter();
 
   const [nombre, setNombre] = useState("");
+  const nombreDebounced = useDebounce(nombre, 400);
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
   const [activo, setActivo] = useState("");
@@ -76,10 +79,17 @@ export default function EventosPage() {
   const [msg, setMsg] = useState<string | null>(null);
   const [msgOk, setMsgOk] = useState<boolean | null>(null);
 
+  // Inline validation for create form
+  const [errNombre, setErrNombre] = useState('');
+  const [errFecha, setErrFecha] = useState('');
+  const [touchedNombre, setTouchedNombre] = useState(false);
+  const [touchedFecha, setTouchedFecha] = useState(false);
+
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editRow, setEditRow] = useState<Partial<Evento>>({});
 
   const [deleteModal, setDeleteModal] = useState<Evento | null>(null);
+  const [deletePerm, setDeletePerm] = useState(false);
 
   const canCreate = useMemo(() =>
     cNombre.trim().length > 0 && DATE_RE.test(cFecha) && (!cHora || TIME_RE.test(cHora)),
@@ -91,7 +101,7 @@ export default function EventosPage() {
     setErrLoad(null);
     try {
       const params = new URLSearchParams();
-      if (nombre.trim()) params.set("nombre", nombre.trim());
+      if (nombreDebounced.trim()) params.set("nombre", nombreDebounced.trim());
       if (fechaDesde) params.set("fechaDesde", fechaDesde);
       if (fechaHasta) params.set("fechaHasta", fechaHasta);
       if (activo !== "") params.set("activo", activo);
@@ -113,11 +123,17 @@ export default function EventosPage() {
     }
   }
 
-  useEffect(() => { fetchEventos(); }, [nombre, fechaDesde, fechaHasta, activo, page, limit]);
+  useEffect(() => { fetchEventos(); }, [nombreDebounced, fechaDesde, fechaHasta, activo, page, limit]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useAutoRefresh(fetchEventos);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    if (!canCreate || sending) return;
+    const nErr = !cNombre.trim() ? 'El nombre del evento es obligatorio.' : '';
+    const fErr = !cFecha || !DATE_RE.test(cFecha) ? 'La fecha es obligatoria y debe ser válida.' : '';
+    setErrNombre(nErr); setErrFecha(fErr);
+    setTouchedNombre(true); setTouchedFecha(true);
+    if (nErr || fErr || sending) return;
     setSending(true);
     setMsg(null);
     try {
@@ -132,6 +148,7 @@ export default function EventosPage() {
       setMsgOk(true);
       setMsg("Evento creado correctamente.");
       setCNombre(""); setCDescripcion(""); setCFecha(todayStr()); setCHora(""); setCActivo(true);
+      setErrNombre(''); setErrFecha(''); setTouchedNombre(false); setTouchedFecha(false);
       setShowForm(false);
     } catch { setMsgOk(false); setMsg("Error de red al crear el evento."); }
     finally { setSending(false); }
@@ -167,13 +184,14 @@ export default function EventosPage() {
     if (!deleteModal) return;
     setSending(true); setMsg(null);
     try {
-      const res = await fetch(`/api/eventos/${deleteModal.id}`, { method: "DELETE" });
+      const url = deletePerm ? `/api/eventos/${deleteModal.id}?permanente=true` : `/api/eventos/${deleteModal.id}`;
+      const res = await fetch(url, { method: "DELETE" });
       const json = await res.json();
       if (!res.ok || !json?.success) { setMsgOk(false); setMsg(json?.message ?? "No se pudo eliminar."); return; }
       await fetchEventos();
       setMsgOk(true); setMsg("Evento eliminado.");
     } catch { setMsgOk(false); setMsg("Error de red al eliminar."); }
-    finally { setSending(false); setDeleteModal(null); }
+    finally { setSending(false); setDeleteModal(null); setDeletePerm(false); }
   }
 
   const inputCls = "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#17609c] focus:border-transparent transition";
@@ -224,11 +242,30 @@ export default function EventosPage() {
               <form onSubmit={handleCreate} className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className={labelCls}>Nombre *</label>
-                  <input type="text" value={cNombre} onChange={e => setCNombre(e.target.value)} className={inputCls} placeholder="Ej. Culto dominical" required />
+                  <input type="text" value={cNombre}
+                    onChange={e => {
+                      const v = e.target.value;
+                      setCNombre(v);
+                      setTouchedNombre(true);
+                      setErrNombre(!v.trim() ? 'El nombre del evento es obligatorio.' : '');
+                    }}
+                    onBlur={() => { setTouchedNombre(true); setErrNombre(!cNombre.trim() ? 'El nombre del evento es obligatorio.' : ''); }}
+                    className={`${inputCls}${touchedNombre && errNombre ? ' border-red-400 bg-red-50/30' : ''}`}
+                    placeholder="Ej. Culto dominical" />
+                  {touchedNombre && errNombre && <p className="mt-1 text-xs text-red-600">{errNombre}</p>}
                 </div>
                 <div>
                   <label className={labelCls}>Fecha *</label>
-                  <input type="date" value={cFecha} onChange={e => setCFecha(e.target.value)} className={inputCls} required />
+                  <input type="date" value={cFecha}
+                    onChange={e => {
+                      const v = e.target.value;
+                      setCFecha(v);
+                      setTouchedFecha(true);
+                      setErrFecha(!v || !DATE_RE.test(v) ? 'La fecha es obligatoria y debe ser válida.' : '');
+                    }}
+                    onBlur={() => { setTouchedFecha(true); setErrFecha(!cFecha || !DATE_RE.test(cFecha) ? 'La fecha es obligatoria.' : ''); }}
+                    className={`${inputCls}${touchedFecha && errFecha ? ' border-red-400 bg-red-50/30' : ''}`} />
+                  {touchedFecha && errFecha && <p className="mt-1 text-xs text-red-600">{errFecha}</p>}
                 </div>
                 <div>
                   <label className={labelCls}>Hora</label>
@@ -436,12 +473,21 @@ export default function EventosPage() {
             <div className="p-6">
               <p className="text-gray-700 text-sm mb-1">¿Eliminar el evento?</p>
               <p className="font-semibold text-gray-900 text-sm mb-4">"{deleteModal.nombre}"</p>
-              <p className="text-xs text-gray-500">Se marcará como inactivo. Esta acción se puede revertir editando el evento.</p>
+              <p className="text-xs text-gray-500 mb-4">
+                {deletePerm
+                  ? 'El evento se eliminará permanentemente y no se podrá recuperar.'
+                  : 'Se marcará como inactivo. Esta acción se puede revertir editando el evento.'}
+              </p>
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input type="checkbox" checked={deletePerm} onChange={e => setDeletePerm(e.target.checked)}
+                  className="w-4 h-4 accent-red-600 cursor-pointer" />
+                <span className="text-xs font-semibold text-red-700">Eliminar permanentemente</span>
+              </label>
             </div>
             <div className="flex gap-3 px-6 pb-6">
-              <button onClick={() => setDeleteModal(null)} className="flex-1 py-2 text-sm font-semibold text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition">Cancelar</button>
-              <button onClick={confirmDelete} disabled={sending} className="flex-1 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-50 transition">
-                {sending ? "Eliminando..." : "Eliminar"}
+              <button onClick={() => { setDeleteModal(null); setDeletePerm(false); }} className="flex-1 py-2 text-sm font-semibold text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition">Cancelar</button>
+              <button onClick={confirmDelete} disabled={sending} className={`flex-1 py-2 text-sm font-semibold text-white rounded-lg disabled:opacity-50 transition ${deletePerm ? 'bg-red-800 hover:bg-red-900' : 'bg-red-600 hover:bg-red-700'}`}>
+                {sending ? "Eliminando..." : deletePerm ? "Eliminar permanentemente" : "Eliminar"}
               </button>
             </div>
           </div>

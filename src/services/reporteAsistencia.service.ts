@@ -82,11 +82,11 @@ export class ReporteAsistenciaService {
   private mapToResponse(reporte: ReporteAsistencia): ReporteAsistenciaResponse {
     return {
       id: reporte.id,
-      asociado_id: reporte.asociado_id,
+      asociado_id: reporte.asociado_id ?? 0,
       evento_id: reporte.evento_id,
       fecha: reporte.fecha,
       estado: reporte.estado as any,
-      hora_registro: reporte.hora_registro,
+      hora_registro: reporte.hora_registro ?? '',
       justificacion: reporte.justificacion,
     };
   }

@@ -15,6 +15,11 @@ export async function GET() {
       success: true,
       data: usuarios,
       message: 'Usuarios obtenidos exitosamente',
+      pagination: {
+        page: 1,
+        totalPages: 1,
+        total: usuarios.length,
+      },
     });
   } catch (error) {
     console.error('Error en GET /api/usuarios:', error);

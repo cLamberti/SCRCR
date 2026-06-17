@@ -27,7 +27,8 @@ export async function GET(request: NextRequest) {
      // Asegurarse de que los datos tengan el formato correcto
     const registrosFormateados = registros.map(registro => ({
       id: registro.id,
-      asociadoId: registro.asociado_id,
+      asociadoId: registro.asociado_id ?? null,
+      congregadoId: registro.congregado_id ?? null,
       eventoId: registro.evento_id,
       estado: registro.estado,
       fecha: registro.fecha,
@@ -55,14 +56,14 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/reporte-asistencia
- * Crea un nuevo registro de asistencia
+ * Crea un nuevo registro de asistencia (asociado o congregado)
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { eventoId, asociadoId, estado, fecha, justificacion } = body;
+    const { eventoId, asociadoId, congregadoId, estado, fecha, justificacion } = body;
 
-    if (!eventoId || !asociadoId || !estado || !fecha) {
+    if (!eventoId || (!asociadoId && !congregadoId) || !estado || !fecha) {
       return NextResponse.json(
         {
           success: false,
@@ -74,7 +75,8 @@ export async function POST(request: NextRequest) {
 
     const nuevoRegistro = await reporteDAO.crear({
       evento_id: eventoId,
-      asociado_id: asociadoId,
+      asociado_id: asociadoId ?? undefined,
+      congregado_id: congregadoId ?? undefined,
       estado,
       fecha,
       justificacion,

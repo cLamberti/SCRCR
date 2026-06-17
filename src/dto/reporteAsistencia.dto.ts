@@ -5,7 +5,8 @@ import { EstadoAsistencia } from '@/models/ReporteAsistencia';
  * DTO para la solicitud de creación de un reporte de asistencia.
  */
 export interface CrearReporteAsistenciaRequest {
-  asociado_id: number;
+  asociado_id?: number;
+  congregado_id?: number;
   evento_id: number;
   fecha: string; // Formato YYYY-MM-DD
   estado: EstadoAsistencia;

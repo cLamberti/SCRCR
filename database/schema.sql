@@ -50,6 +50,8 @@ CREATE TABLE "asociados" (
     "direccion" text,
     "fecha_ingreso" timestamp DEFAULT CURRENT_TIMESTAMP,
     "estado" smallint DEFAULT 1,
+    "observaciones" text,
+    "fecha_inactivo" timestamp,
     "created_at" timestamp DEFAULT CURRENT_TIMESTAMP,
     "updated_at" timestamp DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "asociados_estado_check" CHECK (CHECK ((estado = ANY (ARRAY[0, 1]))))
@@ -211,6 +213,11 @@ CREATE TABLE "congregados" (
     "segundo_ministerio" varchar(50),
     "url_foto_cedula" text NOT NULL,
     "estado" smallint DEFAULT 1 NOT NULL,
+    "observaciones" text,
+    "fecha_nacimiento" timestamp,
+    "correo" varchar(100),
+    "profesion" varchar(100),
+    "direccion" text,
     "created_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL,
     "updated_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL,
     CONSTRAINT "congregados_estado_check" CHECK (CHECK ((estado = ANY (ARRAY[0, 1]))))

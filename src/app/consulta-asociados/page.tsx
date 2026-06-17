@@ -1,15 +1,19 @@
 'use client';
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import Image from 'next/image';
 import {
   FaHome, FaUserPlus, FaList, FaSignOutAlt,
   FaSearch, FaEdit, FaTrash, FaUsers,
-  FaChevronLeft, FaChevronRight, FaExclamationTriangle, 
-FaCalendarAlt
+  FaChevronLeft, FaChevronRight, FaExclamationTriangle,
+  FaCalendarAlt, FaCheckCircle, FaFileExcel, FaFilePdf,
+  FaFolderOpen, FaTimes, FaFileImport, FaDownload
 } from 'react-icons/fa';
+import Swal from 'sweetalert2';
 import { AsociadoResponse } from '@/dto/asociado.dto';
 import Sidebar from '@/components/SideBar';
+import { useAuth } from '@/contexts/AuthContext';
 
 /* ─── Menú (sin "Eliminar Asociados" porque ahora esta vista lo maneja) ─── */
 const menuItems = [
@@ -21,16 +25,18 @@ const menuItems = [
     { id: 'cerrar',             href: '#',                   icon: FaSignOutAlt, label: 'Cerrar Sesión'         },
 ];
 
-type AsociadoRow = {
-  id: number; nombreCompleto: string; cedula: string;
-  correo?: string; telefono?: string; ministerio?: string;
-  direccion?: string; fechaIngreso: string; estado: number;
-};
+type AsociadoRow = AsociadoResponse;
 
 type FormularioEdicion = {
   nombreCompleto: string; cedula: string; correo: string;
-  telefono: string; ministerio: string; direccion: string;
-  fechaIngreso: string; estado: number;
+  telefono: string; telefonoContacto: string; ministerio: string; direccion: string;
+  fechaIngreso: string; fechaNacimiento: string; estadoCivil: string;
+  profesion: string; anosCongregarse: number | ''; fechaAceptacion: string;
+  perteneceJuntaDirectiva: boolean; puestoJuntaDirectiva: string;
+  estado: number; observaciones: string; fechaInactivo: string;
+  // Documentos
+  urlCedula: string; urlCartaSolicitud: string; urlCartaRenuncia: string;
+  urlCartaDesafiliacion: string; urlOtros: string;
 };
 
 type PageSize = 10 | 25 | 50;
@@ -55,9 +61,13 @@ const Badge = ({ activo }: { activo: boolean }) => (
    COMPONENTE PRINCIPAL
 ══════════════════════════════════════════════════════════════════════════ */
 export default function ConsultarAsociadosPage() {
+  const { usuario } = useAuth();
+  const esJuntaDirectiva = usuario?.rol === 'juntaDirectiva';
+
   const [data,      setData]      = useState<AsociadoRow[]>([]);
   const [loading,   setLoading]   = useState(false);
   const [mensaje,   setMensaje]   = useState('');
+  const [erroresLista, setErroresLista] = useState<string[]>([]);
   const [esError,   setEsError]   = useState(false);
 
   /* Filtros */
@@ -74,10 +84,29 @@ export default function ConsultarAsociadosPage() {
   const [modalEditOpen,     setModalEditOpen]     = useState(false);
   const [asociadoEditando,  setAsociadoEditando]  = useState<AsociadoRow | null>(null);
   const [formulario,        setFormulario]        = useState<FormularioEdicion>({
-    nombreCompleto: '', cedula: '', correo: '', telefono: '',
-    ministerio: '', direccion: '', fechaIngreso: '', estado: 1,
+    nombreCompleto: '', cedula: '', correo: '', telefono: '', telefonoContacto: '',
+    ministerio: '', direccion: '', fechaIngreso: '', fechaNacimiento: '', estadoCivil: 'Soltero(a)',
+    profesion: '', anosCongregarse: '', fechaAceptacion: '', perteneceJuntaDirectiva: false,
+    puestoJuntaDirectiva: '', estado: 1, observaciones: '', fechaInactivo: '',
+    urlCedula: '', urlCartaSolicitud: '', urlCartaRenuncia: '', urlCartaDesafiliacion: '', urlOtros: '',
   });
+  const [archivosAsoc, setArchivosAsoc] = useState<Record<string, File | null>>({
+    cedula: null, solicitud: null, renuncia: null, desafiliacion: null, otros: null,
+  });
+  const [subiendoAsoc, setSubiendoAsoc] = useState(false);
   const [guardando, setGuardando] = useState(false);
+  const [asocErrors, setAsocErrors] = useState<Record<string, string>>({});
+  const [asocTouched, setAsocTouched] = useState<Record<string, boolean>>({});
+
+  /* Modal documentos */
+  const [modalDocsOpen, setModalDocsOpen] = useState(false);
+  const [docsAsociado, setDocsAsociado] = useState<AsociadoRow | null>(null);
+
+  /* Modal importar */
+  const [modalImportOpen, setModalImportOpen] = useState(false);
+  const [importRows, setImportRows] = useState<any[]>([]);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importResult, setImportResult] = useState<{ importados: number; omitidos: number; errores: { fila: number; cedula: string; motivo: string }[] } | null>(null);
 
   /* Modal confirmación eliminación masiva */
   const [modalDeleteOpen,    setModalDeleteOpen]    = useState(false);
@@ -109,6 +138,7 @@ export default function ConsultarAsociadosPage() {
   }, []);
 
   useEffect(() => { cargar(); }, [cargar]);
+  useAutoRefresh(cargar);
 
   /* Resetear página y selección cuando cambian filtros o pageSize */
   useEffect(() => { setPagina(1); setSeleccionados(new Set()); }, [filtros, pageSize]);
@@ -133,6 +163,51 @@ export default function ConsultarAsociadosPage() {
     return filtrados.slice(inicio, inicio + pageSize);
   }, [filtrados, paginaActual, pageSize]);
 
+  /* ─── Exportar ─── */
+  const exportarExcel = useCallback(async () => {
+    const { utils, writeFile } = await import('xlsx');
+    const filas = filtrados.map((a, i) => ({
+      '#': i + 1,
+      'Nombre Completo': a.nombreCompleto,
+      'Cédula': a.cedula,
+      'Correo': a.correo ?? '-',
+      'Teléfono': a.telefono ?? '-',
+      'Ministerio': a.ministerio ?? '-',
+      'Dirección': a.direccion ?? '-',
+      'Fecha Ingreso': a.fechaIngreso ? new Date(a.fechaIngreso).toLocaleDateString('es-CR') : '-',
+      'Estado': a.estado === 1 ? 'Activo' : 'Eliminado',
+    }));
+    const ws = utils.json_to_sheet(filas);
+    ws['!cols'] = [{ wch: 4 }, { wch: 35 }, { wch: 14 }, { wch: 30 }, { wch: 14 }, { wch: 18 }, { wch: 30 }, { wch: 14 }, { wch: 10 }];
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, 'Asociados');
+    writeFile(wb, 'listado_asociados.xlsx');
+  }, [filtrados]);
+
+  const exportarPDF = useCallback(async () => {
+    const { default: jsPDF } = await import('jspdf');
+    const { default: autoTable } = await import('jspdf-autotable');
+    const doc = new jsPDF({ orientation: 'landscape' });
+    doc.setFontSize(14);
+    doc.text('Listado de Asociados', 14, 16);
+    doc.setFontSize(9);
+    doc.text(`Generado: ${new Date().toLocaleDateString('es-CR')}  · Total: ${filtrados.length}`, 14, 22);
+    autoTable(doc, {
+      startY: 27,
+      head: [['#', 'Nombre Completo', 'Cédula', 'Correo', 'Teléfono', 'Ministerio', 'Fecha Ingreso', 'Estado']],
+      body: filtrados.map((a, i) => [
+        i + 1, a.nombreCompleto, a.cedula,
+        a.correo ?? '-', a.telefono ?? '-', a.ministerio ?? '-',
+        a.fechaIngreso ? new Date(a.fechaIngreso).toLocaleDateString('es-CR') : '-',
+        a.estado === 1 ? 'Activo' : 'Eliminado',
+      ]),
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [0, 51, 102] },
+      alternateRowStyles: { fillColor: [245, 247, 250] },
+    });
+    doc.save('listado_asociados.pdf');
+  }, [filtrados]);
+
   /* ─── Selección ─── */
   const toggleFila = (id: number) => {
     setSeleccionados(prev => {
@@ -144,49 +219,298 @@ export default function ConsultarAsociadosPage() {
 
   const limpiarSeleccion = () => setSeleccionados(new Set());
 
+  /* ─── Importar Excel ─── */
+  const descargarPlantillaAsociados = async () => {
+    const { utils, writeFile } = await import('xlsx');
+    const cols = ['nombreCompleto','cedula','correo','telefono','telefonoContacto','ministerio','direccion','fechaIngreso','fechaNacimiento','estadoCivil','profesion','anosCongregarse','observaciones'];
+    const ejemplo = [{ nombreCompleto:'Juan Pérez', cedula:'123456789', correo:'juan@correo.com', telefono:'88001234', telefonoContacto:'', ministerio:'Alabanza', direccion:'San José', fechaIngreso:'2024-01-15', fechaNacimiento:'1990-05-20', estadoCivil:'Casado(a)', profesion:'Ingeniero', anosCongregarse:5, observaciones:'' }];
+    const ws = utils.json_to_sheet(ejemplo, { header: cols });
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, 'Asociados');
+    writeFile(wb, 'plantilla_asociados.xlsx');
+  };
+
+  const parsearArchivoAsociados = async (file: File) => {
+    const { read, utils } = await import('xlsx');
+    const buf = await file.arrayBuffer();
+    const wb = read(buf, { type: 'array', cellDates: true });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows: any[] = utils.sheet_to_json(ws, { defval: '' });
+    setImportRows(rows);
+    setImportResult(null);
+  };
+
+  const confirmarImportacionAsociados = async () => {
+    if (importRows.length === 0) return;
+    setImportLoading(true);
+    try {
+      const payload = importRows.map(r => ({
+        nombreCompleto: String(r.nombreCompleto ?? '').trim(),
+        cedula: String(r.cedula ?? '').trim(),
+        correo: String(r.correo ?? '').trim() || undefined,
+        telefono: String(r.telefono ?? '').trim() || undefined,
+        telefonoContacto: String(r.telefonoContacto ?? '').trim() || undefined,
+        ministerio: String(r.ministerio ?? '').trim() || undefined,
+        direccion: String(r.direccion ?? '').trim() || undefined,
+        fechaIngreso: String(r.fechaIngreso ?? '').trim() || undefined,
+        fechaNacimiento: String(r.fechaNacimiento ?? '').trim() || undefined,
+        estadoCivil: String(r.estadoCivil ?? '').trim() || undefined,
+        profesion: String(r.profesion ?? '').trim() || undefined,
+        anosCongregarse: r.anosCongregarse ? Number(r.anosCongregarse) : undefined,
+        observaciones: String(r.observaciones ?? '').trim() || undefined,
+      })).filter(r => r.nombreCompleto && r.cedula);
+      const res = await fetch('/api/asociados/importar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const json = await res.json();
+      setImportResult(json);
+      if (json.importados > 0) await cargar();
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
   /* Asociados seleccionados con sus datos (para el modal) */
   const seleccionadosData = useMemo(
     () => data.filter(r => seleccionados.has(r.id)),
     [data, seleccionados]
   );
 
-  /* ─── Edición ─── */
+  function validarCampoAsoc(campo: string, valor: string): string {
+    switch (campo) {
+      case 'nombreCompleto':
+        if (!valor.trim()) return 'El nombre completo es obligatorio.';
+        if (valor.trim().split(/\s+/).length < 2) return 'Incluye al menos nombre y apellido.';
+        if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]+$/.test(valor)) return 'Solo puede contener letras y espacios.';
+        return '';
+      case 'cedula':
+        if (!valor.trim()) return 'La cédula es obligatoria.';
+        if (!/^[0-9-]+$/.test(valor)) return 'Solo puede contener números y guiones.';
+        if (valor.trim().length < 9) return 'Debe tener al menos 9 caracteres.';
+        return '';
+      case 'telefono':
+        if (!valor.trim()) return 'El teléfono es obligatorio.';
+        if (valor.replace(/[\s\-+()]/g, '').length < 8) return 'Debe tener al menos 8 dígitos.';
+        return '';
+      case 'correo':
+        if (valor && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor)) return 'Ingresa un correo válido, por ejemplo: nombre@correo.com';
+        return '';
+      default: return '';
+    }
+  }
+
+  const handleAsocChange = (campo: string, valor: string) => {
+    setFormulario(prev => ({ ...prev, [campo]: valor }));
+    setAsocTouched(prev => ({ ...prev, [campo]: true }));
+    setAsocErrors(prev => ({ ...prev, [campo]: validarCampoAsoc(campo, valor) }));
+  };
+
+  // Solo valida al perder foco — NO reescribe el valor (evita revertir cambios)
+  const handleAsocBlur = (campo: string) => {
+    setAsocTouched(prev => ({ ...prev, [campo]: true }));
+    setAsocErrors(prev => ({ ...prev, [campo]: validarCampoAsoc(campo, String((formulario as any)[campo] ?? '')) }));
+  };
+
+  const abrirModalCrear = () => {
+    setAsociadoEditando(null);
+    setFormulario({
+      nombreCompleto: '', cedula: '', correo: '', telefono: '', telefonoContacto: '',
+      ministerio: '', direccion: '', fechaIngreso: '', fechaNacimiento: '', estadoCivil: 'Soltero(a)',
+      profesion: '', anosCongregarse: '', fechaAceptacion: '', perteneceJuntaDirectiva: false,
+      puestoJuntaDirectiva: '', estado: 1, observaciones: '', fechaInactivo: '',
+      urlCedula: '', urlCartaSolicitud: '', urlCartaRenuncia: '', urlCartaDesafiliacion: '', urlOtros: '',
+    });
+    setArchivosAsoc({ cedula: null, solicitud: null, renuncia: null, desafiliacion: null, otros: null });
+    setAsocErrors({}); setAsocTouched({});
+    setModalEditOpen(true); setMensaje(''); setErroresLista([]); setEsError(false);
+  };
+
   const abrirModalEdicion = (a: AsociadoRow) => {
     setAsociadoEditando(a);
+    setAsocErrors({}); setAsocTouched({});
     setFormulario({
       nombreCompleto: a.nombreCompleto || '',
       cedula:         a.cedula         || '',
       correo:         a.correo         || '',
       telefono:       a.telefono       || '',
+      telefonoContacto: a.telefonoContacto || '',
       ministerio:     a.ministerio     || '',
       direccion:      a.direccion      || '',
       fechaIngreso:   a.fechaIngreso
         ? new Date(a.fechaIngreso).toISOString().split('T')[0]
         : '',
+      fechaNacimiento: a.fechaNacimiento ? new Date(a.fechaNacimiento).toISOString().split('T')[0] : '',
+      estadoCivil: a.estadoCivil || 'Soltero(a)',
+      profesion: a.profesion || '',
+      anosCongregarse: a.anosCongregarse || '',
+      fechaAceptacion: a.fechaAceptacion ? new Date(a.fechaAceptacion).toISOString().split('T')[0] : '',
+      perteneceJuntaDirectiva: a.perteneceJuntaDirectiva || false,
+      puestoJuntaDirectiva: a.puestoJuntaDirectiva || '',
       estado: a.estado,
+      observaciones: a.observaciones || '',
+      fechaInactivo: a.fechaInactivo
+        ? new Date(a.fechaInactivo).toISOString().split('T')[0]
+        : '',
+      urlCedula: a.urlCedula || '',
+      urlCartaSolicitud: a.urlCartaSolicitud || '',
+      urlCartaRenuncia: a.urlCartaRenuncia || '',
+      urlCartaDesafiliacion: a.urlCartaDesafiliacion || '',
+      urlOtros: a.urlOtros || '',
     });
-    setModalEditOpen(true); setMensaje(''); setEsError(false);
+    setArchivosAsoc({ cedula: null, solicitud: null, renuncia: null, desafiliacion: null, otros: null });
+    setModalEditOpen(true); setMensaje(''); setErroresLista([]); setEsError(false);
+  };
+
+  const validarFormularioAsociado = (): string[] => {
+    const f = formulario;
+    const errores: string[] = [];
+
+    for (const campo of ['nombreCompleto', 'cedula', 'telefono', 'correo'] as const) {
+      const err = validarCampoAsoc(campo, String((f as any)[campo] ?? ''));
+      if (err) errores.push(err);
+    }
+
+    if (f.telefonoContacto && f.telefonoContacto.replace(/[\s\-+()]/g, '').length < 8) {
+      errores.push('El teléfono de contacto debe tener al menos 8 dígitos.');
+    }
+
+    if (f.perteneceJuntaDirectiva && !f.puestoJuntaDirectiva) {
+      errores.push('El puesto en la Junta Directiva es requerido.');
+    }
+
+    if (f.anosCongregarse !== '' && (Number(f.anosCongregarse) < 0 || !Number.isInteger(Number(f.anosCongregarse)))) {
+      errores.push('Los años de congregarse deben ser un número entero positivo.');
+    }
+
+    return errores;
+  };
+
+  const subirDocAsoc = async (file: File): Promise<string | null> => {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('folder', 'asociados');
+    const res = await fetch('/api/documentos/upload', { method: 'POST', body: fd });
+    const json = await res.json();
+    return json.success ? json.url : null;
   };
 
   const guardarCambios = async () => {
-    if (!asociadoEditando) return;
+    // Mark required fields as touched and show inline errors
+    const campos = ['nombreCompleto', 'cedula', 'telefono'];
+    const newErrors: Record<string, string> = {};
+    const newTouched: Record<string, boolean> = {};
+    for (const campo of campos) {
+      newTouched[campo] = true;
+      const err = validarCampoAsoc(campo, String((formulario as any)[campo] ?? ''));
+      if (err) newErrors[campo] = err;
+    }
+    if (formulario.correo) {
+      newTouched.correo = true;
+      const errCorreo = validarCampoAsoc('correo', formulario.correo);
+      if (errCorreo) newErrors.correo = errCorreo;
+    }
+    setAsocTouched(prev => ({ ...prev, ...newTouched }));
+    setAsocErrors(prev => ({ ...prev, ...newErrors }));
+
+    const erroresValidacion = validarFormularioAsociado();
+    if (erroresValidacion.length > 0 || Object.keys(newErrors).length > 0) {
+      setErroresLista(erroresValidacion);
+      setEsError(true);
+      return;
+    }
+
     try {
-      setGuardando(true); setMensaje(''); setEsError(false);
-      const res  = await fetch(`/api/asociados/update?id=${asociadoEditando.id}`, {
-        method: 'PUT',
+      setGuardando(true); setSubiendoAsoc(true); setMensaje(''); setErroresLista([]); setEsError(false);
+
+      // Subir archivos si los hay
+      const docUrls: Record<string, string> = {};
+      const docKeys: [string, string][] = [
+        ['cedula', 'urlCedula'], ['solicitud', 'urlCartaSolicitud'],
+        ['renuncia', 'urlCartaRenuncia'], ['desafiliacion', 'urlCartaDesafiliacion'],
+        ['otros', 'urlOtros'],
+      ];
+      for (const [fileKey, urlKey] of docKeys) {
+        const file = archivosAsoc[fileKey];
+        if (file) {
+          const url = await subirDocAsoc(file);
+          if (url) docUrls[urlKey] = url;
+        }
+      }
+      setSubiendoAsoc(false);
+
+      const url = asociadoEditando
+        ? `/api/asociados/update?id=${asociadoEditando.id}`
+        : '/api/asociados';
+      const method = asociadoEditando ? 'PUT' : 'POST';
+
+      // Limpiar campos opcionales vacíos para no romper validación del servidor
+      const payload: Record<string, unknown> = { ...formulario, ...docUrls };
+      // anosCongregarse debe ser número o ausente (nunca string vacío)
+      if (payload.anosCongregarse === '' || payload.anosCongregarse === null) {
+        delete payload.anosCongregarse;
+      } else {
+        payload.anosCongregarse = Number(payload.anosCongregarse);
+      }
+      // Al reactivar (estado=1), limpiar fechaInactivo
+      if (formulario.estado === 1) {
+        payload.fechaInactivo = '';
+      }
+      // Campos de fecha opcionales: excluir si están vacíos
+      for (const key of ['fechaNacimiento', 'fechaAceptacion'] as const) {
+        if (!payload[key]) delete payload[key];
+      }
+
+      const res  = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formulario),
+        body: JSON.stringify(payload),
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
-        setMensaje(json.message || 'Error al actualizar'); setEsError(true); return;
+        setMensaje(json.message || 'Error al guardar');
+        setErroresLista(Array.isArray(json.errors) ? json.errors : typeof json.errors === 'string' ? [json.errors] : []);
+        setEsError(true);
+        Swal.fire('Error', json.message || 'Hubo un problema al guardar', 'error');
+        return;
       }
-      setMensaje('Asociado actualizado exitosamente.');
+      
+      Swal.fire('¡Éxito!', asociadoEditando ? 'Asociado actualizado exitosamente.' : 'Asociado registrado exitosamente.', 'success');
       setModalEditOpen(false); setAsociadoEditando(null);
       await cargar();
     } catch (err) {
-      setMensaje(err instanceof Error ? err.message : 'Error de conexión.'); setEsError(true);
-    } finally { setGuardando(false); }
+      setMensaje(err instanceof Error ? err.message : 'Error de conexión.'); 
+      setEsError(true);
+      Swal.fire('Error', 'Error de conexión con el servidor', 'error');
+    } finally { setGuardando(false); setSubiendoAsoc(false); }
+  };
+
+  /* ─── Reactivar ─── */
+  const reactivar = async (id: number) => {
+    const confirm = await Swal.fire({
+      title: '¿Reactivar asociado?',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#16a34a',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Reactivar',
+      cancelButtonText: 'Cancelar',
+    });
+    if (!confirm.isConfirmed) return;
+    try {
+      const res = await fetch(`/api/asociados/update?id=${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado: 1, fechaInactivo: '' }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setMensaje('Asociado reactivado exitosamente.');
+        setEsError(false);
+        await cargar();
+      } else {
+        setMensaje(json.message || 'Error al reactivar'); setEsError(true);
+      }
+    } catch {
+      setMensaje('Error de conexión.'); setEsError(true);
+    }
   };
 
   /* ─── Eliminación masiva ─── */
@@ -255,11 +579,37 @@ export default function ConsultarAsociadosPage() {
             {/* ── Cabecera ── */}
             <div className="flex items-start justify-between mb-1">
               <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-[#003366]">Consultar Asociados</h1>
+                <h1 className="text-xl sm:text-2xl font-bold text-[#003366]">Gestión de Asociados</h1>
                 <div className="w-16 h-1 bg-[#003366] rounded mt-1" />
               </div>
-              <div className="relative w-[80px] h-[55px] hidden sm:block">
-                <Image src="/logo-iglesia.png" alt="Logo" fill className="object-contain" sizes="80px" />
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                <button onClick={descargarPlantillaAsociados} title="Descargar plantilla"
+                  className="inline-flex items-center gap-1.5 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold px-3 py-2 rounded-lg transition">
+                  <FaDownload className="text-xs" /> Plantilla
+                </button>
+                <button onClick={() => { setModalImportOpen(true); setImportRows([]); setImportResult(null); }} title="Importar desde Excel"
+                  className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-3 py-2 rounded-lg transition">
+                  <FaFileImport className="text-xs" /> Importar
+                </button>
+                <button onClick={exportarExcel} title="Exportar Excel"
+                  className="inline-flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-3 py-2 rounded-lg transition">
+                  <FaFileExcel className="text-xs" /> Excel
+                </button>
+                <button onClick={exportarPDF} title="Exportar PDF"
+                  className="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-3 py-2 rounded-lg transition">
+                  <FaFilePdf className="text-xs" /> PDF
+                </button>
+                {!esJuntaDirectiva && (
+                  <button
+                    onClick={abrirModalCrear}
+                    className="inline-flex items-center gap-2 bg-[#003366] hover:bg-[#004488] text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
+                  >
+                    <FaUserPlus className="text-xs" /> Nuevo
+                  </button>
+                )}
+                <div className="relative w-[80px] h-[55px] hidden sm:block">
+                  <Image src="/logo-iglesia.png" alt="Logo" fill className="object-contain" sizes="80px" />
+                </div>
               </div>
             </div>
             <p className="text-gray-500 text-sm mb-5">
@@ -267,7 +617,7 @@ export default function ConsultarAsociadosPage() {
             </p>
 
             {/* ── Mensaje global ── */}
-            {mensaje && (
+            {mensaje && !modalEditOpen && (
               <div className={`mb-4 p-3.5 rounded-lg text-sm border ${
                 esError
                   ? 'bg-red-50 text-red-700 border-red-200'
@@ -391,8 +741,8 @@ export default function ConsultarAsociadosPage() {
               )}
             </div>
 
-            {/* ── Tabla ── */}
-            <div className="overflow-x-auto rounded-xl border border-gray-200 mb-4">
+            {/* ── Tabla (desktop) ── */}
+            <div className="hidden md:block overflow-x-auto rounded-xl border border-gray-200 mb-4">
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="bg-[#003366] text-white">
@@ -410,8 +760,8 @@ export default function ConsultarAsociadosPage() {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={9} className="p-8 text-center text-gray-400 text-sm">
-                        Cargando datos...
+                      <td colSpan={9} className="p-8 text-center text-gray-400">
+                        <span className="inline-flex items-center gap-2 text-sm"><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Cargando...</span>
                       </td>
                     </tr>
                   ) : paginados.length > 0 ? (
@@ -454,12 +804,28 @@ export default function ConsultarAsociadosPage() {
                             {formatFecha(r.fechaIngreso)}
                           </td>
                           <td className="px-4 py-3">
-                            <button
-                              onClick={() => abrirModalEdicion(r)}
-                              className="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap"
-                            >
-                              <FaEdit className="text-xs" /> Editar
-                            </button>
+                            <div className="flex items-center gap-1.5">
+                              {r.estado === 0 && (
+                                <button
+                                  onClick={() => reactivar(r.id)}
+                                  className="inline-flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+                                >
+                                  <FaCheckCircle className="text-xs" /> Activar
+                                </button>
+                              )}
+                              <button
+                                onClick={() => abrirModalEdicion(r)}
+                                className="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+                              >
+                                <FaEdit className="text-xs" /> Editar
+                              </button>
+                              <button
+                                onClick={() => { setDocsAsociado(r); setModalDocsOpen(true); }}
+                                className="inline-flex items-center gap-1 bg-[#003366] hover:bg-[#002244] text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+                              >
+                                <FaFolderOpen className="text-xs" /> Docs
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -474,6 +840,80 @@ export default function ConsultarAsociadosPage() {
                   )}
                 </tbody>
               </table>
+            </div>
+
+            {/* ── Tarjetas (mobile) ── */}
+            <div className="md:hidden mb-4">
+              {loading ? (
+                <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Cargando...
+                </div>
+              ) : paginados.length === 0 ? (
+                <div className="bg-white rounded-xl border border-gray-200 p-10 text-center text-gray-400">
+                  <FaSearch className="mx-auto mb-2 text-2xl opacity-30" />
+                  <p className="text-sm">No se encontraron resultados</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {paginados.map(r => {
+                    const checked = seleccionados.has(r.id);
+                    return (
+                      <div
+                        key={r.id}
+                        className={`rounded-xl border shadow-sm p-4 transition-colors ${
+                          checked ? 'bg-blue-50 border-blue-200' : r.estado === 0 ? 'bg-red-50/30 border-gray-200' : 'bg-white border-gray-200'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between mb-2 gap-2">
+                          <div className="flex items-start gap-2 min-w-0 flex-1">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleFila(r.id)}
+                              className="w-4 h-4 accent-[#003366] cursor-pointer mt-0.5 flex-shrink-0"
+                              aria-label={`Seleccionar ${r.nombreCompleto}`}
+                            />
+                            <div className="min-w-0">
+                              <p className={`font-semibold text-sm truncate ${r.estado === 0 ? 'line-through text-gray-400' : 'text-gray-900'}`}>
+                                {r.nombreCompleto}
+                              </p>
+                              <p className="text-xs text-gray-400 mt-0.5">#{r.id} · {r.cedula}</p>
+                            </div>
+                          </div>
+                          <Badge activo={r.estado === 1} />
+                        </div>
+                        <div className="text-xs text-gray-600 space-y-1 mb-3 pl-6">
+                          {r.telefono && <p><span className="font-semibold">Tel:</span> {r.telefono}</p>}
+                          {r.ministerio && <p><span className="font-semibold">Ministerio:</span> {r.ministerio}</p>}
+                          <p><span className="font-semibold">Ingreso:</span> {formatFecha(r.fechaIngreso)}</p>
+                        </div>
+                        <div className="pl-6 flex items-center gap-2">
+                          {r.estado === 0 && (
+                            <button
+                              onClick={() => reactivar(r.id)}
+                              className="inline-flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                            >
+                              <FaCheckCircle className="text-xs" /> Activar
+                            </button>
+                          )}
+                          <button
+                            onClick={() => abrirModalEdicion(r)}
+                            className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                          >
+                            <FaEdit className="text-xs" /> Editar
+                          </button>
+                          <button
+                            onClick={() => { setDocsAsociado(r); setModalDocsOpen(true); }}
+                            className="inline-flex items-center gap-1.5 bg-[#003366] hover:bg-[#002244] text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                          >
+                            <FaFolderOpen className="text-xs" /> Docs
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* ── Paginación ── */}
@@ -535,56 +975,206 @@ export default function ConsultarAsociadosPage() {
       </div>
 
       {/* ══════════════════════════════════════════
-          MODAL EDICIÓN
+          MODAL EDICIÓN / CREAR
       ══════════════════════════════════════════ */}
-      {modalEditOpen && asociadoEditando && (
+      {modalEditOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
             <div className="bg-[#003366] text-white px-6 py-4 flex-shrink-0">
               <h2 className="text-base font-bold">
-                Editar Asociado — ID: {asociadoEditando.id}
+                {asociadoEditando ? `Editar Asociado — ID: ${asociadoEditando.id}` : 'Registrar Asociado'}
               </h2>
             </div>
             <div className="p-6 overflow-y-auto flex-1">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {[
-                  { label: 'Nombre Completo *', field: 'nombreCompleto', type: 'text'  },
-                  { label: 'Cédula *',           field: 'cedula',         type: 'text'  },
-                  { label: 'Correo Electrónico', field: 'correo',         type: 'email' },
-                  { label: 'Teléfono',           field: 'telefono',       type: 'text'  },
-                  { label: 'Ministerio',         field: 'ministerio',     type: 'text'  },
-                  { label: 'Fecha de Ingreso',   field: 'fechaIngreso',   type: 'date'  },
-                ].map(({ label, field, type }) => (
-                  <div key={field}>
-                    <label className="block text-gray-700 text-xs font-semibold mb-1.5">{label}</label>
-                    <input
-                      type={type}
-                      value={formulario[field as keyof FormularioEdicion] as string}
-                      onChange={e => setFormulario({ ...formulario, [field]: e.target.value })}
-                      className={inputClass}
-                    />
+              {mensaje && esError && (
+                <div className="mb-4 p-4 rounded-lg text-sm bg-red-50 text-red-700 border border-red-200">
+                  <p className="font-bold mb-1">{mensaje}</p>
+                  {erroresLista.length > 0 && (
+                    <ul className="list-disc pl-5 space-y-1 mt-2">
+                      {erroresLista.map((err, i) => (
+                        <li key={i}>{typeof err === 'object' ? JSON.stringify(err) : err}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+              <form id="asociado-form" onSubmit={(e) => { e.preventDefault(); guardarCambios(); }} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Fila 1 */}
+                <div>
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Nombre Completo *</label>
+                  <input type="text" value={formulario.nombreCompleto}
+                    onChange={e => handleAsocChange('nombreCompleto', e.target.value)}
+                    onBlur={() => handleAsocBlur('nombreCompleto')}
+                    className={`${inputClass}${asocTouched.nombreCompleto && asocErrors.nombreCompleto ? ' border-red-400 bg-red-50/30' : ''}`} />
+                  {asocTouched.nombreCompleto && asocErrors.nombreCompleto && (
+                    <p className="mt-1 text-xs text-red-600">{asocErrors.nombreCompleto}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Cédula *</label>
+                  <input type="text" value={formulario.cedula}
+                    onChange={e => handleAsocChange('cedula', e.target.value)}
+                    onBlur={() => handleAsocBlur('cedula')}
+                    className={`${inputClass}${asocTouched.cedula && asocErrors.cedula ? ' border-red-400 bg-red-50/30' : ''}`} />
+                  {asocTouched.cedula && asocErrors.cedula && (
+                    <p className="mt-1 text-xs text-red-600">{asocErrors.cedula}</p>
+                  )}
+                </div>
+
+                {/* Fila 2 */}
+                <div>
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Correo Electrónico</label>
+                  <input type="email" value={formulario.correo}
+                    onChange={e => handleAsocChange('correo', e.target.value)}
+                    onBlur={() => handleAsocBlur('correo')}
+                    className={`${inputClass}${asocTouched.correo && asocErrors.correo ? ' border-red-400 bg-red-50/30' : ''}`} />
+                  {asocTouched.correo && asocErrors.correo && (
+                    <p className="mt-1 text-xs text-red-600">{asocErrors.correo}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Teléfono Personal *</label>
+                  <input type="text" value={formulario.telefono}
+                    onChange={e => handleAsocChange('telefono', e.target.value)}
+                    onBlur={() => handleAsocBlur('telefono')}
+                    className={`${inputClass}${asocTouched.telefono && asocErrors.telefono ? ' border-red-400 bg-red-50/30' : ''}`} />
+                  {asocTouched.telefono && asocErrors.telefono && (
+                    <p className="mt-1 text-xs text-red-600">{asocErrors.telefono}</p>
+                  )}
+                </div>
+
+                {/* Fila 3 */}
+                <div>
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Teléfono de Contacto (Emergencia)</label>
+                  <input type="text" value={formulario.telefonoContacto} onChange={e => setFormulario(prev => ({ ...prev, telefonoContacto: e.target.value }))} className={inputClass} />
+                </div>
+                <div>
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Estado Civil</label>
+                  <select value={formulario.estadoCivil} onChange={e => setFormulario(prev => ({ ...prev, estadoCivil: e.target.value }))} className={inputClass}>
+                    <option value="Soltero(a)">Soltero(a)</option>
+                    <option value="Casado(a)">Casado(a)</option>
+                    <option value="Divorciado(a)">Divorciado(a)</option>
+                    <option value="Viudo(a)">Viudo(a)</option>
+                    <option value="Unión libre">Unión libre</option>
+                  </select>
+                </div>
+
+                {/* Fila 4 */}
+                <div>
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Fecha de Nacimiento</label>
+                  <input type="date" value={formulario.fechaNacimiento} onChange={e => setFormulario(prev => ({ ...prev, fechaNacimiento: e.target.value }))} className={inputClass} />
+                </div>
+                <div>
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Profesión u Oficio</label>
+                  <input type="text" value={formulario.profesion} onChange={e => setFormulario(prev => ({ ...prev, profesion: e.target.value }))} className={inputClass} />
+                </div>
+
+                {/* Fila 5 */}
+                <div>
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Años de Congregarse</label>
+                  <input type="number" value={formulario.anosCongregarse} onChange={e => setFormulario(prev => ({ ...prev, anosCongregarse: e.target.value === '' ? '' : Number(e.target.value) }))} className={inputClass} min="0" />
+                </div>
+                <div>
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Fecha de Aceptación (Asociado)</label>
+                  <input type="date" value={formulario.fechaAceptacion} onChange={e => setFormulario(prev => ({ ...prev, fechaAceptacion: e.target.value }))} className={inputClass} />
+                </div>
+
+                {/* Fila 6 */}
+                <div>
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Ministerio</label>
+                  <input type="text" value={formulario.ministerio} onChange={e => setFormulario(prev => ({ ...prev, ministerio: e.target.value }))} className={inputClass} />
+                </div>
+                <div>
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Fecha de Ingreso (Congregación)</label>
+                  <input type="date" value={formulario.fechaIngreso} onChange={e => setFormulario(prev => ({ ...prev, fechaIngreso: e.target.value }))} className={inputClass} />
+                </div>
+
+                {/* Fila 7 */}
+                <div className="flex items-center gap-2 mt-4">
+                  <input type="checkbox" id="junta" checked={formulario.perteneceJuntaDirectiva} onChange={e => setFormulario(prev => ({ ...prev, perteneceJuntaDirectiva: e.target.checked }))} className="w-4 h-4 accent-[#003366] rounded" />
+                  <label htmlFor="junta" className="text-gray-700 text-xs font-semibold">¿Pertenece a la Junta Directiva?</label>
+                </div>
+                {formulario.perteneceJuntaDirectiva && (
+                  <div>
+                    <label className="block text-gray-700 text-xs font-semibold mb-1.5">Puesto en Junta Directiva</label>
+                    <input type="text" value={formulario.puestoJuntaDirectiva} onChange={e => setFormulario(prev => ({ ...prev, puestoJuntaDirectiva: e.target.value }))} className={inputClass} />
                   </div>
-                ))}
+                )}
+
+                {/* Fila 8 */}
                 <div>
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Estado</label>
                   <select
                     value={formulario.estado}
-                    onChange={e => setFormulario({ ...formulario, estado: Number(e.target.value) })}
+                    onChange={e => setFormulario(prev => ({ ...prev, estado: Number(e.target.value) }))}
                     className={inputClass}
                   >
                     <option value={1}>Activo</option>
                     <option value={0}>Inactivo</option>
                   </select>
                 </div>
+                {formulario.estado === 0 && (
+                  <div>
+                    <label className="block text-gray-700 text-xs font-semibold mb-1.5">Fecha de Inactivo</label>
+                    <input
+                      type="date" value={formulario.fechaInactivo}
+                      onChange={e => setFormulario(prev => ({ ...prev, fechaInactivo: e.target.value }))}
+                      className={inputClass}
+                    />
+                  </div>
+                )}
                 <div className="sm:col-span-2">
                   <label className="block text-gray-700 text-xs font-semibold mb-1.5">Dirección</label>
                   <input
                     type="text" value={formulario.direccion}
-                    onChange={e => setFormulario({ ...formulario, direccion: e.target.value })}
+                    onChange={e => setFormulario(prev => ({ ...prev, direccion: e.target.value }))}
                     className={inputClass}
                   />
                 </div>
-              </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">Observaciones</label>
+                  <textarea
+                    value={formulario.observaciones}
+                    onChange={e => setFormulario(prev => ({ ...prev, observaciones: e.target.value }))}
+                    rows={3}
+                    placeholder="Notas adicionales sobre el asociado..."
+                    className={inputClass + ' resize-none'}
+                  />
+                </div>
+
+                {/* ── Documentos ── */}
+                <div className="sm:col-span-2">
+                  <div className="border-t pt-4 mt-1">
+                    <h3 className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-3 flex items-center gap-2">
+                      <span className="w-5 h-5 rounded bg-[#003366]/10 flex items-center justify-center text-[#003366] text-[10px]">📎</span>
+                      Documentos (PDF, JPG, PNG — máx. 10 MB)
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {([
+                        { label: 'Cédula', key: 'cedula', urlKey: 'urlCedula' },
+                        { label: 'Carta de Solicitud', key: 'solicitud', urlKey: 'urlCartaSolicitud' },
+                        { label: 'Carta de Renuncia', key: 'renuncia', urlKey: 'urlCartaRenuncia' },
+                        { label: 'Carta de Desafiliación', key: 'desafiliacion', urlKey: 'urlCartaDesafiliacion' },
+                        { label: 'Otros documentos', key: 'otros', urlKey: 'urlOtros' },
+                      ] as const).map(({ label, key, urlKey }) => (
+                        <div key={key}>
+                          <label className="block text-xs font-semibold text-gray-500 mb-1">{label}</label>
+                          <input type="file" accept=".pdf,image/*"
+                            className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-[#003366] file:text-white hover:file:bg-[#004488]"
+                            onChange={e => setArchivosAsoc(prev => ({ ...prev, [key]: e.target.files?.[0] ?? null }))} />
+                          {archivosAsoc[key] && <p className="mt-0.5 text-[10px] text-gray-400 truncate">{archivosAsoc[key]!.name}</p>}
+                          {!archivosAsoc[key] && formulario[urlKey] && (
+                            <a href={`/api/blob-download?url=${encodeURIComponent(formulario[urlKey])}`} target="_blank" rel="noopener noreferrer"
+                              className="mt-0.5 inline-flex items-center gap-1 text-[10px] text-blue-600 hover:text-blue-800">
+                              📄 Ver archivo existente
+                            </a>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </form>
             </div>
             <div className="bg-gray-50 border-t px-6 py-4 flex justify-end gap-3 flex-shrink-0">
               <button
@@ -595,12 +1185,12 @@ export default function ConsultarAsociadosPage() {
                 Cancelar
               </button>
               <button
-                onClick={guardarCambios} disabled={guardando}
+                type="submit" form="asociado-form" disabled={guardando}
                 className={`px-5 py-2 text-sm rounded-lg font-semibold text-white transition-colors ${
                   guardando ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#003366] hover:bg-[#004488]'
                 }`}
               >
-                {guardando ? 'Guardando...' : 'Guardar cambios'}
+                {guardando ? 'Guardando...' : (asociadoEditando ? 'Guardar cambios' : 'Registrar')}
               </button>
             </div>
           </div>
@@ -689,6 +1279,162 @@ export default function ConsultarAsociadosPage() {
           </div>
         </div>
       )}
+
+      {/* ── Modal Importar ── */}
+      {modalImportOpen && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setModalImportOpen(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="bg-[#003366] px-6 py-4 flex items-center justify-between">
+              <h2 className="text-white font-bold text-base">Importar Asociados desde Excel</h2>
+              <button onClick={() => setModalImportOpen(false)} className="text-white/70 hover:text-white"><FaTimes /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              {!importResult ? (
+                <>
+                  <p className="text-sm text-gray-600">Seleccioná un archivo <strong>.xlsx</strong> o <strong>.xls</strong>. Las filas con cédula duplicada serán omitidas automáticamente.</p>
+                  <input type="file" accept=".xlsx,.xls"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) parsearArchivoAsociados(f); }}
+                    className="block w-full text-sm text-gray-700 border border-gray-300 rounded-lg px-3 py-2 cursor-pointer file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-[#003366] file:text-white hover:file:bg-[#002244]"
+                  />
+                  {importRows.length > 0 && (
+                    <>
+                      <p className="text-xs text-gray-500">{importRows.length} filas detectadas. Vista previa (primeras 5):</p>
+                      <div className="overflow-x-auto rounded-lg border border-gray-200">
+                        <table className="min-w-full text-xs">
+                          <thead className="bg-gray-50">
+                            <tr>{Object.keys(importRows[0]).slice(0,6).map(k => <th key={k} className="px-3 py-2 text-left font-semibold text-gray-600">{k}</th>)}</tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {importRows.slice(0,5).map((r,i) => (
+                              <tr key={i}>{Object.values(r).slice(0,6).map((v:any,j) => <td key={j} className="px-3 py-2 text-gray-700 truncate max-w-[120px]">{String(v)}</td>)}</tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="flex justify-end gap-3">
+                        <button onClick={() => setModalImportOpen(false)} className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100">Cancelar</button>
+                        <button onClick={confirmarImportacionAsociados} disabled={importLoading}
+                          className="px-5 py-2 text-sm rounded-lg font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50">
+                          {importLoading ? 'Importando...' : `Importar ${importRows.length} filas`}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </>
+              ) : (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-3 gap-3 text-center">
+                    <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                      <p className="text-2xl font-bold text-green-700">{importResult.importados}</p>
+                      <p className="text-xs text-green-600 mt-1">Importados</p>
+                    </div>
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+                      <p className="text-2xl font-bold text-yellow-700">{importResult.omitidos}</p>
+                      <p className="text-xs text-yellow-600 mt-1">Omitidos (duplicados)</p>
+                    </div>
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                      <p className="text-2xl font-bold text-red-700">{importResult.errores.length}</p>
+                      <p className="text-xs text-red-600 mt-1">Con error</p>
+                    </div>
+                  </div>
+                  {importResult.errores.length > 0 && (
+                    <div className="rounded-lg border border-red-200 overflow-hidden">
+                      <p className="bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">Filas con error:</p>
+                      <ul className="divide-y divide-red-100 max-h-40 overflow-y-auto">
+                        {importResult.errores.map((e,i) => (
+                          <li key={i} className="px-3 py-2 text-xs text-gray-700">Fila {e.fila} · {e.cedula} — {e.motivo}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  <div className="flex justify-end">
+                    <button onClick={() => setModalImportOpen(false)} className="px-5 py-2 text-sm rounded-lg font-semibold text-white bg-[#003366] hover:bg-[#002244]">Cerrar</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal Documentos ── */}
+      {modalDocsOpen && docsAsociado && (
+        <ModalDocumentosAsociado
+          asociado={docsAsociado}
+          onClose={() => { setModalDocsOpen(false); setDocsAsociado(null); }}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MODAL DOCUMENTOS ASOCIADO
+══════════════════════════════════════════════════════════════════════════ */
+type DocEntry = { label: string; url: string };
+
+function ModalDocumentosAsociado({ asociado, onClose }: { asociado: AsociadoRow; onClose: () => void }) {
+  const docs: DocEntry[] = [
+    { label: 'Cédula',               url: asociado.urlCedula ?? '' },
+    { label: 'Carta de Solicitud',   url: asociado.urlCartaSolicitud ?? '' },
+    { label: 'Carta de Renuncia',    url: asociado.urlCartaRenuncia ?? '' },
+    { label: 'Carta de Desafiliación', url: asociado.urlCartaDesafiliacion ?? '' },
+    { label: 'Otros',                url: asociado.urlOtros ?? '' },
+  ];
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="bg-[#003366] px-6 py-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-white font-bold text-base">Documentos</h2>
+            <p className="text-blue-200 text-xs mt-0.5">{asociado.nombreCompleto}</p>
+          </div>
+          <button onClick={onClose} className="text-white/70 hover:text-white transition-colors">
+            <FaTimes />
+          </button>
+        </div>
+        <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[70vh] overflow-y-auto">
+          {docs.map(doc => (
+            <DocViewer key={doc.label} label={doc.label} url={doc.url} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DocViewer({ label, url }: { label: string; url: string }) {
+  const proxyUrl = url ? `/api/blob-download?url=${encodeURIComponent(url)}` : '';
+  const esImagen = url ? /\.(jpg|jpeg|png|webp|gif)$/i.test(url) : false;
+  const esPdf    = url ? /\.pdf$/i.test(url) : false;
+
+  return (
+    <div className="border border-gray-200 rounded-xl overflow-hidden">
+      <div className="bg-gray-50 px-3 py-2 border-b border-gray-200 flex items-center justify-between">
+        <span className="text-xs font-semibold text-gray-700">{label}</span>
+        {url && (
+          <a href={proxyUrl} target="_blank" rel="noopener noreferrer"
+            className="text-[10px] text-blue-600 hover:underline flex items-center gap-1">
+            Abrir <FaFolderOpen className="text-[10px]" />
+          </a>
+        )}
+      </div>
+      <div className="flex items-center justify-center bg-gray-50 h-40">
+        {!url ? (
+          <p className="text-xs text-gray-400">Sin archivo</p>
+        ) : esImagen ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img src={proxyUrl} alt={label} className="max-h-40 max-w-full object-contain" />
+        ) : esPdf ? (
+          <iframe src={proxyUrl} className="w-full h-40 border-0" title={label} />
+        ) : (
+          <a href={proxyUrl} target="_blank" rel="noopener noreferrer"
+            className="text-xs text-blue-600 hover:underline">
+            Ver documento
+          </a>
+        )}
+      </div>
     </div>
   );
 }

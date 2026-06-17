@@ -6,6 +6,14 @@ import { FaChurch, FaUser, FaSignOutAlt, FaBars, FaTimes, FaCog } from 'react-ic
 import { useAuth } from '@/hooks/useAuth';
 import { usePathname } from 'next/navigation';
 
+const ROL_LABELS: Record<string, string> = {
+  admin: 'Admin',
+  tesorero: 'Tesorero',
+  pastorGeneral: 'Pastor General',
+  juntaDirectiva: 'Junta Directiva',
+  asistenteAdministrativo: 'Asistente Adm.',
+};
+
 export default function Navbar() {
   const { user, isAuthenticated, logout, loading } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -32,12 +40,12 @@ export default function Navbar() {
                   <FaUser className="text-sm opacity-70" />
                   <span className="text-sm font-medium">{user.nombreCompleto}</span>
                   <span className="text-xs bg-white/20 px-2 py-1 rounded">
-                    {user.rol === 'admin' ? 'Admin' : user.rol === 'tesorero' ? 'Tesorero' : 'Pastor General'}
+                    {ROL_LABELS[user.rol] || user.rol}
                   </span>
                 </div>
 
                 {/* Configuración (admin | tesorero | pastorGeneral) */}
-                {['admin', 'tesorero', 'pastorGeneral'].includes(user.rol) && (
+                {['admin', 'tesorero', 'pastorGeneral', 'asistenteAdministrativo'].includes(user.rol) && (
                   <Link
                     href="/configuracion"
                     className="flex items-center gap-2 hover:text-gray-300 transition-colors text-sm font-medium"
@@ -86,10 +94,10 @@ export default function Navbar() {
                 <FaUser className="text-sm opacity-70" />
                 <span className="text-sm font-medium">{user.nombreCompleto}</span>
                 <span className="text-xs bg-white/20 px-2 py-0.5 rounded ml-auto">
-                  {user.rol === 'admin' ? 'Admin' : user.rol === 'tesorero' ? 'Tesorero' : 'Pastor'}
+                  {ROL_LABELS[user.rol] || user.rol}
                 </span>
               </div>
-              {user.rol === 'admin' && (
+              {['admin', 'tesorero', 'pastorGeneral', 'asistenteAdministrativo'].includes(user.rol) && (
                 <Link
                   href="/configuracion"
                   onClick={() => setMenuOpen(false)}

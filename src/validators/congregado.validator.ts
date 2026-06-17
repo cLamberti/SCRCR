@@ -1,4 +1,4 @@
-import { EstadoCivil, EstadoCongregado } from '@/models/Congregado';
+import { EstadoCivil, EstadoCongregado, normalizarEstadoCivil } from '@/models/Congregado';
 import {
     CrearCongregadoRequest,
     ActualizarCongregadoRequest,
@@ -7,6 +7,22 @@ import {
 
 // Regex para validar formato de teléfono (dígitos, espacios, +, -, paréntesis)
 const PHONE_REGEX = /^[\d\s\-+()]+$/;
+const PHONE_MAX_LENGTH = 20;
+
+function validarTelefonoOpcional(valor: string, label: string): string[] {
+    const errors: string[] = [];
+    const cleanPhone = valor.replace(/[\s\-+()]/g, '');
+    if (!PHONE_REGEX.test(valor)) {
+        errors.push(`${label} contiene caracteres no válidos`);
+    } else if (cleanPhone.length < 8) {
+        errors.push(`${label} debe tener al menos 8 dígitos`);
+    } else if (cleanPhone.length > PHONE_MAX_LENGTH) {
+        errors.push(`${label} no puede exceder ${PHONE_MAX_LENGTH} dígitos`);
+    } else if (valor.length > PHONE_MAX_LENGTH) {
+        errors.push(`${label} no puede exceder ${PHONE_MAX_LENGTH} caracteres`);
+    }
+    return errors;
+}
 
 // Regex básico para validar URL (http o https)
 const URL_REGEX = /^https?:\/\/.+/i;
@@ -75,14 +91,7 @@ export class CongregadoValidator {
 
         // Segundo teléfono (opcional)
         if (data.segundoTelefono !== undefined && data.segundoTelefono !== null && data.segundoTelefono !== '') {
-            const cleanPhone2 = data.segundoTelefono.replace(/[\s\-+()]/g, '');
-            if (!PHONE_REGEX.test(data.segundoTelefono)) {
-                errors.push('El segundo teléfono contiene caracteres no válidos');
-            } else if (cleanPhone2.length < 8) {
-                errors.push('El segundo teléfono debe tener al menos 8 dígitos');
-            } else if (cleanPhone2.length > 20) {
-                errors.push('El segundo teléfono no puede exceder 20 dígitos');
-            }
+            errors.push(...validarTelefonoOpcional(data.segundoTelefono, 'El segundo teléfono'));
         }
 
         // Estado civil
@@ -184,19 +193,12 @@ export class CongregadoValidator {
             }
         }
 
-        // Segundo teléfono (si se proporciona; null = eliminar)
-        if (data.segundoTelefono !== undefined && data.segundoTelefono !== null && data.segundoTelefono !== '') {
+        // Segundo teléfono (si se proporciona; null o '' = eliminar/limpiar)
+        if (data.segundoTelefono !== undefined) {
             check(data.segundoTelefono);
-            const cleanPhone2 = data.segundoTelefono.replace(/[\s\-+()]/g, '');
-            if (!PHONE_REGEX.test(data.segundoTelefono)) {
-                errors.push('El segundo teléfono contiene caracteres no válidos');
-            } else if (cleanPhone2.length < 8) {
-                errors.push('El segundo teléfono debe tener al menos 8 dígitos');
-            } else if (cleanPhone2.length > 20) {
-                errors.push('El segundo teléfono no puede exceder 20 dígitos');
+            if (data.segundoTelefono !== null && data.segundoTelefono !== '') {
+                errors.push(...validarTelefonoOpcional(data.segundoTelefono, 'El segundo teléfono'));
             }
-        } else if (data.segundoTelefono === null) {
-            check(data.segundoTelefono);
         }
 
         // Estado civil (si se proporciona)
@@ -217,25 +219,25 @@ export class CongregadoValidator {
             }
         }
 
-        // Segundo ministerio (si se proporciona; null = eliminar)
-        if (data.segundoMinisterio !== undefined && data.segundoMinisterio !== null && data.segundoMinisterio !== '') {
+        // Segundo ministerio (si se proporciona; null o '' = eliminar/limpiar)
+        if (data.segundoMinisterio !== undefined) {
             check(data.segundoMinisterio);
-            if (data.segundoMinisterio.length > 50) {
-                errors.push('El segundo ministerio no puede exceder 50 caracteres');
-            } else if (data.ministerio && data.segundoMinisterio.trim().toLowerCase() === data.ministerio.trim().toLowerCase()) {
-                errors.push('El segundo ministerio no puede ser igual al ministerio principal');
+            if (data.segundoMinisterio !== null && data.segundoMinisterio !== '') {
+                if (data.segundoMinisterio.length > 50) {
+                    errors.push('El segundo ministerio no puede exceder 50 caracteres');
+                } else if (data.ministerio && data.segundoMinisterio.trim().toLowerCase() === data.ministerio.trim().toLowerCase()) {
+                    errors.push('El segundo ministerio no puede ser igual al ministerio principal');
+                }
             }
-        } else if (data.segundoMinisterio === null) {
-            check(data.segundoMinisterio);
         }
 
-        // URL foto cédula (si se proporciona)
+        // URL foto cédula (en actualización se acepta ruta relativa o URL ya guardada)
         if (data.urlFotoCedula !== undefined) {
             check(data.urlFotoCedula);
             if (data.urlFotoCedula.trim().length === 0) {
                 errors.push('La URL de la foto de cédula no puede estar vacía');
-            } else if (!URL_REGEX.test(data.urlFotoCedula)) {
-                errors.push('La URL de la foto de cédula no es válida (debe comenzar con http:// o https://)');
+            } else if (data.urlFotoCedula.length > 500) {
+                errors.push('La URL de la foto de cédula no puede exceder 500 caracteres');
             }
         }
 
@@ -266,10 +268,20 @@ export class CongregadoValidator {
         if (sanitized.nombre) sanitized.nombre = sanitized.nombre.trim();
         if (sanitized.cedula) sanitized.cedula = sanitized.cedula.trim();
         if (sanitized.telefono) sanitized.telefono = sanitized.telefono.trim();
-        if (sanitized.segundoTelefono) sanitized.segundoTelefono = sanitized.segundoTelefono.trim();
+        if (sanitized.segundoTelefono !== undefined && sanitized.segundoTelefono !== null) {
+            const trimmed = sanitized.segundoTelefono.trim();
+            sanitized.segundoTelefono = trimmed.length > 0 ? trimmed : null;
+        }
         if (sanitized.ministerio) sanitized.ministerio = sanitized.ministerio.trim();
-        if (sanitized.segundoMinisterio) sanitized.segundoMinisterio = sanitized.segundoMinisterio.trim();
+        if (sanitized.segundoMinisterio !== undefined && sanitized.segundoMinisterio !== null) {
+            const trimmed = sanitized.segundoMinisterio.trim();
+            sanitized.segundoMinisterio = trimmed.length > 0 ? trimmed : null;
+        }
         if (sanitized.urlFotoCedula) sanitized.urlFotoCedula = sanitized.urlFotoCedula.trim();
+        if (sanitized.estadoCivil) {
+            const estadoCivilNormalizado = normalizarEstadoCivil(sanitized.estadoCivil);
+            if (estadoCivilNormalizado) sanitized.estadoCivil = estadoCivilNormalizado;
+        }
 
         return sanitized;
     }

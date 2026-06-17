@@ -14,6 +14,11 @@ export interface CrearCongregadoRequest {
     segundoMinisterio?: string;     // Opcional, string libre
     urlFotoCedula: string;
     estado?: EstadoCongregado;      // Default: ACTIVO (1)
+    observaciones?: string;
+    fechaNacimiento?: string;
+    correo?: string;
+    profesion?: string;
+    direccion?: string;
 }
 
 /**
@@ -30,6 +35,11 @@ export interface ActualizarCongregadoRequest {
     segundoMinisterio?: string | null; // null = borrar el segundo ministerio
     urlFotoCedula?: string;
     estado?: EstadoCongregado;
+    observaciones?: string | null;
+    fechaNacimiento?: string | null;
+    correo?: string | null;
+    profesion?: string | null;
+    direccion?: string | null;
 }
 
 /**
@@ -47,6 +57,11 @@ export interface CongregadoResponse {
     segundoMinisterio?: string;
     urlFotoCedula: string;
     estado: number;
+    observaciones?: string;
+    fechaNacimiento?: string;
+    correo?: string;
+    profesion?: string;
+    direccion?: string;
     createdAt: string;              // ISO timestamp
     updatedAt: string;              // ISO timestamp
 }
