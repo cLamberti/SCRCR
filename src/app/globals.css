@@ -364,6 +364,62 @@ html:has([data-dashboard]) .flex-grow { min-width: 0; }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
+   OVERRIDES DE MODO OSCURO — página principal (home con Navbar)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Fondos */
+html:has([data-home]).dark [data-home],
+html:has([data-home]).dark [data-home] .bg-gray-50 { background-color: #0f172a !important; }
+
+html:has([data-home]).dark [data-home] .bg-white { background-color: #1e293b !important; }
+
+html:has([data-home]).dark [data-home] .bg-gray-100 { background-color: #273549 !important; }
+
+/* Texto */
+html:has([data-home]).dark [data-home] .text-gray-900,
+html:has([data-home]).dark [data-home] .text-gray-800 { color: #f1f5f9 !important; }
+
+html:has([data-home]).dark [data-home] .text-gray-700 { color: #cbd5e1 !important; }
+
+html:has([data-home]).dark [data-home] .text-gray-600,
+html:has([data-home]).dark [data-home] .text-gray-500 { color: #94a3b8 !important; }
+
+html:has([data-home]).dark [data-home] .text-gray-400 { color: #64748b !important; }
+
+/* Accent */
+html:has([data-home]).dark [data-home] .text-\[\#003366\] { color: var(--p-light) !important; }
+
+/* Bordes */
+html:has([data-home]).dark [data-home] .border-gray-100,
+html:has([data-home]).dark [data-home] .border-gray-200,
+html:has([data-home]).dark [data-home] .border-gray-300 { border-color: #334155 !important; }
+
+/* Badges de colores */
+html:has([data-home]).dark [data-home] .bg-blue-50   { background-color: rgba(59,130,246,0.15) !important; }
+html:has([data-home]).dark [data-home] .bg-green-50  { background-color: rgba(16,185,129,0.15) !important; }
+html:has([data-home]).dark [data-home] .bg-red-50    { background-color: rgba(239,68,68,0.15)  !important; }
+html:has([data-home]).dark [data-home] .bg-yellow-50 { background-color: rgba(234,179,8,0.15)  !important; }
+html:has([data-home]).dark [data-home] .bg-amber-50  { background-color: rgba(245,158,11,0.15) !important; }
+
+/* Textos en badges */
+html:has([data-home]).dark [data-home] .text-red-800  { color: #fca5a5 !important; }
+html:has([data-home]).dark [data-home] .text-red-700  { color: #fca5a5 !important; }
+html:has([data-home]).dark [data-home] .text-yellow-800 { color: #fde68a !important; }
+
+/* Sombras */
+html:has([data-home]).dark [data-home] .shadow-sm { box-shadow: 0 1px 2px rgba(0,0,0,0.4) !important; }
+html:has([data-home]).dark [data-home] .shadow-lg { box-shadow: 0 10px 15px rgba(0,0,0,0.5) !important; }
+
+/* Cards hover */
+html:has([data-home]).dark [data-home] .hover\:shadow-lg:hover { box-shadow: 0 10px 15px rgba(0,0,0,0.6) !important; }
+html:has([data-home]).dark [data-home] .hover\:border-gray-200:hover { border-color: #475569 !important; }
+
+/* Tema-aware accent text */
+html:has([data-home]).dark[data-theme="sky"]    [data-home] .text-\[\#003366\] { color: #7dd3fc !important; }
+html:has([data-home]).dark[data-theme="green"]  [data-home] .text-\[\#003366\] { color: #86efac !important; }
+html:has([data-home]).dark[data-theme="violet"] [data-home] .text-\[\#003366\] { color: #c4b5fd !important; }
+
+/* ══════════════════════════════════════════════════════════════════════════
    RESPONSIVE GENERAL — mejoras globales
    ══════════════════════════════════════════════════════════════════════════ */
 

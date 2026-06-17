@@ -1,18 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
-import { MODULOS, PERMISOS_DEFAULT, ROLES, type Rol, type ModuloKey } from '@/lib/modulos';
+import { MODULOS, PERMISOS_DEFAULT, type Rol, type ModuloKey } from '@/lib/modulos';
 
 type PermisoMatrix = Record<string, Record<string, boolean>>;
 
-async function ensureSeed() {
+const BASE_ROLES = [
+  { key: 'admin',                   label: 'Administrador',            esBase: true },
+  { key: 'pastorGeneral',           label: 'Pastor General',           esBase: true },
+  { key: 'juntaDirectiva',          label: 'Junta Directiva',          esBase: true },
+  { key: 'asistenteAdministrativo', label: 'Asistente Administrativo', esBase: true },
+];
+
+async function ensureRolesSeed() {
+  const count = await prisma.rolDefinicion.count();
+  if (count === 0) {
+    await prisma.rolDefinicion.createMany({ data: BASE_ROLES, skipDuplicates: true });
+  }
+}
+
+async function ensurePermisosSeed(roles: { key: string }[]) {
   const count = await prisma.permisoRol.count();
   if (count > 0) return;
 
   const records: { rol: string; modulo: string; activo: boolean }[] = [];
-  for (const [modulo, roles] of Object.entries(PERMISOS_DEFAULT)) {
-    for (const { key: rol } of ROLES) {
-      records.push({ rol, modulo, activo: roles.includes(rol as Rol) });
+  for (const [modulo, allowedRoles] of Object.entries(PERMISOS_DEFAULT)) {
+    for (const { key: rol } of roles) {
+      records.push({ rol, modulo, activo: allowedRoles.includes(rol as Rol) });
     }
   }
   await prisma.permisoRol.createMany({ data: records, skipDuplicates: true });
@@ -20,13 +34,16 @@ async function ensureSeed() {
 
 export async function GET() {
   try {
-    await ensureSeed();
+    await ensureRolesSeed();
+    const roles = await prisma.rolDefinicion.findMany({ orderBy: [{ esBase: 'desc' }, { createdAt: 'asc' }] });
+    await ensurePermisosSeed(roles);
+
     const rows = await prisma.permisoRol.findMany();
 
     const matrix: PermisoMatrix = {};
     for (const { key: mod } of MODULOS) {
       matrix[mod] = {};
-      for (const { key: rol } of ROLES) {
+      for (const { key: rol } of roles) {
         matrix[mod][rol] = false;
       }
     }
@@ -34,7 +51,7 @@ export async function GET() {
       if (matrix[row.modulo]) matrix[row.modulo][row.rol] = row.activo;
     }
 
-    return NextResponse.json({ success: true, data: matrix });
+    return NextResponse.json({ success: true, data: matrix, roles });
   } catch (error) {
     console.error('GET /api/roles-config:', error);
     return NextResponse.json({ success: false, message: 'Error al obtener permisos.' }, { status: 500 });
@@ -59,6 +76,7 @@ export async function PUT(request: NextRequest) {
     const ops: Promise<unknown>[] = [];
     for (const [modulo, roles] of Object.entries(body)) {
       for (const [rol, activo] of Object.entries(roles)) {
+        // Locked cells: base role restrictions
         const locked = BLOQUEADOS[modulo as ModuloKey];
         if (locked?.includes(rol as Rol)) continue;
         if (modulo === 'gestion-roles' && rol !== 'admin') continue;
