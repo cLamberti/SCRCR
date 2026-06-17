@@ -11,6 +11,7 @@ import {
 } from "react-icons/fa";
 import Sidebar from "@/components/SideBar";
 import { EstadoCivil, normalizarEstadoCivil } from "@/models/Congregado";
+import Swal from 'sweetalert2';
 
 type CongregadoRow = {
   id: number;
