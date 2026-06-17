@@ -310,7 +310,7 @@ export default function GestionRolesPage() {
                   </thead>
                   <tbody>
                     {MODULOS.map((mod, i) => (
-                      <tr key={mod.key} className={`border-t border-gray-100 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                      <tr key={mod.key} className={`border-t border-gray-100 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
                         <td className="px-5 py-3.5">
                           <p className="font-semibold text-gray-800 text-xs">{mod.label}</p>
                           <p className="text-gray-400 text-[11px] mt-0.5 leading-snug">{mod.descripcion}</p>
