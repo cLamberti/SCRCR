@@ -28,24 +28,24 @@ type FormState = {
   rol: string;
 };
 
-const ROL_COLORS: Record<string, string> = {
-  admin: "bg-purple-100 text-purple-800",
-  pastorGeneral: "bg-amber-100 text-amber-800",
-  juntaDirectiva: "bg-blue-100 text-blue-800",
-  asistenteAdministrativo: "bg-emerald-100 text-emerald-800",
+const ROL_COLORS: Record<string, { badge: string; bar: string }> = {
+  admin: { badge: "bg-purple-100 text-purple-800", bar: "bg-purple-400" },
+  pastorGeneral: { badge: "bg-amber-100 text-amber-800", bar: "bg-amber-400" },
+  juntaDirectiva: { badge: "bg-blue-100 text-blue-800", bar: "bg-blue-400" },
+  asistenteAdministrativo: { badge: "bg-emerald-100 text-emerald-800", bar: "bg-emerald-400" },
 };
 
-const PALETTE = [
-  "bg-sky-100 text-sky-800",
-  "bg-rose-100 text-rose-800",
-  "bg-teal-100 text-teal-800",
-  "bg-orange-100 text-orange-800",
-  "bg-indigo-100 text-indigo-800",
-  "bg-pink-100 text-pink-800",
+const PALETTE: { badge: string; bar: string }[] = [
+  { badge: "bg-sky-100 text-sky-800", bar: "bg-sky-400" },
+  { badge: "bg-rose-100 text-rose-800", bar: "bg-rose-400" },
+  { badge: "bg-teal-100 text-teal-800", bar: "bg-teal-400" },
+  { badge: "bg-orange-100 text-orange-800", bar: "bg-orange-400" },
+  { badge: "bg-indigo-100 text-indigo-800", bar: "bg-indigo-400" },
+  { badge: "bg-pink-100 text-pink-800", bar: "bg-pink-400" },
 ];
 let _paletteIdx = 0;
-const dynamicColors: Record<string, string> = {};
-function getRolColor(key: string): string {
+const dynamicColors: Record<string, { badge: string; bar: string }> = {};
+function getRolColor(key: string): { badge: string; bar: string } {
   if (ROL_COLORS[key]) return ROL_COLORS[key];
   if (!dynamicColors[key]) dynamicColors[key] = PALETTE[_paletteIdx++ % PALETTE.length];
   return dynamicColors[key];
@@ -341,7 +341,7 @@ export default function GestionUsuariosPage() {
                     {roles.map(r => (
                       <label key={r.key} className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 cursor-pointer transition ${formState.rol === r.key ? "border-[#003366] bg-[#003366]/5" : "border-gray-200 hover:border-gray-300"}`}>
                         <input type="radio" name="rol" value={r.key} checked={formState.rol === r.key} onChange={() => setFormState(p => ({ ...p, rol: r.key }))} className="sr-only" />
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${getRolColor(r.key)}`}>{r.label}</span>
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${getRolColor(r.key).badge}`}>{r.label}</span>
                       </label>
                     ))}
                   </div>
@@ -384,7 +384,7 @@ export default function GestionUsuariosPage() {
             </div>
             {roles.map(r => (
               <div key={r.key} className="bg-white rounded-xl border border-gray-200 p-4">
-                <div className={`w-8 h-1 rounded-full mb-2 ${getRolColor(r.key).replace('text-', 'bg-').split(' ')[0].replace('bg-', 'bg-').replace('-100', '-400')}`} />
+                <div className={`w-8 h-1 rounded-full mb-2 ${getRolColor(r.key).bar}`} />
                 <p className="text-2xl font-bold text-gray-900">{usuarios.filter(u => u.rol === r.key).length}</p>
                 <p className="text-xs text-gray-400 font-medium truncate">{r.label}</p>
               </div>
@@ -430,7 +430,7 @@ export default function GestionUsuariosPage() {
                           <td className="px-6 py-4 text-gray-600 font-mono text-xs">@{u.username}</td>
                           <td className="px-6 py-4 text-gray-600 text-xs">{u.email}</td>
                           <td className="px-6 py-4">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${getRolColor(u.rol)}`}>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${getRolColor(u.rol).badge}`}>
                               {roles.find(r => r.key === u.rol)?.label ?? u.rol}
                             </span>
                           </td>
@@ -478,7 +478,7 @@ export default function GestionUsuariosPage() {
                         </div>
                       </div>
                       <p className="text-xs text-gray-500 mb-2">{u.email}</p>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${getRolColor(u.rol)}`}>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${getRolColor(u.rol).badge}`}>
                         {roles.find(r => r.key === u.rol)?.label ?? u.rol}
                       </span>
                     </div>
