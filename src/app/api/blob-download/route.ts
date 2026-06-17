@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const BLOB_HOSTNAME_PATTERN = /^[a-z0-9-]+\.blob\.vercel-storage\.com$/i;
+const BLOB_HOSTNAME_PATTERN = /^([a-z0-9-]+\.)+blob\.vercel-storage\.com$/i;
 
 function isValidBlobUrl(url: string): boolean {
   try {
