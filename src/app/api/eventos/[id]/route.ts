@@ -161,7 +161,7 @@ export async function PUT(
   }
 }
 
-/** DELETE /api/eventos/[id] — soft delete */
+/** DELETE /api/eventos/[id] — soft delete or permanent with ?permanente=true */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -188,11 +188,17 @@ export async function DELETE(
       );
     }
 
+    const permanente = request.nextUrl.searchParams.get('permanente') === 'true';
+
+    if (permanente) {
+      await prisma.evento.delete({ where: { id } });
+      await AuditoriaDAO.registrar('eventos', id, 'eliminacion', `Eliminación permanente del evento: ${actual.nombre}`);
+      return NextResponse.json({ success: true, message: "Evento eliminado permanentemente" });
+    }
+
     const result = await prisma.evento.update({
       where: { id },
-      data: {
-        activo: false
-      }
+      data: { activo: false }
     });
 
     await AuditoriaDAO.registrar('eventos', id, 'eliminacion', `Desactivación del evento: ${result.nombre}`);
