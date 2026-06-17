@@ -8,7 +8,7 @@ import {
   FaSearch, FaEdit, FaTrash, FaUsers,
   FaChevronLeft, FaChevronRight, FaExclamationTriangle,
   FaCalendarAlt, FaCheckCircle, FaFileExcel, FaFilePdf,
-  FaFolderOpen, FaTimes
+  FaFolderOpen, FaTimes, FaFileImport, FaDownload
 } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 import { AsociadoResponse } from '@/dto/asociado.dto';
@@ -101,6 +101,12 @@ export default function ConsultarAsociadosPage() {
   /* Modal documentos */
   const [modalDocsOpen, setModalDocsOpen] = useState(false);
   const [docsAsociado, setDocsAsociado] = useState<AsociadoRow | null>(null);
+
+  /* Modal importar */
+  const [modalImportOpen, setModalImportOpen] = useState(false);
+  const [importRows, setImportRows] = useState<any[]>([]);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importResult, setImportResult] = useState<{ importados: number; omitidos: number; errores: { fila: number; cedula: string; motivo: string }[] } | null>(null);
 
   /* Modal confirmación eliminación masiva */
   const [modalDeleteOpen,    setModalDeleteOpen]    = useState(false);
@@ -212,6 +218,55 @@ export default function ConsultarAsociadosPage() {
   };
 
   const limpiarSeleccion = () => setSeleccionados(new Set());
+
+  /* ─── Importar Excel ─── */
+  const descargarPlantillaAsociados = async () => {
+    const { utils, writeFile } = await import('xlsx');
+    const cols = ['nombreCompleto','cedula','correo','telefono','telefonoContacto','ministerio','direccion','fechaIngreso','fechaNacimiento','estadoCivil','profesion','anosCongregarse','observaciones'];
+    const ejemplo = [{ nombreCompleto:'Juan Pérez', cedula:'123456789', correo:'juan@correo.com', telefono:'88001234', telefonoContacto:'', ministerio:'Alabanza', direccion:'San José', fechaIngreso:'2024-01-15', fechaNacimiento:'1990-05-20', estadoCivil:'Casado(a)', profesion:'Ingeniero', anosCongregarse:5, observaciones:'' }];
+    const ws = utils.json_to_sheet(ejemplo, { header: cols });
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, 'Asociados');
+    writeFile(wb, 'plantilla_asociados.xlsx');
+  };
+
+  const parsearArchivoAsociados = async (file: File) => {
+    const { read, utils } = await import('xlsx');
+    const buf = await file.arrayBuffer();
+    const wb = read(buf, { type: 'array', cellDates: true });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows: any[] = utils.sheet_to_json(ws, { defval: '' });
+    setImportRows(rows);
+    setImportResult(null);
+  };
+
+  const confirmarImportacionAsociados = async () => {
+    if (importRows.length === 0) return;
+    setImportLoading(true);
+    try {
+      const payload = importRows.map(r => ({
+        nombreCompleto: String(r.nombreCompleto ?? '').trim(),
+        cedula: String(r.cedula ?? '').trim(),
+        correo: String(r.correo ?? '').trim() || undefined,
+        telefono: String(r.telefono ?? '').trim() || undefined,
+        telefonoContacto: String(r.telefonoContacto ?? '').trim() || undefined,
+        ministerio: String(r.ministerio ?? '').trim() || undefined,
+        direccion: String(r.direccion ?? '').trim() || undefined,
+        fechaIngreso: String(r.fechaIngreso ?? '').trim() || undefined,
+        fechaNacimiento: String(r.fechaNacimiento ?? '').trim() || undefined,
+        estadoCivil: String(r.estadoCivil ?? '').trim() || undefined,
+        profesion: String(r.profesion ?? '').trim() || undefined,
+        anosCongregarse: r.anosCongregarse ? Number(r.anosCongregarse) : undefined,
+        observaciones: String(r.observaciones ?? '').trim() || undefined,
+      })).filter(r => r.nombreCompleto && r.cedula);
+      const res = await fetch('/api/asociados/importar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const json = await res.json();
+      setImportResult(json);
+      if (json.importados > 0) await cargar();
+    } finally {
+      setImportLoading(false);
+    }
+  };
 
   /* Asociados seleccionados con sus datos (para el modal) */
   const seleccionadosData = useMemo(
@@ -528,6 +583,14 @@ export default function ConsultarAsociadosPage() {
                 <div className="w-16 h-1 bg-[#003366] rounded mt-1" />
               </div>
               <div className="flex items-center gap-2 flex-wrap justify-end">
+                <button onClick={descargarPlantillaAsociados} title="Descargar plantilla"
+                  className="inline-flex items-center gap-1.5 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold px-3 py-2 rounded-lg transition">
+                  <FaDownload className="text-xs" /> Plantilla
+                </button>
+                <button onClick={() => { setModalImportOpen(true); setImportRows([]); setImportResult(null); }} title="Importar desde Excel"
+                  className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-3 py-2 rounded-lg transition">
+                  <FaFileImport className="text-xs" /> Importar
+                </button>
                 <button onClick={exportarExcel} title="Exportar Excel"
                   className="inline-flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-3 py-2 rounded-lg transition">
                   <FaFileExcel className="text-xs" /> Excel
@@ -1212,6 +1275,83 @@ export default function ConsultarAsociadosPage() {
                   ? 'Eliminar permanentemente'
                   : 'Confirmar eliminación'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal Importar ── */}
+      {modalImportOpen && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setModalImportOpen(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="bg-[#003366] px-6 py-4 flex items-center justify-between">
+              <h2 className="text-white font-bold text-base">Importar Asociados desde Excel</h2>
+              <button onClick={() => setModalImportOpen(false)} className="text-white/70 hover:text-white"><FaTimes /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              {!importResult ? (
+                <>
+                  <p className="text-sm text-gray-600">Seleccioná un archivo <strong>.xlsx</strong> o <strong>.xls</strong>. Las filas con cédula duplicada serán omitidas automáticamente.</p>
+                  <input type="file" accept=".xlsx,.xls"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) parsearArchivoAsociados(f); }}
+                    className="block w-full text-sm text-gray-700 border border-gray-300 rounded-lg px-3 py-2 cursor-pointer file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-[#003366] file:text-white hover:file:bg-[#002244]"
+                  />
+                  {importRows.length > 0 && (
+                    <>
+                      <p className="text-xs text-gray-500">{importRows.length} filas detectadas. Vista previa (primeras 5):</p>
+                      <div className="overflow-x-auto rounded-lg border border-gray-200">
+                        <table className="min-w-full text-xs">
+                          <thead className="bg-gray-50">
+                            <tr>{Object.keys(importRows[0]).slice(0,6).map(k => <th key={k} className="px-3 py-2 text-left font-semibold text-gray-600">{k}</th>)}</tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {importRows.slice(0,5).map((r,i) => (
+                              <tr key={i}>{Object.values(r).slice(0,6).map((v:any,j) => <td key={j} className="px-3 py-2 text-gray-700 truncate max-w-[120px]">{String(v)}</td>)}</tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="flex justify-end gap-3">
+                        <button onClick={() => setModalImportOpen(false)} className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100">Cancelar</button>
+                        <button onClick={confirmarImportacionAsociados} disabled={importLoading}
+                          className="px-5 py-2 text-sm rounded-lg font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50">
+                          {importLoading ? 'Importando...' : `Importar ${importRows.length} filas`}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </>
+              ) : (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-3 gap-3 text-center">
+                    <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                      <p className="text-2xl font-bold text-green-700">{importResult.importados}</p>
+                      <p className="text-xs text-green-600 mt-1">Importados</p>
+                    </div>
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+                      <p className="text-2xl font-bold text-yellow-700">{importResult.omitidos}</p>
+                      <p className="text-xs text-yellow-600 mt-1">Omitidos (duplicados)</p>
+                    </div>
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                      <p className="text-2xl font-bold text-red-700">{importResult.errores.length}</p>
+                      <p className="text-xs text-red-600 mt-1">Con error</p>
+                    </div>
+                  </div>
+                  {importResult.errores.length > 0 && (
+                    <div className="rounded-lg border border-red-200 overflow-hidden">
+                      <p className="bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">Filas con error:</p>
+                      <ul className="divide-y divide-red-100 max-h-40 overflow-y-auto">
+                        {importResult.errores.map((e,i) => (
+                          <li key={i} className="px-3 py-2 text-xs text-gray-700">Fila {e.fila} · {e.cedula} — {e.motivo}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  <div className="flex justify-end">
+                    <button onClick={() => setModalImportOpen(false)} className="px-5 py-2 text-sm rounded-lg font-semibold text-white bg-[#003366] hover:bg-[#002244]">Cerrar</button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
