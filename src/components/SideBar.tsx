@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   FaHome, FaList,
   FaSignOutAlt, FaBars, FaTimes, FaChurch,
-  FaCalendarAlt, FaUsers, FaChartLine, FaCog, FaClipboardList, FaFileAlt, FaBook,
+  FaCalendarAlt, FaUsers, FaUserShield, FaChartLine, FaCog, FaClipboardList, FaFileAlt, FaBook, FaKey,
 } from 'react-icons/fa';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -18,7 +18,6 @@ type NavItem = {
   icon: React.ComponentType<{ className?: string }>;
   href?: string;
   onClick?: () => void;
-  roles: Role[];
 };
 
 interface SidebarProps {
@@ -27,76 +26,17 @@ interface SidebarProps {
 }
 
 const NAV_ITEMS: Omit<NavItem, 'onClick'>[] = [
-  {
-    id: 'inicio',
-    href: '/',
-    icon: FaHome,
-    label: 'Inicio',
-    roles: ['admin', 'pastorGeneral', 'juntaDirectiva', 'asistenteAdministrativo'],
-  },
-  {
-    id: 'listado',
-    href: '/consulta-asociados',
-    icon: FaList,
-    label: 'Listado Asociados',
-    roles: ['admin', 'juntaDirectiva'],
-  },
-  {
-    id: 'congregados',
-    href: '/congregados',
-    icon: FaUsers,
-    label: 'Congregados',
-    roles: ['admin', 'pastorGeneral', 'asistenteAdministrativo'],
-  },
-  {
-    id: 'eventos',
-    href: '/eventos',
-    icon: FaCalendarAlt,
-    label: 'Eventos',
-    roles: ['admin', 'pastorGeneral', 'asistenteAdministrativo'],
-  },
-  {
-    id: 'gestion-usuarios',
-    href: '/gestion-usuarios',
-    icon: FaUsers,
-    label: 'Gestión de Usuarios',
-    roles: ['admin'],
-  },
-  {
-    id: 'planilla',
-    href: '/planilla',
-    icon: FaFileAlt,
-    label: 'Planilla',
-    roles: ['admin', 'pastorGeneral'],
-  },
-  {
-    id: 'reportes',
-    href: '/reportes',
-    icon: FaChartLine,
-    label: 'Reportes',
-    roles: ['admin', 'pastorGeneral', 'juntaDirectiva', 'asistenteAdministrativo'],
-  },
-  {
-    id: 'permisos',
-    href: '/permisos',
-    icon: FaClipboardList,
-    label: 'Permisos',
-    roles: ['admin', 'pastorGeneral', 'juntaDirectiva', 'asistenteAdministrativo'],
-  },
-  {
-    id: 'actas',
-    href: '/actas',
-    icon: FaBook,
-    label: 'Actas',
-    roles: ['admin', 'juntaDirectiva', 'pastorGeneral'],
-  },
-  {
-    id: 'configuracion',
-    href: '/configuracion',
-    icon: FaCog,
-    label: 'Configuración',
-    roles: ['admin', 'pastorGeneral', 'juntaDirectiva', 'asistenteAdministrativo'],
-  },
+  { id: 'inicio',           href: '/',                icon: FaHome,       label: 'Inicio'                },
+  { id: 'listado',          href: '/consulta-asociados', icon: FaList,   label: 'Listado Asociados'     },
+  { id: 'congregados',      href: '/congregados',     icon: FaUsers,      label: 'Congregados'           },
+  { id: 'eventos',          href: '/eventos',         icon: FaCalendarAlt, label: 'Eventos'              },
+  { id: 'gestion-usuarios', href: '/gestion-usuarios', icon: FaUserShield, label: 'Gestión de Usuarios' },
+  { id: 'planilla',         href: '/planilla',        icon: FaFileAlt,    label: 'Planilla'              },
+  { id: 'reportes',         href: '/reportes',        icon: FaChartLine,  label: 'Reportes'              },
+  { id: 'permisos',         href: '/permisos',        icon: FaClipboardList, label: 'Permisos'           },
+  { id: 'actas',            href: '/actas',           icon: FaBook,       label: 'Actas'                 },
+  { id: 'configuracion',    href: '/configuracion',   icon: FaCog,        label: 'Configuración'         },
+  { id: 'gestion-roles',    href: '/gestion-roles',   icon: FaKey,        label: 'Gestión de Roles'      },
 ];
 
 const ROL_LABEL: Record<Role, string> = {
@@ -113,9 +53,10 @@ export default function Sidebar({ activeItem, pageTitle = 'SCRCR' }: SidebarProp
   const { logout, usuario, loading } = useAuth();
 
   const rol = usuario?.rol as Role | undefined;
+  const modulosPermitidos = usuario?.modulosPermitidos ?? [];
 
   const itemsFiltrados: NavItem[] = !loading && rol
-    ? NAV_ITEMS.filter(item => item.roles.includes(rol))
+    ? NAV_ITEMS.filter(item => modulosPermitidos.includes(item.id))
     : [];
 
   const menuItems: NavItem[] = [
@@ -126,7 +67,6 @@ export default function Sidebar({ activeItem, pageTitle = 'SCRCR' }: SidebarProp
         onClick: logout,
         icon: FaSignOutAlt,
         label: 'Cerrar Sesión',
-        roles: ['admin', 'pastorGeneral', 'juntaDirectiva', 'asistenteAdministrativo'] as Role[],
       }]
       : []),
   ];

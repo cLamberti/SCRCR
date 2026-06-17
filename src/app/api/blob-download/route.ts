@@ -1,10 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+const BLOB_HOSTNAME_PATTERN = /^[a-z0-9-]+\.blob\.vercel-storage\.com$/i;
+
+function isValidBlobUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' && BLOB_HOSTNAME_PATTERN.test(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
 export async function GET(request: NextRequest) {
   const blobUrl = request.nextUrl.searchParams.get('url');
 
   if (!blobUrl) {
     return NextResponse.json({ error: 'URL requerida.' }, { status: 400 });
+  }
+
+  if (!isValidBlobUrl(blobUrl)) {
+    return NextResponse.json({ error: 'URL no permitida.' }, { status: 400 });
   }
 
   try {

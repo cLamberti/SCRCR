@@ -47,11 +47,11 @@ function mapToAsociado(row: any): Asociado {
     estado: row.estado,
     observaciones: row.observaciones ?? undefined,
     fechaInactivo: row.fechaInactivo ?? undefined,
-    urlCedula: (row as any).urlCedula ?? undefined,
-    urlCartaSolicitud: (row as any).urlCartaSolicitud ?? undefined,
-    urlCartaRenuncia: (row as any).urlCartaRenuncia ?? undefined,
-    urlCartaDesafiliacion: (row as any).urlCartaDesafiliacion ?? undefined,
-    urlOtros: (row as any).urlOtros ?? undefined,
+    urlCedula: row.urlCedula ?? undefined,
+    urlCartaSolicitud: row.urlCartaSolicitud ?? undefined,
+    urlCartaRenuncia: row.urlCartaRenuncia ?? undefined,
+    urlCartaDesafiliacion: row.urlCartaDesafiliacion ?? undefined,
+    urlOtros: row.urlOtros ?? undefined,
   });
 }
 
@@ -159,37 +159,32 @@ export class AsociadoDAO {
 
   async actualizar(id: number, data: ActualizarAsociadoRequest): Promise<Asociado> {
     try {
-      const existente = await this.obtenerPorId(id);
-      if (!existente) throw new AsociadoDAOError('Asociado no encontrado', 'NOT_FOUND');
-
       const row = await prisma.asociado.update({
         where: { id },
         data: {
-          nombreCompleto: data.nombreCompleto ?? existente.nombreCompleto,
-          cedula: data.cedula ?? existente.cedula,
-          correo: data.correo ?? existente.correo ?? null,
-          telefono: data.telefono ?? existente.telefono ?? null,
-          telefonoContacto: data.telefonoContacto ?? existente.telefonoContacto ?? null,
-          ministerio: data.ministerio ?? existente.ministerio ?? null,
-          direccion: data.direccion ?? existente.direccion ?? null,
-          fechaIngreso: data.fechaIngreso ? new Date(data.fechaIngreso) : existente.fechaIngreso,
-          fechaNacimiento: data.fechaNacimiento ? new Date(data.fechaNacimiento) : (existente.fechaNacimiento ?? null),
-          estadoCivil: data.estadoCivil ?? existente.estadoCivil ?? null,
-          profesion: data.profesion ?? existente.profesion ?? null,
-          anosCongregarse: data.anosCongregarse ?? existente.anosCongregarse ?? null,
-          fechaAceptacion: data.fechaAceptacion ? new Date(data.fechaAceptacion) : (existente.fechaAceptacion ?? null),
-          perteneceJuntaDirectiva: data.perteneceJuntaDirectiva ?? existente.perteneceJuntaDirectiva,
-          puestoJuntaDirectiva: data.puestoJuntaDirectiva ?? existente.puestoJuntaDirectiva ?? null,
-          estado: data.estado ?? existente.estado,
-          observaciones: data.observaciones !== undefined ? (data.observaciones ?? null) : (existente.observaciones ?? null),
-          fechaInactivo: data.fechaInactivo !== undefined
-            ? (data.fechaInactivo ? new Date(data.fechaInactivo) : null)
-            : (existente.fechaInactivo ?? null),
-          urlCedula: data.urlCedula !== undefined ? (data.urlCedula || null) : ((existente as any).urlCedula ?? null),
-          urlCartaSolicitud: data.urlCartaSolicitud !== undefined ? (data.urlCartaSolicitud || null) : ((existente as any).urlCartaSolicitud ?? null),
-          urlCartaRenuncia: data.urlCartaRenuncia !== undefined ? (data.urlCartaRenuncia || null) : ((existente as any).urlCartaRenuncia ?? null),
-          urlCartaDesafiliacion: data.urlCartaDesafiliacion !== undefined ? (data.urlCartaDesafiliacion || null) : ((existente as any).urlCartaDesafiliacion ?? null),
-          urlOtros: data.urlOtros !== undefined ? (data.urlOtros || null) : ((existente as any).urlOtros ?? null),
+          ...(data.nombreCompleto !== undefined && { nombreCompleto: data.nombreCompleto }),
+          ...(data.cedula !== undefined && { cedula: data.cedula }),
+          ...(data.correo !== undefined && { correo: data.correo ?? null }),
+          ...(data.telefono !== undefined && { telefono: data.telefono ?? null }),
+          ...(data.telefonoContacto !== undefined && { telefonoContacto: data.telefonoContacto ?? null }),
+          ...(data.ministerio !== undefined && { ministerio: data.ministerio ?? null }),
+          ...(data.direccion !== undefined && { direccion: data.direccion ?? null }),
+          ...(data.fechaIngreso !== undefined && { fechaIngreso: new Date(data.fechaIngreso) }),
+          ...(data.fechaNacimiento !== undefined && { fechaNacimiento: data.fechaNacimiento ? new Date(data.fechaNacimiento) : null }),
+          ...(data.estadoCivil !== undefined && { estadoCivil: data.estadoCivil ?? null }),
+          ...(data.profesion !== undefined && { profesion: data.profesion ?? null }),
+          ...(data.anosCongregarse !== undefined && { anosCongregarse: data.anosCongregarse ?? null }),
+          ...(data.fechaAceptacion !== undefined && { fechaAceptacion: data.fechaAceptacion ? new Date(data.fechaAceptacion) : null }),
+          ...(data.perteneceJuntaDirectiva !== undefined && { perteneceJuntaDirectiva: data.perteneceJuntaDirectiva }),
+          ...(data.puestoJuntaDirectiva !== undefined && { puestoJuntaDirectiva: data.puestoJuntaDirectiva ?? null }),
+          ...(data.estado !== undefined && { estado: data.estado }),
+          ...(data.observaciones !== undefined && { observaciones: data.observaciones ?? null }),
+          ...(data.fechaInactivo !== undefined && { fechaInactivo: data.fechaInactivo ? new Date(data.fechaInactivo) : null }),
+          ...(data.urlCedula !== undefined && { urlCedula: data.urlCedula || null }),
+          ...(data.urlCartaSolicitud !== undefined && { urlCartaSolicitud: data.urlCartaSolicitud || null }),
+          ...(data.urlCartaRenuncia !== undefined && { urlCartaRenuncia: data.urlCartaRenuncia || null }),
+          ...(data.urlCartaDesafiliacion !== undefined && { urlCartaDesafiliacion: data.urlCartaDesafiliacion || null }),
+          ...(data.urlOtros !== undefined && { urlOtros: data.urlOtros || null }),
         },
       });
       const actualizado = mapToAsociado(row);
@@ -197,9 +192,8 @@ export class AsociadoDAO {
       return actualizado;
     } catch (error: any) {
       if (error instanceof AsociadoDAOError) throw error;
-      if (error.code === 'P2002') {
-        throw new AsociadoDAOError('Ya existe un asociado con esta cédula', 'DUPLICATE_KEY', error);
-      }
+      if (error.code === 'P2025') throw new AsociadoDAOError('Asociado no encontrado', 'NOT_FOUND');
+      if (error.code === 'P2002') throw new AsociadoDAOError('Ya existe un asociado con esta cédula', 'DUPLICATE_KEY', error);
       throw new AsociadoDAOError('Error al actualizar el asociado', 'DATABASE_ERROR', error);
     }
   }

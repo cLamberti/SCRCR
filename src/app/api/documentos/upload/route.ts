@@ -3,7 +3,7 @@ import { put } from '@vercel/blob';
 
 const MAX_SIZE_MB = 10;
 const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
-const ALLOWED_FOLDERS = ['asociados', 'empleados', 'vacaciones', 'permisos-emp'];
+const ALLOWED_FOLDERS = ['asociados', 'empleados', 'vacaciones', 'permisos-emp', 'congregados'];
 
 export async function POST(request: NextRequest) {
   try {

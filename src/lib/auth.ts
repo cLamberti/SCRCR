@@ -2,33 +2,32 @@
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 
-const secret = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'uwrT0PdHQ7gkJeoaD3iKqMGk'
-);
+function getSecret(): Uint8Array {
+  const s = process.env.JWT_SECRET;
+  if (!s) throw new Error('JWT_SECRET environment variable is not set');
+  return new TextEncoder().encode(s);
+}
 
 export interface TokenPayload {
   id: number;
   username: string;
-  rol: 'admin' | 'tesorero' | 'pastorGeneral';
-  [key: string]: string | number; 
+  rol: 'admin' | 'pastorGeneral' | 'juntaDirectiva' | 'asistenteAdministrativo';
+  [key: string]: string | number;
 }
 
 export async function createToken(payload: TokenPayload): Promise<string> {
-  const token = await new SignJWT(payload as Record<string, unknown>)
+  return new SignJWT(payload as Record<string, unknown>)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('24h')
-    .sign(secret);
-
-  return token;
+    .sign(getSecret());
 }
 
 export async function verifyToken(token: string): Promise<TokenPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, secret);
+    const { payload } = await jwtVerify(token, getSecret());
     return payload as TokenPayload;
-  } catch (error) {
-    console.error('Error verificando token:', error);
+  } catch {
     return null;
   }
 }

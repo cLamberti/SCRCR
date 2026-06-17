@@ -40,6 +40,7 @@ export class EmpleadoDAO {
         ...(data.salarioBase !== undefined && { salarioBase: data.salarioBase }),
         ...(data.cuentaBancaria !== undefined && { cuentaBancaria: data.cuentaBancaria?.trim() ?? null }),
         ...(data.estado !== undefined && { estado: data.estado }),
+        ...(data.diasVacacionesDisponibles !== undefined && { diasVacacionesDisponibles: data.diasVacacionesDisponibles }),
       },
     });
     return this.mapEmpleado(row);
@@ -58,6 +59,7 @@ export class EmpleadoDAO {
       salarioBase: Number(row.salarioBase),
       cuentaBancaria: row.cuentaBancaria ?? undefined,
       estado: row.estado,
+      diasVacacionesDisponibles: row.diasVacacionesDisponibles ?? 12,
     };
   }
 }
@@ -95,14 +97,17 @@ export class PlanillaDAO {
   }
 
   async obtenerTodos(): Promise<Omit<PlanillaResponse, 'lineas'>[]> {
-    const rows = await prisma.periodoPlanilla.findMany({ orderBy: [{ anio: 'desc' }, { mes: 'desc' }] });
+    const rows = await prisma.periodoPlanilla.findMany({
+      orderBy: [{ anio: 'desc' }, { mes: 'desc' }],
+      include: { lineas: { select: { montoAPagar: true } } },
+    });
     return rows.map(r => ({
       id: r.id,
       mes: r.mes,
       anio: r.anio,
       estado: r.estado,
       fechaGeneracion: r.fechaGeneracion.toISOString(),
-      totalAPagar: 0,
+      totalAPagar: r.lineas.reduce((sum, l) => sum + Number(l.montoAPagar), 0),
     }));
   }
 

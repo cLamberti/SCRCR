@@ -2,9 +2,11 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 
+type Rol = 'admin' | 'pastorGeneral' | 'juntaDirectiva' | 'asistenteAdministrativo';
+
 // ── Permisos por ruta ────────────────────────────────────────────────────────
 
-const routePermissions: Record<string, string[]> = {
+const routePermissions: Record<string, Rol[]> = {
   '/consulta-asociados': ['admin', 'juntaDirectiva'],
   '/congregados':        ['admin', 'pastorGeneral', 'asistenteAdministrativo'],
   '/eventos':            ['admin', 'pastorGeneral', 'asistenteAdministrativo'],
@@ -14,6 +16,7 @@ const routePermissions: Record<string, string[]> = {
   '/permisos':           ['admin', 'pastorGeneral', 'asistenteAdministrativo'],
   '/actas':              ['admin', 'juntaDirectiva'],
   '/configuracion':      ['admin', 'pastorGeneral', 'juntaDirectiva', 'asistenteAdministrativo'],
+  '/gestion-roles':      ['admin'],
 };
 
 // Rutas solo para no autenticados
@@ -24,13 +27,12 @@ const publicRoutes = ['/', '/recuperar-password'];
 
 // ── Helper: verificar JWT en Edge ────────────────────────────────────────────
 
-const JWT_FALLBACK = 'uwrT0PdHQ7gkJeoaD3iKqMGk';
-
-async function getTokenPayload(token: string): Promise<{ rol: string } | null> {
+async function getTokenPayload(token: string): Promise<{ rol: Rol } | null> {
+  const jwtSecret = process.env.JWT_SECRET;
+  if (!jwtSecret) return null;
   try {
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET ?? JWT_FALLBACK);
-    const { payload } = await jwtVerify(token, secret);
-    return payload as { rol: string };
+    const { payload } = await jwtVerify(token, new TextEncoder().encode(jwtSecret));
+    return payload as { rol: Rol };
   } catch {
     return null;
   }
@@ -38,19 +40,38 @@ async function getTokenPayload(token: string): Promise<{ rol: string } | null> {
 
 // ── Middleware ────────────────────────────────────────────────────────────────
 
+// Rutas API que no requieren autenticación
+const publicApiRoutes = ['/api/auth/'];
+
 export async function middleware(request: NextRequest) {
   const token = request.cookies.get('auth-token')?.value;
   const { pathname } = request.nextUrl;
 
-  // Rutas públicas — siempre permitir
+  // ── Rutas API ──────────────────────────────────────────────────────────────
+  if (pathname.startsWith('/api/')) {
+    // Las rutas de auth son públicas
+    if (publicApiRoutes.some(r => pathname.startsWith(r))) {
+      return NextResponse.next();
+    }
+    // El resto de API routes requiere token válido
+    if (!token) {
+      return NextResponse.json({ success: false, message: 'No autorizado.' }, { status: 401 });
+    }
+    const payload = await getTokenPayload(token);
+    if (!payload) {
+      return NextResponse.json({ success: false, message: 'Token inválido o expirado.' }, { status: 401 });
+    }
+    return NextResponse.next();
+  }
+
+  // ── Rutas públicas — siempre permitir ─────────────────────────────────────
   if (publicRoutes.includes(pathname)) {
     return NextResponse.next();
   }
 
-  // Rutas de autenticación (/login)
+  // ── Rutas de autenticación (/login) ───────────────────────────────────────
   if (authRoutes.some(route => pathname.startsWith(route))) {
     if (token) {
-      // Solo redirigir si el token es realmente válido
       const payload = await getTokenPayload(token);
       if (payload) {
         return NextResponse.redirect(new URL('/', request.url));
@@ -59,7 +80,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Rutas protegidas
+  // ── Rutas protegidas por rol ───────────────────────────────────────────────
   const protectedRoute = Object.keys(routePermissions).find(route =>
     pathname.startsWith(route),
   );
@@ -71,7 +92,6 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(loginUrl);
     }
 
-    // Verificar token y rol directamente (sin fetch interno)
     const payload = await getTokenPayload(token);
 
     if (!payload) {
@@ -93,6 +113,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.png$|.*\\.jpg$|.*\\.jpeg$|.*\\.svg$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.png$|.*\\.jpg$|.*\\.jpeg$|.*\\.svg$).*)',
   ],
 };

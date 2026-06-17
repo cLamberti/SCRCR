@@ -24,11 +24,7 @@ const menuItems = [
     { id: 'cerrar',             href: '#',                   icon: FaSignOutAlt, label: 'Cerrar Sesión'         },
 ];
 
-type AsociadoRow = {
-  id: number; nombreCompleto: string; cedula: string;
-  correo?: string; telefono?: string; ministerio?: string;
-  direccion?: string; fechaIngreso: string; estado: number;
-};
+type AsociadoRow = AsociadoResponse;
 
 type FormularioEdicion = {
   nombreCompleto: string; cedula: string; correo: string;
@@ -66,52 +62,6 @@ const Badge = ({ activo }: { activo: boolean }) => (
 export default function ConsultarAsociadosPage() {
   const { usuario } = useAuth();
   const esJuntaDirectiva = usuario?.rol === 'juntaDirectiva';
-
-  /* ─── Exportar Excel ─── */
-  const exportarExcel = async () => {
-    const { utils, writeFile } = await import('xlsx');
-    const filas = filtrados.map((a, i) => ({
-      '#': i + 1,
-      'Nombre Completo': a.nombreCompleto,
-      'Cédula': a.cedula,
-      'Correo': a.correo ?? '-',
-      'Teléfono': a.telefono ?? '-',
-      'Ministerio': a.ministerio ?? '-',
-      'Dirección': a.direccion ?? '-',
-      'Fecha Ingreso': a.fechaIngreso ? new Date(a.fechaIngreso).toLocaleDateString('es-CR') : '-',
-      'Estado': a.estado === 1 ? 'Activo' : 'Eliminado',
-    }));
-    const ws = utils.json_to_sheet(filas);
-    ws['!cols'] = [{ wch: 4 }, { wch: 35 }, { wch: 14 }, { wch: 30 }, { wch: 14 }, { wch: 18 }, { wch: 30 }, { wch: 14 }, { wch: 10 }];
-    const wb = utils.book_new();
-    utils.book_append_sheet(wb, ws, 'Asociados');
-    writeFile(wb, 'listado_asociados.xlsx');
-  };
-
-  /* ─── Exportar PDF ─── */
-  const exportarPDF = async () => {
-    const { default: jsPDF } = await import('jspdf');
-    const { default: autoTable } = await import('jspdf-autotable');
-    const doc = new jsPDF({ orientation: 'landscape' });
-    doc.setFontSize(14);
-    doc.text('Listado de Asociados', 14, 16);
-    doc.setFontSize(9);
-    doc.text(`Generado: ${new Date().toLocaleDateString('es-CR')}  · Total: ${filtrados.length}`, 14, 22);
-    autoTable(doc, {
-      startY: 27,
-      head: [['#', 'Nombre Completo', 'Cédula', 'Correo', 'Teléfono', 'Ministerio', 'Fecha Ingreso', 'Estado']],
-      body: filtrados.map((a, i) => [
-        i + 1, a.nombreCompleto, a.cedula,
-        a.correo ?? '-', a.telefono ?? '-', a.ministerio ?? '-',
-        a.fechaIngreso ? new Date(a.fechaIngreso).toLocaleDateString('es-CR') : '-',
-        a.estado === 1 ? 'Activo' : 'Eliminado',
-      ]),
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [0, 51, 102] },
-      alternateRowStyles: { fillColor: [245, 247, 250] },
-    });
-    doc.save('listado_asociados.pdf');
-  };
 
   const [data,      setData]      = useState<AsociadoRow[]>([]);
   const [loading,   setLoading]   = useState(false);
@@ -202,6 +152,51 @@ export default function ConsultarAsociadosPage() {
     return filtrados.slice(inicio, inicio + pageSize);
   }, [filtrados, paginaActual, pageSize]);
 
+  /* ─── Exportar ─── */
+  const exportarExcel = useCallback(async () => {
+    const { utils, writeFile } = await import('xlsx');
+    const filas = filtrados.map((a, i) => ({
+      '#': i + 1,
+      'Nombre Completo': a.nombreCompleto,
+      'Cédula': a.cedula,
+      'Correo': a.correo ?? '-',
+      'Teléfono': a.telefono ?? '-',
+      'Ministerio': a.ministerio ?? '-',
+      'Dirección': a.direccion ?? '-',
+      'Fecha Ingreso': a.fechaIngreso ? new Date(a.fechaIngreso).toLocaleDateString('es-CR') : '-',
+      'Estado': a.estado === 1 ? 'Activo' : 'Eliminado',
+    }));
+    const ws = utils.json_to_sheet(filas);
+    ws['!cols'] = [{ wch: 4 }, { wch: 35 }, { wch: 14 }, { wch: 30 }, { wch: 14 }, { wch: 18 }, { wch: 30 }, { wch: 14 }, { wch: 10 }];
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, 'Asociados');
+    writeFile(wb, 'listado_asociados.xlsx');
+  }, [filtrados]);
+
+  const exportarPDF = useCallback(async () => {
+    const { default: jsPDF } = await import('jspdf');
+    const { default: autoTable } = await import('jspdf-autotable');
+    const doc = new jsPDF({ orientation: 'landscape' });
+    doc.setFontSize(14);
+    doc.text('Listado de Asociados', 14, 16);
+    doc.setFontSize(9);
+    doc.text(`Generado: ${new Date().toLocaleDateString('es-CR')}  · Total: ${filtrados.length}`, 14, 22);
+    autoTable(doc, {
+      startY: 27,
+      head: [['#', 'Nombre Completo', 'Cédula', 'Correo', 'Teléfono', 'Ministerio', 'Fecha Ingreso', 'Estado']],
+      body: filtrados.map((a, i) => [
+        i + 1, a.nombreCompleto, a.cedula,
+        a.correo ?? '-', a.telefono ?? '-', a.ministerio ?? '-',
+        a.fechaIngreso ? new Date(a.fechaIngreso).toLocaleDateString('es-CR') : '-',
+        a.estado === 1 ? 'Activo' : 'Eliminado',
+      ]),
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [0, 51, 102] },
+      alternateRowStyles: { fillColor: [245, 247, 250] },
+    });
+    doc.save('listado_asociados.pdf');
+  }, [filtrados]);
+
   /* ─── Selección ─── */
   const toggleFila = (id: number) => {
     setSeleccionados(prev => {
@@ -276,64 +271,41 @@ export default function ConsultarAsociadosPage() {
       cedula:         a.cedula         || '',
       correo:         a.correo         || '',
       telefono:       a.telefono       || '',
-      telefonoContacto: (a as any).telefonoContacto || '',
+      telefonoContacto: a.telefonoContacto || '',
       ministerio:     a.ministerio     || '',
       direccion:      a.direccion      || '',
       fechaIngreso:   a.fechaIngreso
         ? new Date(a.fechaIngreso).toISOString().split('T')[0]
         : '',
-      fechaNacimiento: (a as any).fechaNacimiento ? new Date((a as any).fechaNacimiento).toISOString().split('T')[0] : '',
-      estadoCivil: (a as any).estadoCivil || 'Soltero(a)',
-      profesion: (a as any).profesion || '',
-      anosCongregarse: (a as any).anosCongregarse || '',
-      fechaAceptacion: (a as any).fechaAceptacion ? new Date((a as any).fechaAceptacion).toISOString().split('T')[0] : '',
-      perteneceJuntaDirectiva: (a as any).perteneceJuntaDirectiva || false,
-      puestoJuntaDirectiva: (a as any).puestoJuntaDirectiva || '',
+      fechaNacimiento: a.fechaNacimiento ? new Date(a.fechaNacimiento).toISOString().split('T')[0] : '',
+      estadoCivil: a.estadoCivil || 'Soltero(a)',
+      profesion: a.profesion || '',
+      anosCongregarse: a.anosCongregarse || '',
+      fechaAceptacion: a.fechaAceptacion ? new Date(a.fechaAceptacion).toISOString().split('T')[0] : '',
+      perteneceJuntaDirectiva: a.perteneceJuntaDirectiva || false,
+      puestoJuntaDirectiva: a.puestoJuntaDirectiva || '',
       estado: a.estado,
-      observaciones: (a as any).observaciones || '',
-      fechaInactivo: (a as any).fechaInactivo
-        ? new Date((a as any).fechaInactivo).toISOString().split('T')[0]
+      observaciones: a.observaciones || '',
+      fechaInactivo: a.fechaInactivo
+        ? new Date(a.fechaInactivo).toISOString().split('T')[0]
         : '',
-      urlCedula: (a as any).urlCedula || '',
-      urlCartaSolicitud: (a as any).urlCartaSolicitud || '',
-      urlCartaRenuncia: (a as any).urlCartaRenuncia || '',
-      urlCartaDesafiliacion: (a as any).urlCartaDesafiliacion || '',
-      urlOtros: (a as any).urlOtros || '',
+      urlCedula: a.urlCedula || '',
+      urlCartaSolicitud: a.urlCartaSolicitud || '',
+      urlCartaRenuncia: a.urlCartaRenuncia || '',
+      urlCartaDesafiliacion: a.urlCartaDesafiliacion || '',
+      urlOtros: a.urlOtros || '',
     });
     setArchivosAsoc({ cedula: null, solicitud: null, renuncia: null, desafiliacion: null, otros: null });
     setModalEditOpen(true); setMensaje(''); setErroresLista([]); setEsError(false);
   };
 
   const validarFormularioAsociado = (): string[] => {
-    const errores: string[] = [];
     const f = formulario;
+    const errores: string[] = [];
 
-    if (!f.nombreCompleto.trim()) {
-      errores.push('El nombre completo es requerido.');
-    } else if (f.nombreCompleto.trim().split(/\s+/).length < 2) {
-      errores.push('El nombre completo debe incluir al menos nombre y apellido.');
-    } else if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]+$/.test(f.nombreCompleto)) {
-      errores.push('El nombre completo solo puede contener letras y espacios.');
-    }
-
-    if (!f.cedula.trim()) {
-      errores.push('La cédula es requerida.');
-    } else if (!/^[0-9-]+$/.test(f.cedula)) {
-      errores.push('La cédula solo puede contener números y guiones.');
-    } else if (f.cedula.trim().length < 9) {
-      errores.push('La cédula debe tener al menos 9 caracteres.');
-    }
-
-    if (!f.telefono.trim()) {
-      errores.push('El celular es requerido.');
-    } else if (!/^[\d\s\-+()]+$/.test(f.telefono)) {
-      errores.push('El celular contiene caracteres no válidos.');
-    } else if (f.telefono.replace(/[\s\-+()]/g, '').length < 8) {
-      errores.push('El celular debe tener al menos 8 dígitos.');
-    }
-
-    if (f.correo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.correo)) {
-      errores.push('El formato del correo electrónico no es válido.');
+    for (const campo of ['nombreCompleto', 'cedula', 'telefono', 'correo'] as const) {
+      const err = validarCampoAsoc(campo, String((f as any)[campo] ?? ''));
+      if (err) errores.push(err);
     }
 
     if (f.telefonoContacto && f.telefonoContacto.replace(/[\s\-+()]/g, '').length < 8) {
@@ -452,6 +424,16 @@ export default function ConsultarAsociadosPage() {
 
   /* ─── Reactivar ─── */
   const reactivar = async (id: number) => {
+    const confirm = await Swal.fire({
+      title: '¿Reactivar asociado?',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#16a34a',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Reactivar',
+      cancelButtonText: 'Cancelar',
+    });
+    if (!confirm.isConfirmed) return;
     try {
       const res = await fetch(`/api/asociados/update?id=${id}`, {
         method: 'PUT',
@@ -710,8 +692,8 @@ export default function ConsultarAsociadosPage() {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={9} className="p-8 text-center text-gray-400 text-sm">
-                        Cargando datos...
+                      <td colSpan={9} className="p-8 text-center text-gray-400">
+                        <span className="inline-flex items-center gap-2 text-sm"><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Cargando...</span>
                       </td>
                     </tr>
                   ) : paginados.length > 0 ? (
@@ -789,8 +771,8 @@ export default function ConsultarAsociadosPage() {
             {/* ── Tarjetas (mobile) ── */}
             <div className="md:hidden mb-4">
               {loading ? (
-                <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">
-                  Cargando datos...
+                <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Cargando...
                 </div>
               ) : paginados.length === 0 ? (
                 <div className="bg-white rounded-xl border border-gray-200 p-10 text-center text-gray-400">

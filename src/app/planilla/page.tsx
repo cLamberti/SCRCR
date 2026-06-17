@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import { FaFileExcel, FaFilePdf, FaPlus, FaLock, FaTrash, FaEye, FaUserTie, FaSpinner, FaCalendarAlt, FaClipboardList } from 'react-icons/fa';
 import Swal from 'sweetalert2';
@@ -9,6 +9,7 @@ import Sidebar from '@/components/SideBar';
 type Empleado = {
   id: number; nombre: string; cedula: string;
   puesto: string; salarioBase: number; cuentaBancaria?: string; estado: number;
+  diasVacacionesDisponibles: number;
 };
 
 type LineaForm = {
@@ -52,7 +53,7 @@ export default function PlanillaPage() {
 
   // Empleados
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
-  const [formEmp, setFormEmp] = useState({ nombre: '', cedula: '', puesto: '', salarioBase: '', cuentaBancaria: '' });
+  const [formEmp, setFormEmp] = useState({ nombre: '', cedula: '', puesto: '', salarioBase: '', cuentaBancaria: '', diasVacacionesDisponibles: '12' });
   const [showFormEmp, setShowFormEmp] = useState(false);
   const [editandoEmp, setEditandoEmp] = useState<Empleado | null>(null);
   const [enviandoEmp, setEnviandoEmp] = useState(false);
@@ -137,10 +138,48 @@ export default function PlanillaPage() {
   useEffect(() => { cargarEmpleados(); cargarPlanillas(); cargarVacaciones(); cargarPermisosEmp(); }, [cargarEmpleados, cargarPlanillas, cargarVacaciones, cargarPermisosEmp]);
   useAutoRefresh(useCallback(() => { cargarEmpleados(); cargarPlanillas(); cargarVacaciones(); cargarPermisosEmp(); }, [cargarEmpleados, cargarPlanillas, cargarVacaciones, cargarPermisosEmp]));
 
+  // Días de vacaciones usados por empleado (excluyendo rechazados)
+  const diasVacUsadosPorEmp = useMemo(() => {
+    const map: Record<number, number> = {};
+    vacaciones.filter(v => v.estado !== 'RECHAZADO').forEach(v => {
+      map[v.empleadoId] = (map[v.empleadoId] || 0) + v.cantidadDias;
+    });
+    return map;
+  }, [vacaciones]);
+
+  // Cerrar modales con Escape
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (modalGenerar) setModalGenerar(false);
+      else if (modalDetalle) setModalDetalle(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [modalGenerar, modalDetalle]);
+
+  // Recalcular días de vacaciones en el modal de generar planilla cuando cambia mes/año
+  useEffect(() => {
+    if (!modalGenerar) return;
+    const vacMes = vacaciones.filter(v => {
+      const f = new Date(v.fechaInicio);
+      return f.getMonth() + 1 === mes && f.getFullYear() === anio && v.estado !== 'RECHAZADO';
+    });
+    const vacPorEmp: Record<number, number> = {};
+    vacMes.forEach(v => { vacPorEmp[v.empleadoId] = (vacPorEmp[v.empleadoId] || 0) + v.cantidadDias; });
+    setLineas(prev => prev.map(l => ({ ...l, diasVacaciones: vacPorEmp[l.empleadoId] || 0 })));
+  }, [mes, anio, modalGenerar, vacaciones]);
+
   // Inicializar líneas cuando se abre el modal de generar
   const abrirModalGenerar = () => {
     const activos = empleados.filter(e => e.estado === 1);
-    setLineas(activos.map(e => ({ empleadoId: e.id, diasAusentes: 0, diasVacaciones: 0, diasIncapacidad: 0 })));
+    const vacMes = vacaciones.filter(v => {
+      const f = new Date(v.fechaInicio);
+      return f.getMonth() + 1 === mes && f.getFullYear() === anio && v.estado !== 'RECHAZADO';
+    });
+    const vacPorEmp: Record<number, number> = {};
+    vacMes.forEach(v => { vacPorEmp[v.empleadoId] = (vacPorEmp[v.empleadoId] || 0) + v.cantidadDias; });
+    setLineas(activos.map(e => ({ empleadoId: e.id, diasAusentes: 0, diasVacaciones: vacPorEmp[e.id] || 0, diasIncapacidad: 0 })));
     setMensajePlan('');
     setModalGenerar(true);
   };
@@ -218,8 +257,8 @@ export default function PlanillaPage() {
   const abrirFormEmp = (emp?: Empleado) => {
     setEditandoEmp(emp || null);
     setFormEmp(emp
-      ? { nombre: emp.nombre, cedula: emp.cedula, puesto: emp.puesto, salarioBase: String(emp.salarioBase), cuentaBancaria: emp.cuentaBancaria || '' }
-      : { nombre: '', cedula: '', puesto: '', salarioBase: '', cuentaBancaria: '' }
+      ? { nombre: emp.nombre, cedula: emp.cedula, puesto: emp.puesto, salarioBase: String(emp.salarioBase), cuentaBancaria: emp.cuentaBancaria || '', diasVacacionesDisponibles: String(emp.diasVacacionesDisponibles ?? 12) }
+      : { nombre: '', cedula: '', puesto: '', salarioBase: '', cuentaBancaria: '', diasVacacionesDisponibles: '12' }
     );
     setMensajeEmp('');
     setEmpErrors({}); setEmpTouched({});
@@ -240,7 +279,7 @@ export default function PlanillaPage() {
     if (Object.keys(newErrors).length > 0) return;
     setEnviandoEmp(true); setMensajeEmp('');
     try {
-      const body = { ...formEmp, salarioBase: Number(formEmp.salarioBase) };
+      const body = { ...formEmp, salarioBase: Number(formEmp.salarioBase), diasVacacionesDisponibles: Number(formEmp.diasVacacionesDisponibles) || 12 };
       const url = editandoEmp ? `/api/empleados/${editandoEmp.id}` : '/api/empleados';
       const method = editandoEmp ? 'PUT' : 'POST';
       const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -278,6 +317,12 @@ export default function PlanillaPage() {
   const guardarVacacion = async () => {
     if (!formVac.empleadoId || !formVac.fechaInicio || !formVac.fechaFin || !formVac.cantidadDias) {
       setMensajeVac('Empleado, fechas y cantidad de días son obligatorios.'); setMensajeVacOk(false); return;
+    }
+    const empSelVac = empleados.find(e => e.id === Number(formVac.empleadoId));
+    const diasUsadosEmp = diasVacUsadosPorEmp[Number(formVac.empleadoId)] || 0;
+    const diasDisponiblesEmp = (empSelVac?.diasVacacionesDisponibles ?? 12) - diasUsadosEmp;
+    if (Number(formVac.cantidadDias) > diasDisponiblesEmp) {
+      setMensajeVac(`Días insuficientes. Disponibles: ${diasDisponiblesEmp}, Solicitados: ${formVac.cantidadDias}.`); setMensajeVacOk(false); return;
     }
     setEnviandoVac(true); setMensajeVac('');
     try {
@@ -518,7 +563,7 @@ export default function PlanillaPage() {
                           {p.estado !== 'cerrado' && (
                             <button onClick={() => cerrarPlanilla(p.id)}
                               className="py-2 px-3 text-xs font-semibold text-gray-600 border border-gray-200 bg-gray-50 rounded-lg flex items-center justify-center gap-1.5 hover:bg-gray-600 hover:text-white transition">
-                              <FaLock />
+                              <FaLock /> Cerrar
                             </button>
                           )}
                         </div>
@@ -610,9 +655,15 @@ export default function PlanillaPage() {
                         placeholder="500000" min="1" />
                       {empTouched.salarioBase && empErrors.salarioBase && <p className="mt-1 text-xs text-red-600">{empErrors.salarioBase}</p>}
                     </div>
-                    <div className="sm:col-span-2">
+                    <div>
                       <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Cuenta Bancaria</label>
                       <input className={inputCls} value={formEmp.cuentaBancaria} onChange={e => setFormEmp(p => ({ ...p, cuentaBancaria: e.target.value }))} placeholder="CR00 0000 0000 0000 0000 00" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Días de Vacaciones Disponibles</label>
+                      <input type="number" min="0" className={inputCls} value={formEmp.diasVacacionesDisponibles}
+                        onChange={e => setFormEmp(p => ({ ...p, diasVacacionesDisponibles: e.target.value }))} placeholder="12" />
+                      <p className="mt-1 text-xs text-gray-400">12 días por cada 56 semanas laboradas</p>
                     </div>
                     <div className="sm:col-span-2 flex justify-end gap-3">
                       <button onClick={() => setShowFormEmp(false)} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition">Cancelar</button>
@@ -650,7 +701,7 @@ export default function PlanillaPage() {
                       <table className="min-w-full text-sm">
                         <thead>
                           <tr className="bg-gray-50 border-b border-gray-100">
-                            {['Nombre', 'Cédula', 'Puesto', 'Salario Base', 'Cuenta Bancaria', 'Estado', 'Acciones'].map(h => (
+                            {['Nombre', 'Cédula', 'Puesto', 'Salario Base', 'Cuenta Bancaria', 'Días Vac.', 'Estado', 'Acciones'].map(h => (
                               <th key={h} className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
                             ))}
                           </tr>
@@ -663,6 +714,11 @@ export default function PlanillaPage() {
                               <td className="px-6 py-4 text-gray-600 whitespace-nowrap">{e.puesto}</td>
                               <td className="px-6 py-4 font-semibold text-gray-900 whitespace-nowrap">₡{e.salarioBase.toLocaleString('es-CR', { minimumFractionDigits: 2 })}</td>
                               <td className="px-6 py-4 text-gray-500 text-xs">{e.cuentaBancaria || '-'}</td>
+                              <td className="px-6 py-4 text-center">
+                                <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700">
+                                  {(e.diasVacacionesDisponibles ?? 12) - (diasVacUsadosPorEmp[e.id] || 0)} / {e.diasVacacionesDisponibles ?? 12}
+                                </span>
+                              </td>
                               <td className="px-6 py-4">
                                 <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold ${e.estado === 1 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                                   {e.estado === 1 ? 'Activo' : 'Inactivo'}
@@ -771,15 +827,45 @@ export default function PlanillaPage() {
                       <input type="number" min="1" className={inputCls} value={formVac.cantidadDias}
                         onChange={e => setFormVac(p => ({ ...p, cantidadDias: e.target.value }))} placeholder="0" />
                     </div>
+                    {formVac.empleadoId && (() => {
+                      const empSel = empleados.find(e => e.id === Number(formVac.empleadoId));
+                      if (!empSel) return null;
+                      const usados = diasVacUsadosPorEmp[empSel.id] || 0;
+                      const disponibles = empSel.diasVacacionesDisponibles - usados;
+                      return (
+                        <div className="sm:col-span-2 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2.5 text-sm flex flex-wrap items-center gap-3">
+                          <span className={`font-semibold ${disponibles <= 0 ? 'text-red-700' : 'text-blue-800'}`}>
+                            {disponibles} día{disponibles !== 1 ? 's' : ''} disponible{disponibles !== 1 ? 's' : ''}
+                          </span>
+                          <span className="text-blue-500 text-xs">({usados} usados de {empSel.diasVacacionesDisponibles} asignados · 12 días / 56 semanas)</span>
+                        </div>
+                      );
+                    })()}
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Fecha Inicial *</label>
                       <input type="date" className={inputCls} value={formVac.fechaInicio}
-                        onChange={e => setFormVac(p => ({ ...p, fechaInicio: e.target.value }))} />
+                        onChange={e => {
+                          const inicio = e.target.value;
+                          const fin = formVac.fechaFin;
+                          let dias = formVac.cantidadDias;
+                          if (inicio && fin && fin >= inicio) {
+                            dias = String(Math.round((new Date(fin).getTime() - new Date(inicio).getTime()) / 86400000) + 1);
+                          }
+                          setFormVac(p => ({ ...p, fechaInicio: inicio, cantidadDias: dias }));
+                        }} />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Fecha Final *</label>
                       <input type="date" className={inputCls} value={formVac.fechaFin}
-                        onChange={e => setFormVac(p => ({ ...p, fechaFin: e.target.value }))} />
+                        onChange={e => {
+                          const fin = e.target.value;
+                          const inicio = formVac.fechaInicio;
+                          let dias = formVac.cantidadDias;
+                          if (inicio && fin && fin >= inicio) {
+                            dias = String(Math.round((new Date(fin).getTime() - new Date(inicio).getTime()) / 86400000) + 1);
+                          }
+                          setFormVac(p => ({ ...p, fechaFin: fin, cantidadDias: dias }));
+                        }} />
                     </div>
                     <div className="sm:col-span-2">
                       <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Observaciones</label>
@@ -810,7 +896,11 @@ export default function PlanillaPage() {
                 ) : vacaciones.length === 0 ? (
                   <div className="p-12 text-center">
                     <FaCalendarAlt className="mx-auto text-gray-300 text-3xl mb-3" />
-                    <p className="text-gray-500 text-sm">No hay vacaciones registradas.</p>
+                    <p className="text-gray-500 text-sm mb-4">No hay vacaciones registradas.</p>
+                    <button onClick={() => { setShowFormVac(true); setMensajeVac(''); }}
+                      className="inline-flex items-center gap-2 bg-[#003366] hover:bg-[#004488] text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+                      <FaPlus className="text-xs" /> Registrar Vacación
+                    </button>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
@@ -932,7 +1022,11 @@ export default function PlanillaPage() {
                 ) : permisosEmp.length === 0 ? (
                   <div className="p-12 text-center">
                     <FaClipboardList className="mx-auto text-gray-300 text-3xl mb-3" />
-                    <p className="text-gray-500 text-sm">No hay permisos registrados.</p>
+                    <p className="text-gray-500 text-sm mb-4">No hay permisos registrados.</p>
+                    <button onClick={() => { setShowFormPerm(true); setMensajePerm(''); }}
+                      className="inline-flex items-center gap-2 bg-[#003366] hover:bg-[#004488] text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+                      <FaPlus className="text-xs" /> Registrar Permiso
+                    </button>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
@@ -979,8 +1073,8 @@ export default function PlanillaPage() {
 
       {/* ── MODAL GENERAR PLANILLA ── */}
       {modalGenerar && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center overflow-y-auto py-8">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl mx-4">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center overflow-y-auto py-8" onClick={() => setModalGenerar(false)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl mx-4" onClick={e => e.stopPropagation()}>
             <div className="bg-[#003366] px-6 py-4 rounded-t-xl flex items-center justify-between">
               <h2 className="text-white font-bold text-base">Nueva Planilla</h2>
               <button onClick={() => setModalGenerar(false)} className="text-white/70 hover:text-white">✕</button>
@@ -1012,9 +1106,12 @@ export default function PlanillaPage() {
                   <table className="min-w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
                     <thead>
                       <tr className="bg-gray-50">
-                        {['Empleado', 'Salario Base', 'Días Ausentes', 'Días Vacaciones', 'Días Incapacidad', 'Días Trabaj.', 'Monto Est.'].map(h => (
+                        {['Empleado', 'Salario Base', 'Días Ausentes', 'Días Incapacidad', 'Días Trabaj.', 'Monto Est.'].map(h => (
                           <th key={h} className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">{h}</th>
                         ))}
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-blue-600 uppercase whitespace-nowrap">
+                          Días Vac. <span className="normal-case text-[10px] bg-blue-100 text-blue-600 px-1 py-0.5 rounded font-medium ml-1">auto</span>
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -1024,13 +1121,18 @@ export default function PlanillaPage() {
                           <tr key={l.empleadoId} className="hover:bg-gray-50">
                             <td className="px-3 py-2 font-medium text-gray-900 text-xs">{emp?.nombre}</td>
                             <td className="px-3 py-2 text-gray-600 text-xs">₡{emp?.salarioBase.toLocaleString('es-CR')}</td>
-                            {(['diasAusentes', 'diasVacaciones', 'diasIncapacidad'] as const).map(campo => (
+                            {(['diasAusentes', 'diasIncapacidad'] as const).map(campo => (
                               <td key={campo} className="px-3 py-2">
                                 <input type="number" min="0" max="30" value={l[campo]}
                                   onChange={e => actualizarLinea(l.empleadoId, campo, Number(e.target.value))}
                                   className="w-16 rounded border border-gray-200 px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-[#003366]" />
                               </td>
                             ))}
+                            <td className="px-3 py-2 text-center">
+                              <span className="inline-flex items-center justify-center w-16 h-7 rounded border border-blue-200 bg-blue-50 text-sm font-semibold text-blue-700 select-none" title="Auto-calculado de vacaciones registradas">
+                                {l.diasVacaciones}
+                              </span>
+                            </td>
                             <td className="px-3 py-2 text-center font-semibold text-gray-700 text-xs">{diasTrabajados(l)}</td>
                             <td className="px-3 py-2 font-semibold text-green-700 text-xs">₡{montoEstimado(l, emp).toLocaleString('es-CR', { minimumFractionDigits: 2 })}</td>
                           </tr>
@@ -1063,8 +1165,8 @@ export default function PlanillaPage() {
 
       {/* ── MODAL DETALLE ── */}
       {modalDetalle && detalle && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center overflow-y-auto py-8">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl mx-4">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center overflow-y-auto py-8" onClick={() => setModalDetalle(false)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl mx-4" onClick={e => e.stopPropagation()}>
             <div className="bg-[#003366] px-6 py-4 rounded-t-xl flex items-center justify-between">
               <h2 className="text-white font-bold text-base">
                 Planilla {MESES[detalle.mes - 1]} {detalle.anio}
