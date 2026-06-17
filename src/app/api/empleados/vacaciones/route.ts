@@ -25,6 +25,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'Empleado, fechas y cantidad de días son obligatorios.' }, { status: 400 });
     }
 
+    const empId = Number(empleadoId);
+    const empleado = await prisma.empleado.findUnique({ where: { id: empId } });
+    if (!empleado) {
+      return NextResponse.json({ success: false, message: 'Empleado no encontrado.' }, { status: 404 });
+    }
+
+    const diasUsadosAgg = await prisma.vacacionEmpleado.aggregate({
+      where: { empleadoId: empId, estado: { not: 'RECHAZADO' } },
+      _sum: { cantidadDias: true },
+    });
+    const diasUsados = diasUsadosAgg._sum.cantidadDias ?? 0;
+    const diasDisponibles = ((empleado as any).diasVacacionesDisponibles ?? 12) - diasUsados;
+    if (Number(cantidadDias) > diasDisponibles) {
+      return NextResponse.json({
+        success: false,
+        message: `Días insuficientes. Disponibles: ${diasDisponibles}, Solicitados: ${cantidadDias}.`,
+      }, { status: 400 });
+    }
+
     const vacacion = await prisma.vacacionEmpleado.create({
       data: {
         empleadoId: Number(empleadoId),

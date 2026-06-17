@@ -7,10 +7,11 @@ import {
   FaUsers, FaUserPlus, FaSearch, FaEdit, FaTrash,
   FaChevronLeft, FaChevronRight, FaExclamationTriangle,
   FaTimes, FaSave, FaPlus, FaFilter, FaCheckCircle,
-  FaFileExcel, FaFilePdf,
+  FaFileExcel, FaFilePdf, FaUpload, FaExternalLinkAlt,
 } from "react-icons/fa";
 import Sidebar from "@/components/SideBar";
 import { EstadoCivil } from "@/models/Congregado";
+import Swal from 'sweetalert2';
 
 type CongregadoRow = {
   id: number;
@@ -53,7 +54,7 @@ const FORM_INICIAL: FormState = {
   nombre: "", cedula: "", fechaIngreso: "", telefono: "",
   segundoTelefono: "", estadoCivil: EstadoCivil.SOLTERO,
   ministerio: "", segundoMinisterio: "",
-  urlFotoCedula: "https://placeholder.com/cedula.jpg", estado: 1,
+  urlFotoCedula: "", estado: 1,
   observaciones: "", fechaNacimiento: "", correo: "", profesion: "", direccion: "",
 };
 
@@ -95,7 +96,6 @@ function validarCampoCongregado(campo: keyof CongregadoFormErrors, valor: string
       if (!valor.trim()) return 'El ministerio es obligatorio.';
       return undefined;
     case 'urlFotoCedula':
-      if (!valor.trim()) return 'La URL de la foto cédula es obligatoria.';
       return undefined;
     case 'correo':
       if (valor && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor))
@@ -186,6 +186,8 @@ export default function CongregadosPage() {
   const [guardando, setGuardando] = useState(false);
   const [formErrors, setFormErrors] = useState<CongregadoFormErrors>({});
   const [formTouched, setFormTouched] = useState<CongregadoFormTouched>({});
+  const [archivoCedula, setArchivoCedula] = useState<File | null>(null);
+  const [subiendoCedula, setSubiendoCedula] = useState(false);
 
   // modal eliminar masivo
   const [modalDelete, setModalDelete] = useState(false);
@@ -259,6 +261,7 @@ export default function CongregadosPage() {
     setEditando(null);
     setForm(FORM_INICIAL);
     setFormErrors({}); setFormTouched({});
+    setArchivoCedula(null);
     setShowForm(true);
     setMensaje(""); setEsError(false);
   };
@@ -283,13 +286,13 @@ export default function CongregadosPage() {
       profesion: row.profesion || "",
       direccion: row.direccion || "",
     });
+    setArchivoCedula(null);
     setShowForm(true);
     setMensaje(""); setEsError(false);
   };
 
   const guardar = async () => {
-    // Validate all required fields first
-    const camposReq: (keyof CongregadoFormErrors)[] = ['nombre', 'cedula', 'fechaIngreso', 'telefono', 'ministerio', 'urlFotoCedula'];
+    const camposReq: (keyof CongregadoFormErrors)[] = ['nombre', 'cedula', 'fechaIngreso', 'telefono', 'ministerio'];
     const newErrors: CongregadoFormErrors = {};
     const newTouched: CongregadoFormTouched = {};
     for (const campo of camposReq) {
@@ -302,18 +305,37 @@ export default function CongregadosPage() {
       const errCorreo = validarCampoCongregado('correo', form.correo);
       if (errCorreo) newErrors.correo = errCorreo;
     }
+    if (!archivoCedula && !form.urlFotoCedula) {
+      newTouched.urlFotoCedula = true;
+      newErrors.urlFotoCedula = 'Sube un documento de cédula.';
+    }
     setFormTouched(prev => ({ ...prev, ...newTouched }));
     setFormErrors(prev => ({ ...prev, ...newErrors }));
     if (Object.keys(newErrors).length > 0) return;
+
     setGuardando(true); setMensaje(""); setEsError(false);
     try {
+      let urlCedula = form.urlFotoCedula;
+
+      if (archivoCedula) {
+        setSubiendoCedula(true);
+        const fd = new FormData();
+        fd.append('file', archivoCedula);
+        fd.append('folder', 'congregados');
+        const uploadRes = await fetch('/api/documentos/upload', { method: 'POST', body: fd });
+        const uploadJson = await uploadRes.json();
+        setSubiendoCedula(false);
+        if (!uploadRes.ok || !uploadJson.success) {
+          setMensaje(uploadJson.message || 'Error al subir el documento.'); setEsError(true); setGuardando(false); return;
+        }
+        urlCedula = uploadJson.url;
+      }
+
       const body = {
         ...form,
+        urlFotoCedula: urlCedula,
         segundoTelefono: form.segundoTelefono || null,
         segundoMinisterio: form.segundoMinisterio || null,
-        // Garantizar URL válida para no romper validación
-        urlFotoCedula: form.urlFotoCedula || "https://placeholder.com/cedula.jpg",
-        // Campos de fecha opcionales: excluir si están vacíos
         ...(form.fechaNacimiento ? {} : { fechaNacimiento: undefined }),
       };
 
@@ -333,12 +355,22 @@ export default function CongregadosPage() {
     } catch {
       setMensaje("Error de conexión."); setEsError(true);
     } finally {
-      setGuardando(false);
+      setGuardando(false); setSubiendoCedula(false);
     }
   };
 
   // ── Reactivar ─────────────────────────────────────────────────────────────
   const reactivar = async (id: number) => {
+    const confirm = await Swal.fire({
+      title: '¿Reactivar congregado?',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#16a34a',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Reactivar',
+      cancelButtonText: 'Cancelar',
+    });
+    if (!confirm.isConfirmed) return;
     try {
       const res = await fetch(`/api/congregados/${id}`, {
         method: "PUT",
@@ -532,7 +564,7 @@ export default function CongregadosPage() {
                 </thead>
                 <tbody data-testid="table-body">
                   {loading ? (
-                    <tr><td colSpan={10} className="p-8 text-center text-gray-400 text-sm">Cargando datos...</td></tr>
+                    <tr><td colSpan={10} className="p-8 text-center text-gray-400"><span className="inline-flex items-center gap-2 text-sm"><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Cargando...</span></td></tr>
                   ) : paginados.length > 0 ? (
                     paginados.map(r => {
                       const checked = seleccionados.has(r.id);
@@ -585,8 +617,8 @@ export default function CongregadosPage() {
             {/* Tarjetas (mobile) */}
             <div className="md:hidden mb-4">
               {loading ? (
-                <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">
-                  Cargando datos...
+                <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Cargando...
                 </div>
               ) : paginados.length === 0 ? (
                 <div className="bg-white rounded-xl border border-gray-200 p-10 text-center text-gray-400">
@@ -693,7 +725,7 @@ export default function CongregadosPage() {
               <h2 className="text-base font-bold flex items-center gap-2">
                 {editando ? <><FaEdit className="text-sm" /> Editar Congregado — ID: {editando.id}</> : <><FaUserPlus className="text-sm" /> Registrar Congregado</>}
               </h2>
-              <button onClick={() => { setShowForm(false); setEditando(null); }} className="text-white/70 hover:text-white transition">
+              <button onClick={() => { setShowForm(false); setEditando(null); setArchivoCedula(null); }} className="text-white/70 hover:text-white transition">
                 <FaTimes />
               </button>
             </div>
@@ -795,14 +827,42 @@ export default function CongregadosPage() {
                   <input type="text" value={form.segundoMinisterio} onChange={e => setForm(prev => ({ ...prev, segundoMinisterio: e.target.value }))} className={inputClass} placeholder="Opcional" />
                 </div>
 
-                {/* URL foto cédula */}
+                {/* Foto cédula */}
                 <div className="sm:col-span-2">
-                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">URL foto cédula *</label>
-                  <input type="url" value={form.urlFotoCedula}
-                    onChange={e => handleCampoCong('urlFotoCedula', e.target.value)}
-                    onBlur={() => handleBlurCong('urlFotoCedula')}
-                    className={formTouched.urlFotoCedula && formErrors.urlFotoCedula ? inputClassError : inputClass}
-                    placeholder="https://..." />
+                  <label className="block text-gray-700 text-xs font-semibold mb-1.5">
+                    Foto / documento de cédula *
+                  </label>
+                  <label className={`flex items-center gap-3 cursor-pointer px-3 py-2.5 rounded-lg border text-sm transition-colors ${
+                    formTouched.urlFotoCedula && formErrors.urlFotoCedula
+                      ? 'border-red-400 bg-red-50/30'
+                      : 'border-gray-300 hover:border-[#003366] bg-white'
+                  }`}>
+                    <FaUpload className="text-[#003366] flex-shrink-0" />
+                    <span className="text-gray-500 truncate flex-1">
+                      {archivoCedula ? archivoCedula.name : 'Seleccionar archivo (JPG, PNG, PDF — máx. 10 MB)'}
+                    </span>
+                    <input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png,.webp"
+                      className="sr-only"
+                      onChange={e => {
+                        const f = e.target.files?.[0] ?? null;
+                        setArchivoCedula(f);
+                        if (f) setFormErrors(prev => ({ ...prev, urlFotoCedula: undefined }));
+                      }}
+                    />
+                  </label>
+                  {editando && form.urlFotoCedula && !archivoCedula && (
+                    <p className="mt-1.5 text-xs text-gray-500 flex items-center gap-1">
+                      <FaExternalLinkAlt className="text-[10px]" />
+                      Documento actual:&nbsp;
+                      <a href={form.urlFotoCedula} target="_blank" rel="noreferrer"
+                        className="text-[#003366] underline truncate max-w-[260px]">
+                        ver archivo
+                      </a>
+                      &nbsp;·&nbsp;selecciona un archivo para reemplazarlo
+                    </p>
+                  )}
                   {formTouched.urlFotoCedula && formErrors.urlFotoCedula && (
                     <p className="mt-1 text-xs text-red-600">{formErrors.urlFotoCedula}</p>
                   )}
@@ -848,14 +908,23 @@ export default function CongregadosPage() {
             </div>
 
             <div className="bg-gray-50 border-t px-6 py-4 flex justify-end gap-3 flex-shrink-0">
-              <button onClick={() => { setShowForm(false); setEditando(null); }} disabled={guardando}
+              <button onClick={() => { setShowForm(false); setEditando(null); setArchivoCedula(null); }} disabled={guardando}
                 className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50 transition">
                 Cancelar
               </button>
               <button onClick={guardar} disabled={guardando}
                 className={`px-5 py-2 text-sm rounded-lg font-semibold text-white flex items-center gap-2 transition ${guardando ? "bg-gray-400 cursor-not-allowed" : "bg-[#003366] hover:bg-[#004488]"}`}>
-                <FaSave className="text-xs" />
-                {guardando ? "Guardando..." : editando ? "Guardar cambios" : "Registrar"}
+                {guardando ? (
+                  <>
+                    <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                    </svg>
+                    {subiendoCedula ? "Subiendo documento..." : "Guardando..."}
+                  </>
+                ) : (
+                  <><FaSave className="text-xs" />{editando ? "Guardar cambios" : "Registrar"}</>
+                )}
               </button>
             </div>
           </div>

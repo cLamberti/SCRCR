@@ -13,6 +13,7 @@ export interface ActualizarEmpleadoRequest {
   salarioBase?: number;
   cuentaBancaria?: string;
   estado?: number;
+  diasVacacionesDisponibles?: number;
 }
 
 export interface EmpleadoResponse {
@@ -23,6 +24,7 @@ export interface EmpleadoResponse {
   salarioBase: number;
   cuentaBancaria?: string;
   estado: number;
+  diasVacacionesDisponibles: number;
 }
 
 export interface CrearPlanillaRequest {

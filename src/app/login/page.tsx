@@ -141,9 +141,6 @@ function LoginForm() {
                     placeholder="••••••••"
                     autoComplete="current-password"
                   />
-                  {passwordTouched && passwordError && (
-                    <p className="mt-1 text-xs text-red-600">{passwordError}</p>
-                  )}
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
@@ -153,6 +150,9 @@ function LoginForm() {
                     {showPassword ? <FaEyeSlash /> : <FaEye />}
                   </button>
                 </div>
+                {passwordTouched && passwordError && (
+                  <p className="mt-1 text-xs text-red-600">{passwordError}</p>
+                )}
               </div>
 
               {error && (

@@ -147,6 +147,7 @@ model Empleado {
   salarioBase    Decimal         @map("salario_base") @db.Decimal(12, 2)
   cuentaBancaria   String?            @map("cuenta_bancaria") @db.VarChar(50)
   estado           Int                @default(1) @db.SmallInt
+  diasVacacionesDisponibles Int       @default(12) @map("dias_vacaciones_disponibles")
   urlCedula        String?            @map("url_cedula")
   urlHojaSolicitud String?            @map("url_hoja_solicitud")
   createdAt        DateTime           @default(now()) @map("created_at")

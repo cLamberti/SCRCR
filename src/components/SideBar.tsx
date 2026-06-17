@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   FaHome, FaList,
   FaSignOutAlt, FaBars, FaTimes, FaChurch,
-  FaCalendarAlt, FaUsers, FaChartLine, FaCog, FaClipboardList, FaFileAlt, FaBook,
+  FaCalendarAlt, FaUsers, FaUserShield, FaChartLine, FaCog, FaClipboardList, FaFileAlt, FaBook,
 } from 'react-icons/fa';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -58,7 +58,7 @@ const NAV_ITEMS: Omit<NavItem, 'onClick'>[] = [
   {
     id: 'gestion-usuarios',
     href: '/gestion-usuarios',
-    icon: FaUsers,
+    icon: FaUserShield,
     label: 'Gestión de Usuarios',
     roles: ['admin'],
   },
