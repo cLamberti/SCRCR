@@ -25,7 +25,7 @@ export const CreateUsuarioSchema = z.object({
   nombreCompleto: z.string()
     .min(3, 'El nombre completo debe tener al menos 3 caracteres')
     .max(255, 'El nombre completo no puede exceder 255 caracteres'),
-  rol: z.enum(['admin', 'pastorGeneral', 'juntaDirectiva', 'asistenteAdministrativo']),
+  rol: z.string().min(1, 'El rol es requerido').max(100, 'El rol no puede exceder 100 caracteres'),
 });
 
 export type CreateUsuarioDTO = z.infer<typeof CreateUsuarioSchema>;
