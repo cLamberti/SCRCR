@@ -365,9 +365,7 @@ export default function CongregadosPage() {
         ...form,
         segundoTelefono: form.segundoTelefono.trim() || null,
         segundoMinisterio: form.segundoMinisterio.trim() || null,
-        // Garantizar URL válida para no romper validación
-        urlFotoCedula: form.urlFotoCedula.trim() || "https://placeholder.com/cedula.jpg",
-        // Campos de fecha opcionales: excluir si están vacíos
+        ...(urlCedula.trim() ? { urlFotoCedula: urlCedula.trim() } : {}),
         ...(form.fechaNacimiento ? {} : { fechaNacimiento: undefined }),
       };
 
@@ -910,7 +908,7 @@ export default function CongregadosPage() {
                     <p className="mt-1.5 text-xs text-gray-500 flex items-center gap-1">
                       <FaExternalLinkAlt className="text-[10px]" />
                       Documento actual:&nbsp;
-                      <a href={form.urlFotoCedula} target="_blank" rel="noreferrer"
+                      <a href={`/api/blob-download?url=${encodeURIComponent(form.urlFotoCedula)}`} target="_blank" rel="noreferrer"
                         className="text-[#003366] underline truncate max-w-[260px]">
                         ver archivo
                       </a>
