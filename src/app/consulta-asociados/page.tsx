@@ -1084,7 +1084,7 @@ export default function ConsultarAsociadosPage() {
                             onChange={e => setArchivosAsoc(prev => ({ ...prev, [key]: e.target.files?.[0] ?? null }))} />
                           {archivosAsoc[key] && <p className="mt-0.5 text-[10px] text-gray-400 truncate">{archivosAsoc[key]!.name}</p>}
                           {!archivosAsoc[key] && formulario[urlKey] && (
-                            <a href={formulario[urlKey]} target="_blank" rel="noopener noreferrer"
+                            <a href={`/api/blob-download?url=${encodeURIComponent(formulario[urlKey])}`} target="_blank" rel="noopener noreferrer"
                               className="mt-0.5 inline-flex items-center gap-1 text-[10px] text-blue-600 hover:text-blue-800">
                               📄 Ver archivo existente
                             </a>
