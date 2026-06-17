@@ -16,6 +16,7 @@ const routePermissions: Record<string, Rol[]> = {
   '/permisos':           ['admin', 'pastorGeneral', 'asistenteAdministrativo'],
   '/actas':              ['admin', 'juntaDirectiva'],
   '/configuracion':      ['admin', 'pastorGeneral', 'juntaDirectiva', 'asistenteAdministrativo'],
+  '/gestion-roles':      ['admin'],
 };
 
 // Rutas solo para no autenticados

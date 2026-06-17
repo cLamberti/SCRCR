@@ -9,6 +9,7 @@ interface Usuario {
   username: string;
   email: string;
   rol: string;
+  modulosPermitidos: string[];
 }
 
 interface AuthContextType {
@@ -17,26 +18,23 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   verificarSesion: () => Promise<void>;
+  refrescarPermisos: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
-  // Empieza en true: no sabemos si hay sesión hasta que verifiquemos
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   const verificarSesion = useCallback(async () => {
-    // No resetear loading si ya está en true para evitar flashes
     setLoading(true);
     try {
       const res = await fetch('/api/auth/verify', {
         credentials: 'include',
-        // Evita que el browser use una respuesta cacheada
         cache: 'no-store',
       });
-
       if (res.ok) {
         const data = await res.json();
         setUsuario(data.success ? data.data : null);
@@ -46,15 +44,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       setUsuario(null);
     } finally {
-      // Solo aquí se libera el loading
       setLoading(false);
     }
   }, []);
 
-  // Verificar sesión una sola vez al montar el provider
-  useEffect(() => {
-    verificarSesion();
-  }, [verificarSesion]);
+  const refrescarPermisos = useCallback(async () => {
+    if (!usuario) return;
+    try {
+      const res = await fetch('/api/auth/verify', { credentials: 'include', cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) setUsuario(data.data);
+      }
+    } catch {}
+  }, [usuario]);
+
+  useEffect(() => { verificarSesion(); }, [verificarSesion]);
 
   const login = async (username: string, password: string) => {
     const res = await fetch('/api/auth/login', {
@@ -63,16 +68,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       body: JSON.stringify({ username, password }),
       credentials: 'include',
     });
-
     const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.message || 'Error al iniciar sesión');
 
-    if (!res.ok || !data.success) {
-      throw new Error(data.message || 'Error al iniciar sesión');
-    }
-
-    // Setear el usuario ANTES de navegar para que el sidebar
-    // ya tenga el rol disponible cuando la nueva página monte
-    setUsuario(data.data);
+    // After login, fetch full user data including modulosPermitidos
+    const verifyRes = await fetch('/api/auth/verify', { credentials: 'include', cache: 'no-store' });
+    const verifyData = await verifyRes.json();
+    setUsuario(verifyData.success ? verifyData.data : data.data);
     setLoading(false);
 
     router.push('/');
@@ -81,20 +83,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
-      });
-    } catch {
-      // Continuar aunque falle el endpoint
-    } finally {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+    } catch {}
+    finally {
       setUsuario(null);
       router.push('/login');
     }
   };
 
   return (
-    <AuthContext.Provider value={{ usuario, loading, login, logout, verificarSesion }}>
+    <AuthContext.Provider value={{ usuario, loading, login, logout, verificarSesion, refrescarPermisos }}>
       {children}
     </AuthContext.Provider>
   );
@@ -102,8 +100,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth debe ser usado dentro de un AuthProvider');
-  }
+  if (context === undefined) throw new Error('useAuth debe ser usado dentro de un AuthProvider');
   return context;
 }

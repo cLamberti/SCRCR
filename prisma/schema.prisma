@@ -309,3 +309,13 @@ model PermisoEmpleado {
 
   @@map("permisos_empleado")
 }
+
+model PermisoRol {
+  id     Int     @id @default(autoincrement())
+  rol    String  @db.VarChar(30)
+  modulo String  @db.VarChar(50)
+  activo Boolean @default(true)
+
+  @@unique([rol, modulo])
+  @@map("permisos_rol")
+}
