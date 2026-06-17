@@ -319,3 +319,13 @@ model PermisoRol {
   @@unique([rol, modulo])
   @@map("permisos_rol")
 }
+
+model RolDefinicion {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique @db.VarChar(30)
+  label     String   @db.VarChar(50)
+  esBase    Boolean  @default(false) @map("es_base")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("roles_definicion")
+}
