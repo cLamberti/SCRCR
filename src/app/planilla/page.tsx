@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
-import { FaFileExcel, FaFilePdf, FaPlus, FaLock, FaTrash, FaEye, FaUserTie, FaSpinner, FaCalendarAlt, FaClipboardList } from 'react-icons/fa';
+import { FaFileExcel, FaFilePdf, FaPlus, FaLock, FaTrash, FaEye, FaUserTie, FaSpinner, FaCalendarAlt, FaClipboardList, FaEdit } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 import Sidebar from '@/components/SideBar';
 
@@ -93,6 +93,7 @@ export default function PlanillaPage() {
 
   // Generar planilla
   const [modalGenerar, setModalGenerar] = useState(false);
+  const [editandoPlanillaId, setEditandoPlanillaId] = useState<number | null>(null);
   const [mes, setMes] = useState(new Date().getMonth() + 1);
   const [anio, setAnio] = useState(new Date().getFullYear());
   const [lineas, setLineas] = useState<LineaForm[]>([]);
@@ -151,7 +152,7 @@ export default function PlanillaPage() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      if (modalGenerar) setModalGenerar(false);
+      if (modalGenerar) { setModalGenerar(false); setEditandoPlanillaId(null); }
       else if (modalDetalle) setModalDetalle(false);
     };
     document.addEventListener('keydown', onKey);
@@ -172,6 +173,7 @@ export default function PlanillaPage() {
 
   // Inicializar líneas cuando se abre el modal de generar
   const abrirModalGenerar = () => {
+    setEditandoPlanillaId(null);
     const activos = empleados.filter(e => e.estado === 1);
     const vacMes = vacaciones.filter(v => {
       const f = new Date(v.fechaInicio);
@@ -184,6 +186,41 @@ export default function PlanillaPage() {
     setModalGenerar(true);
   };
 
+  const abrirModalEditarPlanilla = async (id: number) => {
+    try {
+      const res = await fetch(`/api/planilla/${id}`);
+      const json = await res.json();
+      if (!json.success) {
+        Swal.fire('Error', 'No se pudo obtener la planilla para editar.', 'error');
+        return;
+      }
+      const p: PlanillaDetalle = json.data;
+      setMes(p.mes);
+      setAnio(p.anio);
+      setEditandoPlanillaId(id);
+      
+      // Load current lines, mapping back to LineaForm format
+      const formLines: LineaForm[] = p.lineas.map(l => {
+        // Need to find the employee id... the detail doesn't include it directly unless it does? 
+        // Wait, lineas in PlanillaDetalle has empleadoNombre, empleadoCedula. We need empleadoId.
+        // Let's find it from `empleados` state by cedula.
+        const emp = empleados.find(e => e.cedula === l.empleadoCedula);
+        return {
+          empleadoId: emp ? emp.id : 0, // Should always find it
+          diasAusentes: l.diasAusentes,
+          diasVacaciones: l.diasVacaciones,
+          diasIncapacidad: l.diasIncapacidad
+        };
+      }).filter(l => l.empleadoId !== 0); // Exclude if somehow not found
+
+      setLineas(formLines);
+      setMensajePlan('');
+      setModalGenerar(true);
+    } catch (error) {
+      Swal.fire('Error', 'Problema de red al cargar la planilla.', 'error');
+    }
+  };
+
   const actualizarLinea = (empleadoId: number, campo: keyof Omit<LineaForm, 'empleadoId'>, valor: number) => {
     setLineas(prev => prev.map(l => l.empleadoId === empleadoId ? { ...l, [campo]: Math.max(0, valor) } : l));
   };
@@ -191,16 +228,19 @@ export default function PlanillaPage() {
   const generarPlanilla = async () => {
     setGenerando(true); setMensajePlan('');
     try {
-      const res = await fetch('/api/planilla', {
-        method: 'POST',
+      const url = editandoPlanillaId ? `/api/planilla/${editandoPlanillaId}` : '/api/planilla';
+      const method = editandoPlanillaId ? 'PUT' : 'POST';
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mes, anio, lineas }),
       });
       const json = await res.json();
-      if (!res.ok || !json.success) { setMensajePlan(json.message || 'Error al generar la planilla.'); return; }
+      if (!res.ok || !json.success) { setMensajePlan(json.message || 'Error al guardar la planilla.'); return; }
       setModalGenerar(false);
+      setEditandoPlanillaId(null);
       await cargarPlanillas();
-      Swal.fire('¡Éxito!', 'Planilla generada exitosamente.', 'success');
+      Swal.fire('¡Éxito!', editandoPlanillaId ? 'Planilla actualizada exitosamente.' : 'Planilla generada exitosamente.', 'success');
     } catch { setMensajePlan('Error de conexión.'); }
     finally { setGenerando(false); }
   };
@@ -522,10 +562,16 @@ export default function PlanillaPage() {
                                   <FaFileExcel className="text-xs" />
                                 </button>
                                 {p.estado !== 'cerrado' && (
-                                  <button onClick={() => cerrarPlanilla(p.id)} title="Cerrar planilla"
-                                    className="p-2 rounded-lg bg-gray-50 text-gray-600 hover:bg-gray-600 hover:text-white border border-gray-200 transition">
-                                    <FaLock className="text-xs" />
-                                  </button>
+                                  <>
+                                    <button onClick={() => abrirModalEditarPlanilla(p.id)} title="Editar planilla"
+                                      className="p-2 rounded-lg bg-orange-50 text-orange-600 hover:bg-orange-600 hover:text-white border border-orange-200 transition">
+                                      <FaEdit className="text-xs" />
+                                    </button>
+                                    <button onClick={() => cerrarPlanilla(p.id)} title="Cerrar planilla"
+                                      className="p-2 rounded-lg bg-gray-50 text-gray-600 hover:bg-gray-600 hover:text-white border border-gray-200 transition">
+                                      <FaLock className="text-xs" />
+                                    </button>
+                                  </>
                                 )}
                               </div>
                             </td>
@@ -561,10 +607,16 @@ export default function PlanillaPage() {
                             <FaFileExcel /> Exportar
                           </button>
                           {p.estado !== 'cerrado' && (
-                            <button onClick={() => cerrarPlanilla(p.id)}
-                              className="py-2 px-3 text-xs font-semibold text-gray-600 border border-gray-200 bg-gray-50 rounded-lg flex items-center justify-center gap-1.5 hover:bg-gray-600 hover:text-white transition">
-                              <FaLock /> Cerrar
-                            </button>
+                            <>
+                              <button onClick={() => abrirModalEditarPlanilla(p.id)}
+                                className="py-2 px-3 text-xs font-semibold text-orange-600 border border-orange-200 bg-orange-50 rounded-lg flex items-center justify-center gap-1.5 hover:bg-orange-600 hover:text-white transition">
+                                <FaEdit /> Editar
+                              </button>
+                              <button onClick={() => cerrarPlanilla(p.id)}
+                                className="py-2 px-3 text-xs font-semibold text-gray-600 border border-gray-200 bg-gray-50 rounded-lg flex items-center justify-center gap-1.5 hover:bg-gray-600 hover:text-white transition">
+                                <FaLock /> Cerrar
+                              </button>
+                            </>
                           )}
                         </div>
                       </div>
@@ -1076,7 +1128,7 @@ export default function PlanillaPage() {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center overflow-y-auto py-8" onClick={() => setModalGenerar(false)}>
           <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl mx-4" onClick={e => e.stopPropagation()}>
             <div className="bg-[#003366] px-6 py-4 rounded-t-xl flex items-center justify-between">
-              <h2 className="text-white font-bold text-base">Nueva Planilla</h2>
+              <h2 className="text-white font-bold text-base">{editandoPlanillaId ? 'Editar Planilla' : 'Nueva Planilla'}</h2>
               <button onClick={() => setModalGenerar(false)} className="text-white/70 hover:text-white">✕</button>
             </div>
             <div className="p-6 space-y-5">
@@ -1155,7 +1207,7 @@ export default function PlanillaPage() {
                 <button onClick={() => setModalGenerar(false)} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition">Cancelar</button>
                 <button onClick={generarPlanilla} disabled={generando || lineas.length === 0}
                   className="px-5 py-2 text-sm font-semibold text-white bg-[#003366] hover:bg-[#004488] disabled:opacity-50 rounded-lg transition">
-                  {generando ? 'Generando...' : 'Generar Planilla'}
+                  {generando ? 'Guardando...' : (editandoPlanillaId ? 'Actualizar Planilla' : 'Generar Planilla')}
                 </button>
               </div>
             </div>

@@ -123,6 +123,44 @@ export class PlanillaDAO {
     await prisma.periodoPlanilla.update({ where: { id }, data: { estado: 'cerrado' } });
   }
 
+  async actualizarPeriodo(id: number, data: CrearPlanillaRequest, empleados: EmpleadoResponse[]): Promise<PlanillaResponse> {
+    const periodo = await prisma.$transaction(async (tx) => {
+      // 1. Delete existing lines for this period
+      await tx.lineaPlanilla.deleteMany({ where: { periodoPlanillaId: id } });
+
+      // 2. Update period and recreate lines
+      return await tx.periodoPlanilla.update({
+        where: { id },
+        data: {
+          mes: data.mes,
+          anio: data.anio,
+          lineas: {
+            create: data.lineas.map(l => {
+              const empleado = empleados.find(e => e.id === l.empleadoId)!;
+              const salarioDiario = empleado.salarioBase / 30;
+              const diasAusentes = l.diasAusentes || 0;
+              const diasVacaciones = l.diasVacaciones || 0;
+              const diasIncapacidad = l.diasIncapacidad || 0;
+              const diasTrabajados = 30 - diasAusentes - diasVacaciones - diasIncapacidad;
+              const montoAPagar = Math.max(0, empleado.salarioBase - diasAusentes * salarioDiario);
+              return {
+                empleadoId: l.empleadoId,
+                diasTrabajados,
+                diasAusentes,
+                diasVacaciones,
+                diasIncapacidad,
+                montoAPagar: parseFloat(montoAPagar.toFixed(2)),
+              };
+            }),
+          },
+        },
+        include: { lineas: { include: { empleado: true } } },
+      });
+    });
+
+    return this.mapPeriodo(periodo);
+  }
+
   private mapPeriodo(row: any): PlanillaResponse {
     const lineas: LineaPlanillaResponse[] = row.lineas.map((l: any) => ({
       id: l.id,
