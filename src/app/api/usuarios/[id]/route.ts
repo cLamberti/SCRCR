@@ -72,6 +72,12 @@ export async function DELETE(
       let motivo = "";
       try {
         const body = await request.json();
+        if (body.motivoInactivo !== undefined && typeof body.motivoInactivo !== "string") {
+          return NextResponse.json(
+            { success: false, message: "motivoInactivo debe ser una cadena de texto" },
+            { status: 400 }
+          );
+        }
         motivo = body.motivoInactivo || "";
       } catch (e) {
         // Ignorar si no hay body
@@ -135,6 +141,27 @@ export async function PUT(
     const body = await request.json();
     const { estado, motivoInactivo } = body;
 
+    if (estado !== undefined && typeof estado !== "number") {
+      return NextResponse.json(
+        { success: false, message: "El estado debe ser un número (0 o 1)" },
+        { status: 400 }
+      );
+    }
+
+    if (estado !== undefined && estado !== 0 && estado !== 1) {
+      return NextResponse.json(
+        { success: false, message: "Estado no soportado" },
+        { status: 400 }
+      );
+    }
+
+    if (motivoInactivo !== undefined && typeof motivoInactivo !== "string") {
+      return NextResponse.json(
+        { success: false, message: "motivoInactivo debe ser una cadena de texto" },
+        { status: 400 }
+      );
+    }
+
     const dataToUpdate: any = {};
     if (estado !== undefined) {
       dataToUpdate.estado = estado;
@@ -180,8 +207,16 @@ export async function PUT(
       message: "Usuario actualizado correctamente",
       data: usuario,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error al actualizar usuario:", error);
+    
+    if (error?.code === 'P2025') {
+      return NextResponse.json(
+        { success: false, message: "Usuario no encontrado" },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json(
       { success: false, message: "Error interno del servidor" },
       { status: 500 }
