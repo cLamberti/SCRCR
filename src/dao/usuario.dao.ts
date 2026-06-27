@@ -13,6 +13,7 @@ function mapToUsuario(row: any): Usuario {
     ultimoAcceso: row.ultimoAcceso,
     intentosFallidos: row.intentosFallidos,
     bloqueadoHasta: row.bloqueadoHasta,
+    motivoInactivo: row.motivoInactivo,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -31,6 +32,7 @@ export class UsuarioDAO {
         ultimoAcceso: true,
         intentosFallidos: true,
         bloqueadoHasta: true,
+        motivoInactivo: true,
         createdAt: true,
         updatedAt: true,
       },

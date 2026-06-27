@@ -86,3 +86,61 @@ export async function DELETE(
     );
   }
 }
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const caller = getAuthenticatedUser(request);
+    if (!caller) {
+      return NextResponse.json(
+        { success: false, message: "No autenticado" },
+        { status: 401 }
+      );
+    }
+
+    if (caller.rol !== "admin") {
+      return NextResponse.json(
+        { success: false, message: "No tienes permisos" },
+        { status: 403 }
+      );
+    }
+
+    const { id: idParam } = await params;
+    const id = parseInt(idParam, 10);
+
+    if (isNaN(id)) {
+      return NextResponse.json(
+        { success: false, message: "ID de usuario inválido" },
+        { status: 400 }
+      );
+    }
+
+    const body = await request.json();
+    const { estado, motivoInactivo } = body;
+
+    const dataToUpdate: any = {};
+    if (estado !== undefined) dataToUpdate.estado = estado;
+    if (motivoInactivo !== undefined) dataToUpdate.motivoInactivo = motivoInactivo;
+
+    if (estado === 1) dataToUpdate.motivoInactivo = null;
+
+    const usuario = await prisma.usuario.update({
+      where: { id },
+      data: dataToUpdate,
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: "Usuario actualizado correctamente",
+      data: usuario,
+    });
+  } catch (error) {
+    console.error("Error al actualizar usuario:", error);
+    return NextResponse.json(
+      { success: false, message: "Error interno del servidor" },
+      { status: 500 }
+    );
+  }
+}
