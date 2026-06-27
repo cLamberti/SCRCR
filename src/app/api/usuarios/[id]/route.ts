@@ -69,9 +69,30 @@ export async function DELETE(
         message: "Usuario eliminado permanentemente",
       });
     } else {
+      let motivo = "";
+      try {
+        const body = await request.json();
+        if (body.motivoInactivo !== undefined && typeof body.motivoInactivo !== "string") {
+          return NextResponse.json(
+            { success: false, message: "motivoInactivo debe ser una cadena de texto" },
+            { status: 400 }
+          );
+        }
+        motivo = body.motivoInactivo || "";
+      } catch (e) {
+        // Ignorar si no hay body
+      }
+
+      if (!motivo || motivo.trim() === '') {
+        return NextResponse.json(
+          { success: false, message: "El motivo de inactivación es requerido" },
+          { status: 400 }
+        );
+      }
+
       await prisma.usuario.update({
         where: { id },
-        data: { estado: 0 },
+        data: { estado: 0, motivoInactivo: motivo.trim() },
       });
       return NextResponse.json({
         success: true,
@@ -80,6 +101,122 @@ export async function DELETE(
     }
   } catch (error) {
     console.error("Error al eliminar usuario:", error);
+    return NextResponse.json(
+      { success: false, message: "Error interno del servidor" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const caller = getAuthenticatedUser(request);
+    if (!caller) {
+      return NextResponse.json(
+        { success: false, message: "No autenticado" },
+        { status: 401 }
+      );
+    }
+
+    if (caller.rol !== "admin") {
+      return NextResponse.json(
+        { success: false, message: "No tienes permisos" },
+        { status: 403 }
+      );
+    }
+
+    const { id: idParam } = await params;
+    const id = parseInt(idParam, 10);
+
+    if (isNaN(id)) {
+      return NextResponse.json(
+        { success: false, message: "ID de usuario inválido" },
+        { status: 400 }
+      );
+    }
+
+    const body = await request.json();
+    const { estado, motivoInactivo } = body;
+
+    if (estado !== undefined && typeof estado !== "number") {
+      return NextResponse.json(
+        { success: false, message: "El estado debe ser un número (0 o 1)" },
+        { status: 400 }
+      );
+    }
+
+    if (estado !== undefined && estado !== 0 && estado !== 1) {
+      return NextResponse.json(
+        { success: false, message: "Estado no soportado" },
+        { status: 400 }
+      );
+    }
+
+    if (motivoInactivo !== undefined && typeof motivoInactivo !== "string") {
+      return NextResponse.json(
+        { success: false, message: "motivoInactivo debe ser una cadena de texto" },
+        { status: 400 }
+      );
+    }
+
+    const dataToUpdate: any = {};
+    if (estado !== undefined) {
+      dataToUpdate.estado = estado;
+      if (estado === 0) {
+        if (!motivoInactivo || motivoInactivo.trim() === "") {
+          return NextResponse.json(
+            { success: false, message: "El motivo de inactivación es requerido" },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
+    if (motivoInactivo !== undefined) {
+      dataToUpdate.motivoInactivo = motivoInactivo.trim();
+    }
+
+    if (estado === 1) {
+      dataToUpdate.motivoInactivo = null;
+    }
+
+    const usuario = await prisma.usuario.update({
+      where: { id },
+      data: dataToUpdate,
+      select: {
+        id: true,
+        nombreCompleto: true,
+        username: true,
+        email: true,
+        rol: true,
+        estado: true,
+        ultimoAcceso: true,
+        intentosFallidos: true,
+        bloqueadoHasta: true,
+        motivoInactivo: true,
+        createdAt: true,
+        updatedAt: true,
+      }
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: "Usuario actualizado correctamente",
+      data: usuario,
+    });
+  } catch (error: any) {
+    console.error("Error al actualizar usuario:", error);
+    
+    if (error?.code === 'P2025') {
+      return NextResponse.json(
+        { success: false, message: "Usuario no encontrado" },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json(
       { success: false, message: "Error interno del servidor" },
       { status: 500 }

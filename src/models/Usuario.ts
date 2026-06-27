@@ -10,6 +10,7 @@ export interface Usuario {
   ultimoAcceso: Date | null;
   intentosFallidos: number;
   bloqueadoHasta: Date | null;
+  motivoInactivo?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }

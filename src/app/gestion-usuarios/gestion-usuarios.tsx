@@ -16,6 +16,7 @@ type UsuarioRow = {
   email: string;
   rol: string;
   estado: number;
+  motivoInactivo?: string | null;
 };
 
 type RolDef = { key: string; label: string; esBase: boolean };
@@ -201,10 +202,9 @@ export default function GestionUsuariosPage() {
       denyButtonText: 'Desactivar (Soft Delete)',
       cancelButtonText: 'Cancelar'
     }).then(async (result) => {
-      if (result.isConfirmed || result.isDenied) {
-        const isHardDelete = result.isConfirmed;
+      if (result.isConfirmed) {
         try {
-          const res = await fetch(`/api/usuarios/${id}?hardDelete=${isHardDelete}`, {
+          const res = await fetch(`/api/usuarios/${id}?hardDelete=true`, {
             method: "DELETE"
           });
           const json = await res.json();
@@ -213,6 +213,70 @@ export default function GestionUsuariosPage() {
             cargarUsuarios();
           } else {
             Swal.fire('Error', json.message || 'Error al eliminar el usuario', 'error');
+          }
+        } catch (error) {
+          Swal.fire('Error', 'No se pudo conectar con el servidor', 'error');
+        }
+      } else if (result.isDenied) {
+        const { value: motivo } = await Swal.fire({
+          title: 'Motivo de inactivación',
+          input: 'text',
+          inputLabel: 'Ingresa el motivo (ej. Ya no pertenece a la iglesia)',
+          inputPlaceholder: 'Escribe el motivo aquí...',
+          showCancelButton: true,
+          inputValidator: (value) => {
+            if (!value || !value.trim()) {
+              return '¡Debes escribir un motivo!';
+            }
+          }
+        });
+        
+        if (motivo) {
+          try {
+            const res = await fetch(`/api/usuarios/${id}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ estado: 0, motivoInactivo: motivo })
+            });
+            const json = await res.json();
+            if (res.ok && json.success) {
+              Swal.fire('¡Desactivado!', 'El usuario ha sido desactivado correctamente.', 'success');
+              cargarUsuarios();
+            } else {
+              Swal.fire('Error', json.message || 'Error al desactivar el usuario', 'error');
+            }
+          } catch (error) {
+            Swal.fire('Error', 'No se pudo conectar con el servidor', 'error');
+          }
+        }
+      }
+    });
+  };
+
+  const handleReactivar = (id: number, nombre: string) => {
+    Swal.fire({
+      title: 'Reactivar Usuario',
+      text: `¿Estás seguro de reactivar a ${nombre}?`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#16a34a',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Sí, reactivar',
+      cancelButtonText: 'Cancelar'
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          const res = await fetch(`/api/usuarios/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ estado: 1 })
+          });
+          const json = await res.json();
+          if (res.ok && json.success) {
+            Swal.fire('¡Activado!', 'El usuario ha sido reactivado correctamente.', 'success');
+            cargarUsuarios();
+          } else {
+            Swal.fire('Error', json.message || 'Error al reactivar el usuario', 'error');
           }
         } catch (error) {
           Swal.fire('Error', 'No se pudo conectar con el servidor', 'error');
@@ -439,15 +503,33 @@ export default function GestionUsuariosPage() {
                               <span className={`w-1.5 h-1.5 rounded-full ${u.estado === 1 ? "bg-green-500" : "bg-red-500"}`} />
                               {u.estado === 1 ? "Activo" : "Inactivo"}
                             </span>
+                            {u.estado === 0 && u.motivoInactivo && (
+                              <p className="text-[10px] text-red-600 mt-1 truncate max-w-[150px]" title={u.motivoInactivo}>
+                                {u.motivoInactivo}
+                              </p>
+                            )}
                           </td>
                           <td className="px-6 py-4">
-                            <button 
-                              onClick={() => handleEliminar(u.id, u.nombreCompleto)} 
-                              className="inline-flex items-center justify-center w-8 h-8 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white border border-red-200 hover:border-red-600 rounded-lg transition-colors shadow-sm" 
-                              title="Eliminar usuario"
-                            >
-                              <FaTrash className="text-sm" />
-                            </button>
+                            <div className="flex items-center gap-2">
+                              {u.estado === 0 && (
+                                <button 
+                                  onClick={() => handleReactivar(u.id, u.nombreCompleto)} 
+                                  className="inline-flex items-center justify-center w-8 h-8 bg-green-50 text-green-600 hover:bg-green-600 hover:text-white border border-green-200 hover:border-green-600 rounded-lg transition-colors shadow-sm" 
+                                  title="Activar usuario"
+                                  aria-label={`Activar usuario ${u.nombreCompleto}`}
+                                >
+                                  <span className="font-bold">✓</span>
+                                </button>
+                              )}
+                              <button 
+                                onClick={() => handleEliminar(u.id, u.nombreCompleto)} 
+                                className="inline-flex items-center justify-center w-8 h-8 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white border border-red-200 hover:border-red-600 rounded-lg transition-colors shadow-sm" 
+                                title={u.estado === 0 ? "Eliminar permanentemente" : "Eliminar o Desactivar"}
+                                aria-label={u.estado === 0 ? `Eliminar permanentemente usuario ${u.nombreCompleto}` : `Eliminar o desactivar usuario ${u.nombreCompleto}`}
+                              >
+                                <FaTrash className="text-sm" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -468,16 +550,32 @@ export default function GestionUsuariosPage() {
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${u.estado === 1 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
                             {u.estado === 1 ? "Activo" : "Inactivo"}
                           </span>
-                          <button 
-                            onClick={() => handleEliminar(u.id, u.nombreCompleto)} 
-                            className="inline-flex items-center justify-center w-8 h-8 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white border border-red-200 hover:border-red-600 rounded-lg transition-colors shadow-sm"
-                            title="Eliminar usuario"
-                          >
-                            <FaTrash className="text-sm" />
-                          </button>
+                          <div className="flex items-center gap-2">
+                            {u.estado === 0 && (
+                              <button 
+                                onClick={() => handleReactivar(u.id, u.nombreCompleto)} 
+                                className="inline-flex items-center justify-center w-8 h-8 bg-green-50 text-green-600 hover:bg-green-600 hover:text-white border border-green-200 hover:border-green-600 rounded-lg transition-colors shadow-sm"
+                                title="Activar usuario"
+                                aria-label={`Activar usuario ${u.nombreCompleto}`}
+                              >
+                                <span className="font-bold">✓</span>
+                              </button>
+                            )}
+                            <button 
+                              onClick={() => handleEliminar(u.id, u.nombreCompleto)} 
+                              className="inline-flex items-center justify-center w-8 h-8 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white border border-red-200 hover:border-red-600 rounded-lg transition-colors shadow-sm"
+                              title={u.estado === 0 ? "Eliminar permanentemente" : "Eliminar o Desactivar"}
+                              aria-label={u.estado === 0 ? `Eliminar permanentemente usuario ${u.nombreCompleto}` : `Eliminar o desactivar usuario ${u.nombreCompleto}`}
+                            >
+                              <FaTrash className="text-sm" />
+                            </button>
+                          </div>
                         </div>
                       </div>
-                      <p className="text-xs text-gray-500 mb-2">{u.email}</p>
+                      <p className="text-xs text-gray-500 mb-1">{u.email}</p>
+                      {u.estado === 0 && u.motivoInactivo && (
+                        <p className="text-[10px] text-red-600 mb-2 font-medium">Motivo: {u.motivoInactivo}</p>
+                      )}
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${getRolColor(u.rol).badge}`}>
                         {roles.find(r => r.key === u.rol)?.label ?? u.rol}
                       </span>
