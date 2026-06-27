@@ -69,9 +69,24 @@ export async function DELETE(
         message: "Usuario eliminado permanentemente",
       });
     } else {
+      let motivo = "";
+      try {
+        const body = await request.json();
+        motivo = body.motivoInactivo || "";
+      } catch (e) {
+        // Ignorar si no hay body
+      }
+
+      if (!motivo || motivo.trim() === '') {
+        return NextResponse.json(
+          { success: false, message: "El motivo de inactivación es requerido" },
+          { status: 400 }
+        );
+      }
+
       await prisma.usuario.update({
         where: { id },
-        data: { estado: 0 },
+        data: { estado: 0, motivoInactivo: motivo.trim() },
       });
       return NextResponse.json({
         success: true,
@@ -121,14 +136,43 @@ export async function PUT(
     const { estado, motivoInactivo } = body;
 
     const dataToUpdate: any = {};
-    if (estado !== undefined) dataToUpdate.estado = estado;
-    if (motivoInactivo !== undefined) dataToUpdate.motivoInactivo = motivoInactivo;
+    if (estado !== undefined) {
+      dataToUpdate.estado = estado;
+      if (estado === 0) {
+        if (!motivoInactivo || motivoInactivo.trim() === "") {
+          return NextResponse.json(
+            { success: false, message: "El motivo de inactivación es requerido" },
+            { status: 400 }
+          );
+        }
+      }
+    }
 
-    if (estado === 1) dataToUpdate.motivoInactivo = null;
+    if (motivoInactivo !== undefined) {
+      dataToUpdate.motivoInactivo = motivoInactivo.trim();
+    }
+
+    if (estado === 1) {
+      dataToUpdate.motivoInactivo = null;
+    }
 
     const usuario = await prisma.usuario.update({
       where: { id },
       data: dataToUpdate,
+      select: {
+        id: true,
+        nombreCompleto: true,
+        username: true,
+        email: true,
+        rol: true,
+        estado: true,
+        ultimoAcceso: true,
+        intentosFallidos: true,
+        bloqueadoHasta: true,
+        motivoInactivo: true,
+        createdAt: true,
+        updatedAt: true,
+      }
     });
 
     return NextResponse.json({

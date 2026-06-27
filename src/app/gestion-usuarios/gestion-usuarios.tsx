@@ -225,7 +225,7 @@ export default function GestionUsuariosPage() {
           inputPlaceholder: 'Escribe el motivo aquí...',
           showCancelButton: true,
           inputValidator: (value) => {
-            if (!value) {
+            if (!value || !value.trim()) {
               return '¡Debes escribir un motivo!';
             }
           }
@@ -516,6 +516,7 @@ export default function GestionUsuariosPage() {
                                   onClick={() => handleReactivar(u.id, u.nombreCompleto)} 
                                   className="inline-flex items-center justify-center w-8 h-8 bg-green-50 text-green-600 hover:bg-green-600 hover:text-white border border-green-200 hover:border-green-600 rounded-lg transition-colors shadow-sm" 
                                   title="Activar usuario"
+                                  aria-label={`Activar usuario ${u.nombreCompleto}`}
                                 >
                                   <span className="font-bold">✓</span>
                                 </button>
@@ -524,6 +525,7 @@ export default function GestionUsuariosPage() {
                                 onClick={() => handleEliminar(u.id, u.nombreCompleto)} 
                                 className="inline-flex items-center justify-center w-8 h-8 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white border border-red-200 hover:border-red-600 rounded-lg transition-colors shadow-sm" 
                                 title={u.estado === 0 ? "Eliminar permanentemente" : "Eliminar o Desactivar"}
+                                aria-label={u.estado === 0 ? `Eliminar permanentemente usuario ${u.nombreCompleto}` : `Eliminar o desactivar usuario ${u.nombreCompleto}`}
                               >
                                 <FaTrash className="text-sm" />
                               </button>
@@ -554,6 +556,7 @@ export default function GestionUsuariosPage() {
                                 onClick={() => handleReactivar(u.id, u.nombreCompleto)} 
                                 className="inline-flex items-center justify-center w-8 h-8 bg-green-50 text-green-600 hover:bg-green-600 hover:text-white border border-green-200 hover:border-green-600 rounded-lg transition-colors shadow-sm"
                                 title="Activar usuario"
+                                aria-label={`Activar usuario ${u.nombreCompleto}`}
                               >
                                 <span className="font-bold">✓</span>
                               </button>
@@ -562,6 +565,7 @@ export default function GestionUsuariosPage() {
                               onClick={() => handleEliminar(u.id, u.nombreCompleto)} 
                               className="inline-flex items-center justify-center w-8 h-8 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white border border-red-200 hover:border-red-600 rounded-lg transition-colors shadow-sm"
                               title={u.estado === 0 ? "Eliminar permanentemente" : "Eliminar o Desactivar"}
+                              aria-label={u.estado === 0 ? `Eliminar permanentemente usuario ${u.nombreCompleto}` : `Eliminar o desactivar usuario ${u.nombreCompleto}`}
                             >
                               <FaTrash className="text-sm" />
                             </button>
